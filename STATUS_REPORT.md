@@ -7,6 +7,7 @@
 - Map search overlay with scope (rooms/businesses/posts)
 - Search filters (open now, verified, tags)
 - Feed screen (tabs, search, tags) + post creation
+- Feed actions (share) + user profile drilldown + distance badge (UI)
 - Room chat (realtime) + distance gating
 - Business profile (hero, menu, offers, Q&A chat)
 - Business chat join gating (blocked for shadowbanned/u2u-locked)
@@ -29,6 +30,8 @@
 - Voice rooms placeholder (UI only, coming soon)
 - Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders)
 - Blip Admin Portal (feature flags, verification queue, moderation ops)
+- Side panel navigation drawer
+- Business admin access gating (business accounts only)
 
 ## In-Progress
 - Push notifications: set FCM/APNS keys + redeploy `push-send`

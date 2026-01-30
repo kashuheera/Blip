@@ -4,9 +4,11 @@ import {
   Animated,
   FlatList,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleProp,
   StyleSheet,
   Switch,
@@ -52,6 +54,7 @@ type RootStackParamList = {
   DirectChat: { threadId: string; title: string } | undefined;
   Orders: undefined;
   Profile: undefined;
+  UserProfile: { handle: string } | undefined;
   Auth: undefined;
   Business: { businessId?: string; tab?: 'menu' | 'qa' | 'reviews' | 'offers' } | undefined;
   Room: { roomId?: string } | undefined;
@@ -771,10 +774,21 @@ const AppHeader = () => {
   const styles = useStyles();
   const { colors, resolvedMode } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { userId, profile, signOut } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const handleNavigate = (target: keyof RootStackParamList) => {
+    setMenuOpen(false);
+    navigation.navigate(target);
+  };
+  const handleSignOut = async () => {
+    await signOut();
+    setMenuOpen(false);
+    navigation.navigate('Auth');
+  };
   return (
     <View style={styles.appBar}>
       <View style={styles.appBarLeft}>
-        <Pressable style={styles.appBarIconButton} onPress={() => navigation.navigate('Profile')}>
+        <Pressable style={styles.appBarIconButton} onPress={() => setMenuOpen(true)}>
           <Ionicons name="menu" size={22} color={colors.text} />
         </Pressable>
         <View style={styles.appBarBrand}>
@@ -795,6 +809,60 @@ const AppHeader = () => {
           <Ionicons name="cart-outline" size={20} color={colors.text} />
         </Pressable>
       </View>
+      <Modal transparent animationType="fade" visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
+        <View style={styles.sideSheetContainer}>
+          <Pressable style={styles.sideSheetOverlay} onPress={() => setMenuOpen(false)} />
+          <View style={styles.sideSheet}>
+            <View style={styles.sideSheetHeader}>
+              <Text style={styles.sideSheetTitle}>Menu</Text>
+              <Pressable style={styles.iconButtonSm} onPress={() => setMenuOpen(false)}>
+                <Ionicons name="close" size={18} color={colors.text} />
+              </Pressable>
+            </View>
+            <Text style={styles.metaText}>
+              {userId ? `Signed in as @${profile?.handle ?? userId.slice(0, 6)}` : 'Sign in to access more.'}
+            </Text>
+            <View style={styles.sideSheetList}>
+              <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('Profile')}>
+                <Ionicons name="person-outline" size={18} color={colors.text} />
+                <Text style={styles.sideSheetItemText}>Profile</Text>
+              </Pressable>
+              <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('Messages')}>
+                <Ionicons name="chatbubbles-outline" size={18} color={colors.text} />
+                <Text style={styles.sideSheetItemText}>Messages</Text>
+              </Pressable>
+              <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('Orders')}>
+                <Ionicons name="receipt-outline" size={18} color={colors.text} />
+                <Text style={styles.sideSheetItemText}>Orders</Text>
+              </Pressable>
+              <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('BusinessAdmin')}>
+                <Ionicons name="storefront-outline" size={18} color={colors.text} />
+                <Text style={styles.sideSheetItemText}>Business admin</Text>
+              </Pressable>
+              {profile?.isAdmin ? (
+                <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('AdminPortal')}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color={colors.text} />
+                  <Text style={styles.sideSheetItemText}>Blip admin</Text>
+                </Pressable>
+              ) : null}
+              <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('Help')}>
+                <Ionicons name="help-circle-outline" size={18} color={colors.text} />
+                <Text style={styles.sideSheetItemText}>Help & support</Text>
+              </Pressable>
+            </View>
+            <View style={styles.sectionDivider} />
+            {userId ? (
+              <Pressable style={styles.secondaryButton} onPress={handleSignOut}>
+                <Text style={styles.secondaryButtonText}>Log out</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.secondaryButton} onPress={() => handleNavigate('Auth')}>
+                <Text style={styles.secondaryButtonText}>Sign in</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -875,6 +943,25 @@ const BottomNav = () => {
       ))}
     </View>
   );
+};
+
+const hashString = (value: string) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+};
+
+const estimateDistanceLabel = (seed: string) => {
+  const minMeters = 120;
+  const maxMeters = 3200;
+  const span = maxMeters - minMeters;
+  const meters = minMeters + (hashString(seed) % span);
+  if (meters < 1000) {
+    return `~${meters} m away`;
+  }
+  return `~${(meters / 1000).toFixed(1)} km away`;
 };
 
 const pinColor = (pin: MapPin) => {
@@ -2138,6 +2225,7 @@ type FeedProps = NativeStackScreenProps<RootStackParamList, 'Feed'>;
 const FeedScreen = ({ route }: FeedProps) => {
   const styles = useStyles();
   const { colors } = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { userId } = useAuth();
   const [posts, setPosts] = useState<PostEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -2226,6 +2314,19 @@ const FeedScreen = ({ route }: FeedProps) => {
       return true;
     });
   }, [activeTag, posts, searchValue]);
+
+  const handlePostAction = (label: string) => {
+    setNotice(`${label} is coming soon.`);
+  };
+
+  const handleShare = async (post: PostEntry) => {
+    try {
+      await Share.share({ message: post.body });
+      void trackAnalyticsEvent('post_share', { post_id: post.id }, userId);
+    } catch {
+      setNotice('Unable to share right now.');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -2319,7 +2420,10 @@ const FeedScreen = ({ route }: FeedProps) => {
         }
         renderItem={({ item }) => (
           <View style={styles.postCard}>
-            <View style={styles.postHeader}>
+            <Pressable
+              style={styles.postHeader}
+              onPress={() => navigation.navigate('UserProfile', { handle: item.authorHandle })}
+            >
               <View style={styles.postAvatar}>
                 <Text style={styles.postAvatarText}>{item.authorHandle.slice(0, 2).toUpperCase()}</Text>
               </View>
@@ -2328,9 +2432,9 @@ const FeedScreen = ({ route }: FeedProps) => {
                 <Text style={styles.metaText}>Level 3 | XP 120</Text>
               </View>
               <View style={styles.postBadge}>
-                <Text style={styles.postBadgeText}>Local</Text>
+                <Text style={styles.postBadgeText}>{estimateDistanceLabel(item.id)}</Text>
               </View>
-            </View>
+            </Pressable>
             <Text style={styles.cardBody}>{item.body}</Text>
             {item.mediaUrl ? (
               <Image source={{ uri: item.mediaUrl }} style={styles.feedMediaImage} />
@@ -2340,21 +2444,17 @@ const FeedScreen = ({ route }: FeedProps) => {
               <Text style={styles.metaText}>Room / Business context</Text>
             </View>
             <View style={styles.postActions}>
-              <Pressable style={styles.postActionButton}>
+              <Pressable style={styles.postActionButton} onPress={() => handlePostAction('Likes')}>
                 <Ionicons name="heart-outline" size={16} color={colors.text} />
                 <Text style={styles.postActionText}>Like</Text>
               </Pressable>
-              <Pressable style={styles.postActionButton}>
-                <Ionicons name="repeat-outline" size={16} color={colors.text} />
-                <Text style={styles.postActionText}>Repost</Text>
+              <Pressable style={styles.postActionButton} onPress={() => handleShare(item)}>
+                <Ionicons name="share-social-outline" size={16} color={colors.text} />
+                <Text style={styles.postActionText}>Share</Text>
               </Pressable>
-              <Pressable style={styles.postActionButton}>
+              <Pressable style={styles.postActionButton} onPress={() => handlePostAction('Replies')}>
                 <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.text} />
                 <Text style={styles.postActionText}>Reply</Text>
-              </Pressable>
-              <Pressable style={styles.postActionButton}>
-                <Ionicons name="bookmark-outline" size={16} color={colors.text} />
-                <Text style={styles.postActionText}>Save</Text>
               </Pressable>
             </View>
           </View>
@@ -3628,17 +3728,108 @@ const ProfileScreen = () => {
           </Pressable>
           <View style={styles.rowBetween}>
             <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('BugReport')}>
-              <Text style={styles.secondaryButtonText}>Report a bug</Text>
+              <Text style={styles.secondaryButtonTextSmall} numberOfLines={1}>
+                Report a bug
+              </Text>
             </Pressable>
             <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Onboarding')}>
-              <Text style={styles.secondaryButtonText}>Onboarding</Text>
+              <Text style={styles.secondaryButtonTextSmall} numberOfLines={1}>
+                Onboarding
+              </Text>
             </Pressable>
             {userId ? (
               <Pressable style={styles.secondaryButton} onPress={signOut}>
-                <Text style={styles.secondaryButtonText}>Log out</Text>
+                <Text style={styles.secondaryButtonTextSmall} numberOfLines={1}>
+                  Log out
+                </Text>
               </Pressable>
             ) : null}
           </View>
+        </View>
+      </ScrollView>
+      <BottomNav />
+      <StatusBar style="auto" />
+    </SafeAreaView>
+  );
+};
+
+type UserProfileProps = NativeStackScreenProps<RootStackParamList, 'UserProfile'>;
+
+const UserProfileScreen = ({ route }: UserProfileProps) => {
+  const styles = useStyles();
+  const { userId } = useAuth();
+  const handle = route.params?.handle ?? 'user';
+  const [profileData, setProfileData] = useState<{
+    handle: string;
+    level: number;
+    xp: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    void trackAnalyticsEvent('screen_view', { screen: 'user_profile', handle }, userId);
+  }, [handle, userId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadProfile = async () => {
+      if (!supabase) {
+        setProfileData({ handle, level: 3, xp: 120 });
+        return;
+      }
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('current_handle, level, xp')
+        .eq('current_handle', handle)
+        .maybeSingle();
+      if (!isMounted) {
+        return;
+      }
+      if (error || !data) {
+        setProfileData(null);
+        setNotice('Profile not found.');
+      } else {
+        setProfileData({
+          handle: data.current_handle ?? handle,
+          level: data.level ?? 1,
+          xp: data.xp ?? 0,
+        });
+      }
+      setLoading(false);
+    };
+    void loadProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [handle]);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <AppHeader />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.card}>
+          <SectionTitle icon="person-outline" label={`@${handle}`} />
+          {loading ? <Text style={styles.metaText}>Loading profile...</Text> : null}
+          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+          {profileData ? (
+            <>
+              <View style={styles.rowBetween}>
+                <Text style={styles.cardTitle}>Level</Text>
+                <Text style={styles.cardTitle}>{profileData.level}</Text>
+              </View>
+              <View style={styles.rowBetween}>
+                <Text style={styles.cardTitle}>XP</Text>
+                <Text style={styles.cardTitle}>{profileData.xp}</Text>
+              </View>
+              <Pressable style={styles.primaryButton} onPress={() => setNotice('Chat requests coming soon.')}>
+                <Text style={styles.primaryButtonText}>Request chat</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.metaText}>This user is unavailable.</Text>
+          )}
         </View>
       </ScrollView>
       <BottomNav />
@@ -3659,7 +3850,7 @@ const AuthScreen = () => {
   const [submitting, setSubmitting] = useState(false);
   const authHint =
     authMode === 'business'
-      ? 'Business sign-in opens the Business Admin Portal.'
+      ? 'Business sign-in uses a separate business account and opens the Business Admin Portal.'
       : authMode === 'fleet'
         ? 'Fleet access is not live yet.'
         : 'Personal sign-in takes you to the map.';
@@ -4810,6 +5001,7 @@ const OnboardingScreen = () => {
 const BusinessAdminScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { userId } = useAuth();
   const { businesses, setBusinesses } = useBusinesses();
   const [ownedBusinesses, setOwnedBusinesses] = useState<OwnedBusinessEntry[]>([]);
@@ -4831,6 +5023,7 @@ const BusinessAdminScreen = () => {
   const [exceptionClosed, setExceptionClosed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [hasBusinessAccess, setHasBusinessAccess] = useState<boolean | null>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const activeBusiness =
     ownedBusinesses.find((entry) => entry.id === selectedBusinessId) ?? ownedBusinesses[0] ?? null;
@@ -4851,7 +5044,7 @@ const BusinessAdminScreen = () => {
       }
       setLoading(true);
       setNotice(null);
-      const { data: businessRows, error: businessError } = await supabase
+      const { data: ownedRows, error: businessError } = await supabase
         .from('businesses')
         .select('id, name, image_url, logo_url, card_image_url, pin_icon_url')
         .eq('owner_id', userId);
@@ -4863,7 +5056,29 @@ const BusinessAdminScreen = () => {
         setLoading(false);
         return;
       }
-      const businesses = (businessRows ?? [])
+      const { data: staffAccessRows } = await supabase
+        .from('business_staff')
+        .select('business_id')
+        .eq('user_id', userId);
+      const staffBusinessIds = (staffAccessRows ?? [])
+        .map((row) => String(row.business_id ?? ''))
+        .filter((id) => id.length > 0);
+      const staffBusinessesRes = staffBusinessIds.length
+        ? await supabase
+            .from('businesses')
+            .select('id, name, image_url, logo_url, card_image_url, pin_icon_url')
+            .in('id', staffBusinessIds)
+        : { data: [] as any[] };
+      const combinedRows = [...(ownedRows ?? []), ...(staffBusinessesRes.data ?? [])];
+      const uniqueRows = new Map<string, any>();
+      combinedRows.forEach((row) => {
+        const id = String(row.id ?? '');
+        if (!id || uniqueRows.has(id)) {
+          return;
+        }
+        uniqueRows.set(id, row);
+      });
+      const businesses = Array.from(uniqueRows.values())
         .map((row) => {
           const imageUrl = row.card_image_url ?? row.image_url ?? null;
           const logoUrl = row.pin_icon_url ?? row.logo_url ?? null;
@@ -4876,11 +5091,13 @@ const BusinessAdminScreen = () => {
         })
         .filter((row) => row.id.length > 0);
       setOwnedBusinesses(businesses);
+      setHasBusinessAccess(businesses.length > 0);
       if (!selectedBusinessId && businesses.length > 0) {
         setSelectedBusinessId(businesses[0].id);
       }
       const businessIds = businesses.map((row) => row.id);
       if (businessIds.length === 0) {
+        setNotice('Business access required. Sign in with a business account.');
         setLoading(false);
         return;
       }
@@ -5206,7 +5423,19 @@ const BusinessAdminScreen = () => {
           {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
           {!userId ? <Text style={styles.metaText}>Sign in to manage your business.</Text> : null}
         </View>
-        {ownedBusinesses.length > 0 ? (
+        {hasBusinessAccess === false ? (
+          <View style={styles.card}>
+            <SectionTitle icon="lock-closed-outline" label="Business access required" />
+            <Text style={styles.cardBody}>
+              Business accounts are separate from personal users. Sign in with a business account to
+              manage listings.
+            </Text>
+            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Auth')}>
+              <Text style={styles.secondaryButtonText}>Go to business sign-in</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {hasBusinessAccess ? (
           <View style={styles.card}>
             <SectionTitle icon="storefront-outline" label="Business selection" />
             <View style={styles.filterRow}>
@@ -5232,7 +5461,7 @@ const BusinessAdminScreen = () => {
             </View>
           </View>
         ) : null}
-        {activeBusiness ? (
+        {hasBusinessAccess && activeBusiness ? (
           <View style={styles.card}>
             <SectionTitle icon="image-outline" label="Media" />
             <Text style={styles.cardBody}>Upload a hero image and logo for your listing.</Text>
@@ -5280,7 +5509,7 @@ const BusinessAdminScreen = () => {
             </View>
           </View>
         ) : null}
-        {activeBusiness ? (
+        {hasBusinessAccess && activeBusiness ? (
           <View style={styles.card}>
             <SectionTitle icon="time-outline" label="Hours exceptions" />
             <Text style={styles.cardBody}>Add holiday hours or temporary closures.</Text>
@@ -5349,7 +5578,7 @@ const BusinessAdminScreen = () => {
             )}
           </View>
         ) : null}
-        {activeBusiness ? (
+        {hasBusinessAccess && activeBusiness ? (
           <View style={styles.card}>
             <SectionTitle icon="ticket-outline" label="Coupons" />
             <Text style={styles.cardBody}>Create loyalty or promo codes for customers.</Text>
@@ -5394,7 +5623,7 @@ const BusinessAdminScreen = () => {
             )}
           </View>
         ) : null}
-        {ownedBusinesses.length === 0 ? (
+        {hasBusinessAccess && ownedBusinesses.length === 0 ? (
           <View style={styles.card}>
             <Text style={styles.metaText}>No businesses linked to this account.</Text>
           </View>
@@ -6174,6 +6403,7 @@ export default function App() {
               <Stack.Screen name="Room" component={RoomScreen} />
               <Stack.Screen name="Onboarding" component={OnboardingScreen} />
               <Stack.Screen name="Profile" component={ProfileScreen} />
+              <Stack.Screen name="UserProfile" component={UserProfileScreen} />
               <Stack.Screen name="Auth" component={AuthScreen} />
               <Stack.Screen name="Business" component={BusinessScreen} />
               <Stack.Screen name="BusinessAdmin" component={BusinessAdminScreen} />
@@ -7205,6 +7435,11 @@ const useStyles = () => {
           fontWeight: '600',
           color: colors.text,
         },
+        secondaryButtonTextSmall: {
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.text,
+        },
         authBody: {
           flex: 1,
           paddingHorizontal: 16,
@@ -7231,6 +7466,58 @@ const useStyles = () => {
           fontSize: 12,
           fontWeight: '600',
           color: colors.textMuted,
+        },
+        sideSheetContainer: {
+          flex: 1,
+          justifyContent: 'flex-start',
+        },
+        sideSheetOverlay: {
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          backgroundColor: colors.overlay,
+        },
+        sideSheet: {
+          width: 280,
+          maxWidth: '85%',
+          height: '100%',
+          backgroundColor: colors.surface,
+          borderTopRightRadius: 20,
+          borderBottomRightRadius: 20,
+          borderRightWidth: 1,
+          borderColor: colors.border,
+          padding: 16,
+          paddingTop: 40,
+          gap: 12,
+        },
+        sideSheetHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        },
+        sideSheetTitle: {
+          fontSize: 18,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        sideSheetList: {
+          gap: 10,
+        },
+        sideSheetItem: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          paddingVertical: 8,
+          paddingHorizontal: 6,
+          borderRadius: 12,
+          backgroundColor: colors.surfaceMuted,
+        },
+        sideSheetItemText: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.text,
         },
         storyRow: {
           flexDirection: 'row',

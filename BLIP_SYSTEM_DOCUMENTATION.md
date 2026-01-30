@@ -20,6 +20,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Map search overlay with scope (rooms/businesses/posts) and text match.
 - Feed screen (tabs + search + tags) + create post.
 - Stories placeholder card in Feed (UI only).
+- Feed actions updated: share button + user profile drilldown + distance badge (UI).
 - Auth screen with Personal/Business/Fleet tabs + pending buttons for Magic link/OTP + Google OAuth.
 - Room chat with realtime updates + distance gating.
 - Business profile (menu, offers, Q&A chat) + chat join gating.
@@ -35,12 +36,14 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Help/support + bug reporting.
 - Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders).
 - Blip Admin Portal (feature flags, verification queue, moderation ops).
+- Side panel navigation drawer (hamburger menu).
 
 ### Known broken, disabled, or deferred
 - Magic link / email OTP auth: deferred. Must-have before rollout with proper domain redirects/deep links (mobile cannot follow `127.0.0.1` links).
 - Google OAuth: not implemented.
 - Payments/billing: not implemented (billing screen is placeholder only).
 - Stories + voice rooms: UI placeholders only (no functional media/voice backend).
+- Business admin access requires a business account (owner/staff). Personal-only accounts are blocked from admin controls.
 - Push notifications delivery: requires FCM/APNS keys + redeploy `push-send`.
 - Web support: location is disabled on web (mobile-first).
 - Advanced search filters: open now/verified/tags are wired for businesses/rooms.

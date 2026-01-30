@@ -17,6 +17,7 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - Access: open signup; no invite-only or waitlist in MVP.
 - Tiers: not included for now.
 - Ordering: included (no payments in MVP; pickup only in app; delivery handled by businesses outside BLIP).
+- Accounts: personal and business logins are separate; personal accounts cannot access business admin.
 - Safer onboarding: Supabase phone OTP + in-house device ID (lightweight device fingerprint).
 - AI safety: use Moderation API for text + media checks (edge function).
 - Push notifications: native FCM/APNs via edge function + device tokens.
@@ -26,6 +27,7 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - Implemented: Room chat with distance gating; Business profile (menu/offers/Q&A); Reviews storage + UI.
 - Implemented: Orders cart flow + `order_items`; Messages (business list + direct threads + direct chat).
 - Implemented: Profile identity switch + reputation/trust labels + device ID display; billing placeholder.
+- Implemented: Side panel navigation + user profile drilldown from feed (UI).
 - Implemented: AI safety checks for posts + room/business/direct messages.
 - Implemented: Push plumbing (device tokens + test push), but delivery requires FCM/APNS keys.
 - Admin: Business Admin Portal + Blip Admin Portal in-app screens.
