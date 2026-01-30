@@ -13,57 +13,39 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - `BLIP_FEATURES_SPEC.md`: Product spec (feature intent and rules).
 - `BLIP_AI_RULES.md`: Dev constraints + product decisions.
 
-## 2) Quick “works vs broken” summary (today)
+## 2) Quick "works vs broken" summary (today)
 
 ### Works (implemented + expected to function)
-- Map-first home (rooms within 500m + city-scoped businesses) with approximate location privacy and fixed ~1km map zoom.
-- Feed screen (local posts scoped to `area_key`) + create post.
-- Search for rooms/businesses/posts (text + tags on map, text + author on posts).
-- Map polish: clustered markers, in-map detail sheet, saved pin highlights.
-- Discovery ranking: feed sort (trending, for-you, newest).
-- Saved places + lists (favorites + collections; shareable flag stub).
-- Business reviews + ratings (user reviews, optional photo URL, reportable).
-- Review submissions award XP (first review only).
-- Rooms (create / view / join / leave) + room messaging.
-- Business listings (create business, view profile) + owner-only edits + categories/amenities.
-- Business verification workflow (owner request + admin review + verified badge).
-- Business Admin Portal dashboard (staff roles/permissions + menus/offers/orders management).
-- Blip Admin Portal dashboard (feature flags + verification queue + moderation ops).
-- Offers, menus, and pickup-only ordering (no payments).
-- Direct messaging via chat requests + acceptance system (chat points).
-- Direct messaging presence (online, typing indicators, read receipts).
-- Messaging media uploads (DMs unlock after 10 messages; room/business chats support uploads).
-- Direct messaging continuity controls (mutual opt-in keeps DM history).
-- Safety: block + report, plus server-side rate limiting triggers (spam throttling).
-- Safety: AI-assisted moderation checks (text + image) for posts, comments, chats, and reviews.
-- Safety: reputation + trust score (profile counters that increment with actions).
-- Safety: community moderation roles in rooms (owner/mod roles + moderation actions).
-- Safer onboarding: phone OTP verification + lightweight device fingerprinting.
-- Moderation screen (in-app) for admins (requires `profiles.is_admin = true`).
-- Appeals flow (submit appeal; admin approves/rejects).
-- Theme + dark mode preference (persisted locally).
-- Push notifications for chat + room activity + orders (FCM/APNs via edge function).
-- Empty states + skeleton loaders on key list screens.
-- Onboarding tutorial + first-run setup (permissions, privacy, rooms).
-- Help/support center (quick FAQ + contact support link).
-- Bug reporting (writes to Supabase + optional GitHub issue link).
-- Keyboard-safe forms on key screens (Auth/Create/Business create): scroll + keyboard avoiding.
-- Dropdown menus for key sorting/filter/actions on Auth, Profile, Feed, Map, Messages, Business, Admin.
-- Post engagement (reactions, comments, reposts, saves).
-- Following/friends system (follow, mutuals, friend activity).
-- Saved posts list on the Profile screen.
-- Basic profile photo (avatar URL) on the Profile screen.
-- Profile richness: interests, badges, and social proof stats.
-- Dual profiles (switch personal vs business identity for posts/comments).
-- Micro-interactions polish (pressed feedback on primary actions).
-- Analytics + funnels (edge ingest + pre-login queue + admin funnel snapshot).
+- Map-first home with clustering + spiderfy + recenter.
+- Map search overlay with scope (rooms/businesses/posts) and text match.
+- Feed screen (tabs + search + tags) + create post.
+- Stories placeholder card in Feed (UI only).
+- Auth screen with Personal/Business/Fleet tabs + pending buttons for Magic link/OTP + Google OAuth.
+- Room chat with realtime updates + distance gating.
+- Business profile (menu, offers, Q&A chat) + chat join gating.
+- Business reviews (storage + UI) with ratings + text.
+- Orders flow (menu -> cart -> order + order_items).
+- Messages (business list + direct threads + direct chat).
+- Voice rooms placeholder card in Messages (UI only).
+- Profile (identity switch, level/xp, reputation/trust labels, device ID display).
+- Billing placeholder screen (no payments).
+- Push notifications plumbing (device token capture + test push).
+- AI moderation checks for posts + room/business/direct messages.
+- Onboarding flow (privacy + interests).
+- Help/support + bug reporting.
+- Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders).
+- Blip Admin Portal (feature flags, verification queue, moderation ops).
 
-### Known broken, disabled, or deferred (must-have tracked elsewhere)
+### Known broken, disabled, or deferred
 - Magic link / email OTP auth: deferred. Must-have before rollout with proper domain redirects/deep links (mobile cannot follow `127.0.0.1` links).
 - Google OAuth: not implemented.
-- Delivery: handled by businesses outside the app (pickup-only in BLIP for now).
-- Payments/billing: not implemented (appeals allow choosing a payment method, but no provider is wired; business subscriptions are UI placeholders only).
-- Web support: location is explicitly disabled on web (map/feed are mobile-first).
+- Payments/billing: not implemented (billing screen is placeholder only).
+- Stories + voice rooms: UI placeholders only (no functional media/voice backend).
+- Push notifications delivery: requires FCM/APNS keys + redeploy `push-send`.
+- Web support: location is disabled on web (mobile-first).
+- Advanced search filters: open now/verified/tags are wired for businesses/rooms.
+- Analytics + funnels: wired (edge ingest must be deployed with ANALYTICS_SERVICE_ROLE_KEY).
+- Chat + post media uploads are wired (requires chat-media/post-media buckets).
 - Full gap list / parity wishlist: see section 9.
 
 ## 3) How to run the app (local dev)
@@ -101,11 +83,17 @@ From `c:\Blip\app`:
 - Follows migration: `supabase/migrations/20260119006000_add_follows.sql`
 - Place lists migration: `supabase/migrations/20260119007000_add_place_lists.sql`
 - Business reviews migration: `supabase/migrations/20260119008000_add_business_reviews.sql`
+- Business reviews (refresh): `supabase/migrations/20260129093000_add_business_reviews.sql`
 - Direct messaging presence migration: `supabase/migrations/20260119009000_add_direct_realtime_signals.sql`
 - Direct messaging media migration: `supabase/migrations/20260119010000_add_direct_message_media.sql`
 - Direct messaging continuity migration: `supabase/migrations/20260119011000_add_direct_chat_continuity.sql`
 - Room/business messaging media migration: `supabase/migrations/20260119012000_add_room_business_message_media.sql`
 - Chat media storage bucket: `supabase/migrations/20260119013000_add_chat_media_storage.sql`
+- Business media storage bucket: `supabase/migrations/20260129100500_add_business_media_storage.sql`
+- Business hours exceptions: `supabase/migrations/20260129102500_add_business_hours_exceptions.sql`
+- Post media fields: `supabase/migrations/20260129104500_add_post_media.sql`
+- Post media storage bucket: `supabase/migrations/20260129104600_add_post_media_storage.sql`
+- Business coupons: `supabase/migrations/20260129105000_add_business_coupons.sql`
 - Business verification workflow: `supabase/migrations/20260120091000_add_business_verification_workflow.sql`
 - Analytics events: `supabase/migrations/20260120093000_add_analytics_events.sql`
 - Safety + push + reputation + room roles: `supabase/migrations/20260122090000_add_safety_push_reputation.sql`
@@ -402,6 +390,8 @@ The sections below map “product features” to concrete implementation artifac
   - `CreateBusinessScreen` inserts into `businesses`.
   - `BusinessEditScreen` updates `businesses` fields.
   - `BusinessScreen` shows a demo analytics summary (views, chat volume, saves, orders).
+  - `BusinessAdminScreen` uploads hero/logo images to `business-media` storage and updates `image_url` + `logo_url`.
+  - `BusinessAdminScreen` manages holiday/temporary closures via `business_hours_exceptions`.
 - DB:
   - `businesses.owner_id` controls edit permissions via RLS.
   - Metadata fields: `businesses.categories`, `businesses.amenities`.
@@ -449,6 +439,9 @@ The sections below map “product features” to concrete implementation artifac
   - `OrderScreen` inserts into `orders` + `order_items`.
   - `OrdersScreen` shows the user’s orders.
   - `BusinessScreen` shows business-side orders.
+  - Orders show an in-app receipt summary after submission.
+  - Order submission can trigger push notifications (requires `push-send` keys).
+  - Email/SMS receipts are pending (provider selection deferred).
 - DB:
   - RLS: orders visible by buyer or business owner; items share similar rules.
   - Inserts are rate-limited.
@@ -500,11 +493,11 @@ The sections below map “product features” to concrete implementation artifac
 - Known limitation:
   - There is no UI to grant admin; it must be set in DB.
 
-#### E5 — AI-assisted safety checks
-- What it does: blocks unsafe text/image content across posts, comments, chats, reviews, and order notes.
+#### E5 - AI-assisted safety checks
+- What it does: blocks unsafe text content before saving.
 - Client:
   - `runModerationCheck()` helper in `app/App.tsx`.
-  - Called from Create, PostComments, Room, Business, Direct chat, Reviews, Orders.
+  - Currently called from Create (posts), Room chat, Business chat, Direct chat.
 - Edge:
   - `supabase/functions/moderation-check` (OpenAI Moderation API).
 - DB:
@@ -519,19 +512,18 @@ The sections below map “product features” to concrete implementation artifac
   - `profiles.reputation_score`, `profiles.trust_score`.
   - RPC: `award_reputation(p_delta int)`.
 
-#### E7 — Community moderation roles (rooms)
+#### E7 - Community moderation roles (rooms)
 - What it does: allows room owners to grant/remove moderator roles.
 - Client:
-  - Room header shows role label (Owner/Moderator).
-  - Room message menu includes “Make moderator” / “Remove moderator”.
+  - Room header shows a Moderator badge for owners/admins.
 - DB:
   - `room_roles` table; `assign_room_owner` trigger assigns room creator as owner.
 
-#### E8 — Safer onboarding (phone verification + device fingerprinting)
+#### E8 - Safer onboarding (phone verification + device fingerprinting)
 - What it does: adds optional phone verification and lightweight device ID tracking.
 - Client:
-  - `PhoneVerificationModal` (Profile) uses Supabase phone OTP.
-  - `registerDeviceFingerprint()` stores a device ID per user.
+  - Profile shows a Phone verification CTA (OTP flow to be wired).
+  - Device ID is generated locally and stored in AsyncStorage, then upserted to DB after login.
 - DB:
   - `device_fingerprints` stores device IDs linked to user accounts.
 
@@ -610,33 +602,33 @@ The sections below map “product features” to concrete implementation artifac
 - Client: `pressablePressed` style in `app/App.tsx` applied to primary `Pressable` buttons.
 
 #### POL4 - Analytics + funnels
-- What it does: tracks key funnel events and shows a 7-day snapshot for admins.
+- What it does: tracks key funnel events and surfaces a 7-day snapshot for admins.
 - Client:
   - `trackAnalyticsEvent()` queues events in AsyncStorage (`blip.analytics.queue.v1`) before login.
-  - Anonymous device key stored in `blip.analytics.anon.v1` to link pre-login events.
   - Events flush after sign-in using `supabase/functions/analytics-ingest`.
-  - Message sends use `trackAnalyticsOnce` (first message per context per session) to keep volume down.
-  - `ModerationScreen` displays the analytics snapshot.
+  - Screen views and core actions are tracked in `app/App.tsx`.
 - Edge:
   - `supabase/functions/analytics-ingest/index.ts` validates event names and writes with service role.
 - DB:
   - `analytics_events` table with admin-only read policy.
-- Event names:
-  - session_start, screen_view, auth_sign_in, auth_sign_up, signup_confirmed, search_query, filter_toggle, identity_switch, phone_verification, push_permission, post_view, post_create, post_comment, post_reaction, post_repost, post_bookmark, post_share, message_send, chat_request_sent, order_place, review_submit, place_save, room_join, business_view, place_view, business_verification_requested, report_submit, appeal_submit, bug_report_submit, location_permission, onboarding_completed.
+- Status:
+  - Requires `ANALYTICS_SERVICE_ROLE_KEY` secret + deployed function.
 
 #### POL5 - Help/support center
 - What it does: in-app FAQ + contact support link.
 - Client: `HelpScreen` in `app/App.tsx` using `EXPO_PUBLIC_SUPPORT_EMAIL`.
 
 #### POL6 - Push notifications
-- What it does: sends push notifications for chats, room activity, and orders.
+- What it does: registers push tokens and can trigger a test notification.
 - Client:
-  - `registerPushToken()` saves device tokens.
-  - `sendPushToUsers()` triggers the edge function on key actions.
+  - `registerForPushAsync()` captures a device token (native or Expo fallback).
+  - Profile screen shows token/status and includes a "Send test push" button.
 - Edge:
-  - `supabase/functions/push-send` (FCM/APNs).
+  - `supabase/functions/push-send` (FCM/APNs) required for real delivery.
 - DB:
   - `device_tokens` stores per-device push tokens.
+- Status:
+  - Delivery requires FCM/APNS keys + redeploy `push-send`.
 
 ## 6) Troubleshooting / “how to recreate when it breaks”
 
@@ -751,10 +743,10 @@ This section lists missing features (not implemented yet) so you can track rollo
   - Needed to implement: web location permissions + alternate UX for map/geo + responsive layouts.
 
 ### Social features missing (vs Reddit/IG/Snap/BeReal/Discord)
-- Creator-style features: stories/ephemeral post format, highlights, pinned posts.
+- Creator-style features: stories/ephemeral post format, highlights, pinned posts (UI placeholder in Feed only).
 
 ### Messaging & community missing (vs Discord/Snap/Bumble)
-- Voice rooms / voice channels (Discord-style).
+- Voice rooms / voice channels (Discord-style) (UI placeholder in Messages only).
 
 ### Local + map experience missing (vs Google Maps/Snap Map)
 - None currently tracked; core map polish and business metadata are implemented.
@@ -764,3 +756,16 @@ This section lists missing features (not implemented yet) so you can track rollo
 
 ### Product polish missing (to feel finished)
 - None currently tracked.
+
+
+
+
+
+
+
+
+
+
+
+
+

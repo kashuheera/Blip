@@ -7,23 +7,18 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleProp,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   View,
-  ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
-import * as ImagePicker from 'expo-image-picker';
 import MapView, { Circle, Marker, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import {
   createNativeStackNavigator,
@@ -34,19 +29,9 @@ import { createClient } from '@supabase/supabase-js';
 
 const APP_VERSION = Constants.expoConfig?.version ?? 'dev';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
-
 type RootStackParamList = {
   Home: undefined;
-  Feed: { search?: string } | undefined;
+  Feed: undefined;
   Create: undefined;
   Messages: undefined;
   DirectChat: { threadId: string; title: string } | undefined;
@@ -55,9 +40,7 @@ type RootStackParamList = {
   Auth: undefined;
   Business: { businessId?: string; tab?: 'menu' | 'qa' | 'reviews' | 'offers' } | undefined;
   Room: { roomId?: string } | undefined;
-  Onboarding: undefined;
   BusinessAdmin: undefined;
-  Billing: undefined;
   AdminPortal: undefined;
   Moderation: undefined;
   Help: undefined;
@@ -139,7 +122,6 @@ type Room = {
   latitude?: number | null;
   longitude?: number | null;
   saved?: boolean;
-  createdBy?: string | null;
 };
 
 type DirectThreadSummary = {
@@ -155,8 +137,6 @@ type DirectMessage = {
   body: string;
   senderId: string | null;
   createdAt: string;
-  mediaUrl?: string | null;
-  mediaType?: string | null;
 };
 
 type BusinessMessage = {
@@ -180,8 +160,6 @@ type PostEntry = {
   authorHandle: string;
   body: string;
   createdAt: string;
-  mediaUrl?: string | null;
-  mediaType?: string | null;
 };
 
 type OrderEntry = {
@@ -191,13 +169,6 @@ type OrderEntry = {
   status: string;
   notes?: string | null;
   createdAt: string;
-};
-
-type CartItemEntry = {
-  id: string;
-  name: string;
-  priceCents: number | null;
-  quantity: number;
 };
 
 type BusinessStaffEntry = {
@@ -225,34 +196,6 @@ type BusinessOfferEntry = {
   createdAt: string;
 };
 
-type BusinessReviewEntry = {
-  id: string;
-  businessId: string;
-  author: string;
-  rating: number;
-  body: string;
-  createdAt: string;
-};
-
-type BusinessHoursException = {
-  id: string;
-  businessId: string;
-  date: string;
-  isClosed: boolean;
-  openTime: string | null;
-  closeTime: string | null;
-  note: string | null;
-};
-
-type BusinessCouponEntry = {
-  id: string;
-  businessId: string;
-  code: string;
-  details: string;
-  active: boolean;
-  createdAt: string;
-};
-
 type BusinessAuditEntry = {
   id: string;
   businessId: string;
@@ -260,13 +203,6 @@ type BusinessAuditEntry = {
   entityType: string | null;
   entityId: string | null;
   createdAt: string;
-};
-
-type OwnedBusinessEntry = {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  logoUrl: string | null;
 };
 
 type BugReportEntry = {
@@ -292,7 +228,6 @@ type BusinessContextValue = {
 type AuthContextValue = {
   userId: string | null;
   email: string | null;
-  deviceId: string | null;
   profile: ProfileSummary | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<boolean>;
@@ -365,32 +300,32 @@ const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
 
 const THEME_COLORS: Record<ResolvedThemeMode, ThemeColors> = {
   light: {
-    background: '#F8FAFC',
+    background: '#F6F2FB',
     surface: '#FFFFFF',
-    surfaceMuted: '#EEF2F7',
-    text: '#1F2937',
-    textMuted: '#6B7280',
-    border: '#E2E8F0',
-    borderStrong: '#CBD5E1',
-    primary: '#3B82F6',
+    surfaceMuted: '#EEE7F5',
+    text: '#1C132D',
+    textMuted: '#6C5A83',
+    border: '#E0D4EB',
+    borderStrong: '#C7B7D9',
+    primary: '#8459B7',
     primaryText: '#FFFFFF',
-    danger: '#F97316',
-    overlay: 'rgba(31, 41, 55, 0.45)',
-    placeholder: '#94A3B8',
+    danger: '#EF4444',
+    overlay: 'rgba(31, 62, 99, 0.45)',
+    placeholder: '#9E90B4',
   },
   dark: {
-    background: '#0F172A',
-    surface: '#111827',
-    surfaceMuted: '#1E293B',
-    text: '#F8FAFC',
-    textMuted: '#94A3B8',
-    border: '#273244',
-    borderStrong: '#334155',
-    primary: '#3B82F6',
+    background: '#1F3E63',
+    surface: '#243F66',
+    surfaceMuted: '#2B4A74',
+    text: '#F7F3FF',
+    textMuted: '#C2B7D9',
+    border: '#32547F',
+    borderStrong: '#3E6290',
+    primary: '#8459B7',
     primaryText: '#FFFFFF',
-    danger: '#FB923C',
-    overlay: 'rgba(0, 0, 0, 0.55)',
-    placeholder: '#64748B',
+    danger: '#F87171',
+    overlay: 'rgba(0, 0, 0, 0.62)',
+    placeholder: '#A89EBB',
   },
 };
 
@@ -437,7 +372,6 @@ const useAuth = () => {
     context ?? {
       userId: null,
       email: null,
-      deviceId: null,
       profile: null,
       loading: false,
       signIn: async () => false,
@@ -524,7 +458,6 @@ const demoRooms: Room[] = [
     latitude: 31.4504,
     longitude: 74.4348,
     saved: true,
-    createdBy: null,
   },
   {
     id: 'r2',
@@ -532,7 +465,6 @@ const demoRooms: Room[] = [
     category: 'events',
     latitude: 31.452,
     longitude: 74.4358,
-    createdBy: null,
   },
 ];
 
@@ -540,27 +472,6 @@ const demoUserPins: MapPin[] = [
   { id: 'u1', kind: 'user', title: 'User', latitude: 31.4508, longitude: 74.4359 },
   { id: 'u2', kind: 'user', title: 'User', latitude: 31.4499, longitude: 74.4349 },
   { id: 'u3', kind: 'user', title: 'User', latitude: 31.4515, longitude: 74.4362 },
-];
-
-const demoSearchPosts: PostEntry[] = [
-  {
-    id: 'p1',
-    authorHandle: 'lahorelocal',
-    body: 'Best biryani spots near Askari 11? Drop recs.',
-    createdAt: 'Today',
-  },
-  {
-    id: 'p2',
-    authorHandle: 'groceryrunner',
-    body: 'Fresh Mart just restocked weekend essentials.',
-    createdAt: 'Today',
-  },
-  {
-    id: 'p3',
-    authorHandle: 'blipteam',
-    body: 'New business chatrooms are live for local stores.',
-    createdAt: 'Yesterday',
-  },
 ];
 
 const BusinessProvider = ({ children }: { children: React.ReactNode }) => {
@@ -604,7 +515,6 @@ const BusinessProvider = ({ children }: { children: React.ReactNode }) => {
 const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
-  const [deviceId, setDeviceId] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -664,56 +574,6 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!supabase || !userId || !deviceId) {
-      return;
-    }
-    void supabase.from('device_fingerprints').upsert(
-      {
-        user_id: userId,
-        device_id: deviceId,
-        platform: Platform.OS,
-        last_seen_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,device_id' }
-    );
-  }, [deviceId, userId]);
-
-  useEffect(() => {
-    if (!userId) {
-      return;
-    }
-    void flushAnalyticsQueue();
-  }, [userId]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadDeviceId = async () => {
-      try {
-        const stored = await AsyncStorage.getItem('blip_device_id');
-        if (stored) {
-          if (isMounted) {
-            setDeviceId(stored);
-          }
-          return;
-        }
-        const nextId = `dev_${Math.random().toString(36).slice(2, 8)}_${Date.now().toString(36)}`;
-        await AsyncStorage.setItem('blip_device_id', nextId);
-        if (isMounted) {
-          setDeviceId(nextId);
-        }
-      } catch {
-        if (isMounted) {
-          setDeviceId(null);
-        }
-      }
-    };
-    void loadDeviceId();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
   const signIn = async (nextEmail: string, password: string) => {
     if (!supabase) {
       return false;
@@ -728,7 +588,6 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUserId(data.user?.id ?? null);
     setEmail(data.user?.email ?? null);
     void loadProfile(data.user?.id ?? null);
-    void trackAnalyticsEvent('auth_sign_in', { method: 'password' }, data.user?.id ?? null);
     return true;
   };
 
@@ -746,7 +605,6 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUserId(data.user?.id ?? null);
     setEmail(data.user?.email ?? null);
     void loadProfile(data.user?.id ?? null);
-    void trackAnalyticsEvent('auth_sign_up', { method: 'password' }, data.user?.id ?? null);
     return true;
   };
 
@@ -761,7 +619,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ userId, email, deviceId, profile, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ userId, email, profile, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
@@ -810,50 +668,6 @@ const SectionTitle = ({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; l
   );
 };
 
-const SkeletonCard = ({ lines = 3 }: { lines?: number }) => {
-  const styles = useStyles();
-  return (
-    <View style={styles.skeletonCard}>
-      <View style={styles.skeletonRow}>
-        <View style={[styles.skeleton, styles.skeletonAvatar]} />
-        <View style={styles.skeletonColumn}>
-          <View style={[styles.skeleton, styles.skeletonLineWide]} />
-          <View style={[styles.skeleton, styles.skeletonLineShort]} />
-        </View>
-      </View>
-      {Array.from({ length: lines }).map((_, index) => (
-        <View
-          key={`line-${index}`}
-          style={[
-            styles.skeleton,
-            index === lines - 1 ? styles.skeletonLineShort : styles.skeletonLine,
-          ]}
-        />
-      ))}
-    </View>
-  );
-};
-
-const SkeletonRowItem = ({ lines = 2 }: { lines?: number }) => {
-  const styles = useStyles();
-  return (
-    <View style={styles.skeletonRowCard}>
-      <View style={[styles.skeleton, styles.skeletonAvatar]} />
-      <View style={styles.skeletonColumn}>
-        {Array.from({ length: lines }).map((_, index) => (
-          <View
-            key={`row-${index}`}
-            style={[
-              styles.skeleton,
-              index === 0 ? styles.skeletonLineWide : styles.skeletonLineShort,
-            ]}
-          />
-        ))}
-      </View>
-    </View>
-  );
-};
-
 const BottomNav = () => {
   const styles = useStyles();
   const { colors } = useTheme();
@@ -879,7 +693,7 @@ const BottomNav = () => {
 
 const pinColor = (pin: MapPin) => {
   if (pin.kind === 'user') {
-    return '#F97316';
+    return '#FF3B30';
   }
   if (pin.kind === 'room') {
     return '#38BDF8';
@@ -1041,176 +855,6 @@ const distanceKm = (a: { latitude: number; longitude: number }, b: { latitude: n
   return 2 * radius * Math.asin(Math.min(1, Math.sqrt(h)));
 };
 
-const runModerationCheck = async (payload: {
-  content_type: string;
-  content_id?: string | null;
-  text?: string;
-  image_url?: string;
-}) => {
-  if (!supabase) {
-    return { allowed: true, flagged: false, status: 'offline' as const };
-  }
-  try {
-    const { data, error } = await supabase.functions.invoke('moderation-check', {
-      body: payload,
-    });
-    if (error || !data) {
-      return { allowed: true, flagged: false, status: 'unavailable' as const };
-    }
-    return { ...(data as { allowed: boolean; flagged: boolean }), status: 'ok' as const };
-  } catch {
-    return { allowed: true, flagged: false, status: 'unavailable' as const };
-  }
-};
-
-const ANALYTICS_QUEUE_KEY = 'blip.analytics.queue.v1';
-const ANALYTICS_ANON_KEY = 'blip.analytics.anon.v1';
-let analyticsSessionId = `sess_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-
-const getAnalyticsAnonId = async () => {
-  try {
-    const existing = await AsyncStorage.getItem(ANALYTICS_ANON_KEY);
-    if (existing) {
-      return existing;
-    }
-    const nextId = `anon_${Math.random().toString(36).slice(2, 10)}`;
-    await AsyncStorage.setItem(ANALYTICS_ANON_KEY, nextId);
-    return nextId;
-  } catch {
-    return null;
-  }
-};
-
-const enqueueAnalyticsEvent = async (event: Record<string, unknown>) => {
-  try {
-    const raw = await AsyncStorage.getItem(ANALYTICS_QUEUE_KEY);
-    const nextQueue = raw ? (JSON.parse(raw) as Record<string, unknown>[]) : [];
-    nextQueue.push(event);
-    const trimmed = nextQueue.slice(-100);
-    await AsyncStorage.setItem(ANALYTICS_QUEUE_KEY, JSON.stringify(trimmed));
-  } catch {
-    // ignore queue errors
-  }
-};
-
-const sendAnalyticsEvents = async (events: Record<string, unknown>[]) => {
-  if (!supabase) {
-    return false;
-  }
-  try {
-    const { error } = await supabase.functions.invoke('analytics-ingest', {
-      body: { events },
-    });
-    return !error;
-  } catch {
-    return false;
-  }
-};
-
-const trackAnalyticsEvent = async (
-  name: string,
-  props: Record<string, unknown>,
-  userId?: string | null
-) => {
-  const anonId = await getAnalyticsAnonId();
-  const event = {
-    name,
-    session_id: analyticsSessionId,
-    ts: Date.now(),
-    anon_id: anonId ?? undefined,
-    props,
-  };
-  if (!userId) {
-    await enqueueAnalyticsEvent(event);
-    return;
-  }
-  const ok = await sendAnalyticsEvents([event]);
-  if (!ok) {
-    await enqueueAnalyticsEvent(event);
-  }
-};
-
-const flushAnalyticsQueue = async () => {
-  try {
-    const raw = await AsyncStorage.getItem(ANALYTICS_QUEUE_KEY);
-    if (!raw) {
-      return;
-    }
-    const queue = JSON.parse(raw) as Record<string, unknown>[];
-    if (!Array.isArray(queue) || queue.length === 0) {
-      return;
-    }
-    const ok = await sendAnalyticsEvents(queue);
-    if (ok) {
-      await AsyncStorage.removeItem(ANALYTICS_QUEUE_KEY);
-    }
-  } catch {
-    // ignore
-  }
-};
-
-const pickAndUploadImage = async (bucket: string, pathPrefix: string) => {
-  if (!supabase) {
-    return { url: null, error: 'no_supabase' };
-  }
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (permission.status !== 'granted') {
-    return { url: null, error: 'permission' };
-  }
-  const picker = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: true,
-    quality: 0.8,
-  });
-  if (picker.canceled || !picker.assets?.length) {
-    return { url: null, error: 'canceled' };
-  }
-  const asset = picker.assets[0];
-  const extension = asset.uri.split('.').pop() ?? 'jpg';
-  const filePath = `${pathPrefix}/${Date.now()}.${extension}`;
-  try {
-    const response = await fetch(asset.uri);
-    const blob = await response.blob();
-    const upload = await supabase.storage.from(bucket).upload(filePath, blob, {
-      upsert: true,
-      contentType: asset.type ?? 'image/jpeg',
-    });
-    if (upload.error) {
-      return { url: null, error: 'upload' };
-    }
-    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-    return { url: data.publicUrl, error: null };
-  } catch {
-    return { url: null, error: 'upload' };
-  }
-};
-
-const registerForPushAsync = async () => {
-  if (Platform.OS === 'web') {
-    return { token: null, status: 'unsupported' as const };
-  }
-  const settings = await Notifications.getPermissionsAsync();
-  let status = settings.status;
-  if (status !== 'granted') {
-    const request = await Notifications.requestPermissionsAsync();
-    status = request.status;
-  }
-  if (status !== 'granted') {
-    return { token: null, status: 'denied' as const };
-  }
-  try {
-    const deviceToken = await Notifications.getDevicePushTokenAsync();
-    return { token: deviceToken.data, status: 'granted' as const };
-  } catch {
-    try {
-      const expoToken = await Notifications.getExpoPushTokenAsync();
-      return { token: expoToken.data, status: 'expo' as const };
-    } catch {
-      return { token: null, status: 'error' as const };
-    }
-  }
-};
-
 const buildSpiderfyPins = (
   pins: MapPin[],
   center: { latitude: number; longitude: number }
@@ -1236,7 +880,7 @@ const HomeScreen = () => {
   const { colors, resolvedMode } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { businesses: businessList, setBusinesses } = useBusinesses();
-  const { profile, userId } = useAuth();
+  const { profile } = useAuth();
   const initialRegion = useMemo<Region>(
     () => ({
       latitude: 31.4498226,
@@ -1262,9 +906,6 @@ const HomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchScope, setSearchScope] = useState<'rooms' | 'businesses' | 'posts'>('businesses');
-  const [filterOpenNow, setFilterOpenNow] = useState(false);
-  const [filterVerified, setFilterVerified] = useState(false);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
   const showUsers = true;
   const [userPins, setUserPins] = useState<MapPin[]>(demoUserPins);
   const [rooms, setRooms] = useState<Room[]>(demoRooms);
@@ -1275,24 +916,12 @@ const HomeScreen = () => {
       if (query && !business.name.toLowerCase().includes(query)) {
         return false;
       }
-      if (filterOpenNow && !business.openNow) {
-        return false;
-      }
-      if (filterVerified && !business.verified) {
-        return false;
-      }
-      if (activeTag) {
-        const tag = activeTag.toLowerCase();
-        const tags = [business.category, ...(business.categories ?? [])]
-          .filter(Boolean)
-          .map((entry) => String(entry).toLowerCase());
-        if (!tags.includes(tag)) {
-          return false;
-        }
-      }
       return true;
     });
-  }, [activeTag, businessList, filterOpenNow, filterVerified, searchQuery]);
+  }, [
+    businessList,
+    searchQuery,
+  ]);
 
   const businessPins = useMemo(
     () =>
@@ -1321,50 +950,9 @@ const HomeScreen = () => {
       if (query && !room.title.toLowerCase().includes(query)) {
         return false;
       }
-      if (activeTag && room.category.toLowerCase() !== activeTag.toLowerCase()) {
-        return false;
-      }
       return true;
     });
-  }, [activeTag, rooms, searchQuery]);
-
-  const tagOptions = useMemo(() => {
-    if (searchScope === 'rooms') {
-      return Array.from(
-        new Set(
-          rooms
-            .map((room) => room.category)
-            .filter((entry): entry is string => Boolean(entry))
-        )
-      ).slice(0, 8);
-    }
-    if (searchScope === 'businesses') {
-      return Array.from(
-        new Set(
-          businessList.flatMap((business) => [
-            business.category,
-            ...(business.categories ?? []),
-          ])
-        )
-      ).slice(0, 8);
-    }
-    return [];
-  }, [businessList, rooms, searchScope]);
-
-  useEffect(() => {
-    if (activeTag && tagOptions.length > 0 && !tagOptions.includes(activeTag)) {
-      setActiveTag(null);
-    }
-  }, [activeTag, tagOptions]);
-  const postSearchResults = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return demoSearchPosts.filter((post) => {
-      if (query && !post.body.toLowerCase().includes(query)) {
-        return false;
-      }
-      return true;
-    });
-  }, [searchQuery]);
+  }, [rooms, searchQuery]);
   const roomPins = useMemo(
     () =>
       filteredRooms
@@ -1395,19 +983,14 @@ const HomeScreen = () => {
         : null,
     [currentLocation]
   );
-  const scopedRoomPins = useMemo(() => (searchScope === 'rooms' ? roomPins : []), [roomPins, searchScope]);
-  const scopedBusinessPins = useMemo(
-    () => (searchScope === 'businesses' ? businessPins : []),
-    [businessPins, searchScope]
-  );
   const allPins = useMemo(
     () => [
       ...(showUsers ? userPins : []),
-      ...scopedRoomPins,
-      ...scopedBusinessPins,
+      ...roomPins,
+      ...businessPins,
       ...(currentLocationPin ? [currentLocationPin] : []),
     ],
-    [currentLocationPin, scopedBusinessPins, scopedRoomPins, showUsers, userPins]
+    [businessPins, currentLocationPin, roomPins, showUsers, userPins]
   );
   const clusters = useMemo(() => buildClusters(allPins, region), [allPins, region]);
   const businessById = useMemo(() => {
@@ -1455,7 +1038,7 @@ const HomeScreen = () => {
 
       const { data: roomRows } = await supabase
         .from('rooms')
-        .select('id, title, category, latitude, longitude, radius_meters, created_by')
+        .select('id, title, category, latitude, longitude, radius_meters')
         .limit(100);
       if (isMounted && Array.isArray(roomRows) && roomRows.length > 0) {
         const nextRooms = roomRows
@@ -1466,7 +1049,6 @@ const HomeScreen = () => {
             latitude: typeof row.latitude === 'number' ? row.latitude : null,
             longitude: typeof row.longitude === 'number' ? row.longitude : null,
             distanceMeters: typeof row.radius_meters === 'number' ? row.radius_meters : undefined,
-            createdBy: row.created_by ? String(row.created_by) : null,
           }))
           .filter((room) => room.id.length > 0);
         if (nextRooms.length > 0) {
@@ -1522,10 +1104,6 @@ const HomeScreen = () => {
       isMounted = false;
     };
   }, [setBusinesses]);
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'home' }, userId);
-  }, [userId]);
 
   const handleClusterPress = (cluster: MapCluster) => {
     setSelectedBusinessId(null);
@@ -1595,33 +1173,18 @@ const HomeScreen = () => {
         </View>
         {searchOpen ? (
           <View style={styles.searchOverlay}>
-          <View style={styles.searchOverlayHeader}>
-            <View style={styles.searchInputWrap}>
-              <Ionicons name="search" size={18} color={colors.textMuted} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search rooms, businesses, posts"
+            <View style={styles.searchOverlayHeader}>
+              <View style={styles.searchInputWrap}>
+                <Ionicons name="search" size={18} color={colors.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search rooms, businesses, posts"
                   placeholderTextColor={colors.placeholder}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                 />
               </View>
-              <Pressable
-                style={styles.iconButton}
-                onPress={() => {
-                  setSearchOpen(false);
-                  if (searchQuery.trim()) {
-                    void trackAnalyticsEvent(
-                      'search_query',
-                      {
-                        scope: searchScope,
-                        length: searchQuery.trim().length,
-                      },
-                      userId
-                    );
-                  }
-                }}
-              >
+              <Pressable style={styles.iconButton} onPress={() => setSearchOpen(false)}>
                 <Ionicons name="close" size={20} color={colors.text} />
               </Pressable>
             </View>
@@ -1633,17 +1196,7 @@ const HomeScreen = () => {
                     styles.filterChip,
                     searchScope === scope && styles.filterChipActive,
                   ]}
-                  onPress={() => {
-                    setSearchScope(scope as 'rooms' | 'businesses' | 'posts');
-                    setSelectedBusinessId(null);
-                    setSelectedRoomId(null);
-                    setSpiderfy(null);
-                    void trackAnalyticsEvent(
-                      'filter_toggle',
-                      { filter: 'scope', value: scope },
-                      userId
-                    );
-                  }}
+                  onPress={() => setSearchScope(scope as 'rooms' | 'businesses' | 'posts')}
                 >
                   <Text
                     style={[
@@ -1656,170 +1209,12 @@ const HomeScreen = () => {
                 </Pressable>
               ))}
             </View>
-            {searchScope === 'businesses' ? (
-              <View style={styles.filterRow}>
-                <Pressable
-                  style={[
-                    styles.filterChip,
-                    filterOpenNow && styles.filterChipActive,
-                  ]}
-                  onPress={() => {
-                    const nextValue = !filterOpenNow;
-                    setFilterOpenNow(nextValue);
-                    void trackAnalyticsEvent(
-                      'filter_toggle',
-                      { filter: 'open_now', value: nextValue },
-                      userId
-                    );
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      filterOpenNow && styles.filterChipTextActive,
-                    ]}
-                  >
-                    Open now
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.filterChip,
-                    filterVerified && styles.filterChipActive,
-                  ]}
-                  onPress={() => {
-                    setFilterVerified((prev) => !prev);
-                    void trackAnalyticsEvent(
-                      'filter_toggle',
-                      { filter: 'verified', value: !filterVerified },
-                      userId
-                    );
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      filterVerified && styles.filterChipTextActive,
-                    ]}
-                  >
-                    Verified
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
-            {tagOptions.length > 0 ? (
-              <View style={styles.filterRow}>
-                {tagOptions.map((tag) => (
-                  <Pressable
-                    key={tag}
-                    style={[
-                      styles.filterChip,
-                      activeTag === tag && styles.filterChipActive,
-                    ]}
-                    onPress={() => {
-                      const nextTag = activeTag === tag ? null : tag;
-                      setActiveTag(nextTag);
-                      void trackAnalyticsEvent(
-                        'filter_toggle',
-                        { filter: 'tag', value: nextTag ?? 'none' },
-                        userId
-                      );
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.filterChipText,
-                        activeTag === tag && styles.filterChipTextActive,
-                      ]}
-                    >
-                      #{tag}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-            <View style={styles.searchResults}>
-              {searchScope === 'rooms' ? (
-                filteredRooms.length === 0 ? (
-                  <Text style={styles.metaText}>No rooms found.</Text>
-                ) : (
-                  filteredRooms.slice(0, 5).map((room) => (
-                    <Pressable
-                      key={room.id}
-                      style={styles.searchResultRow}
-                      onPress={() => {
-                        setSearchOpen(false);
-                        navigation.navigate('Room', { roomId: room.id });
-                      }}
-                    >
-                      <Ionicons name="chatbubbles-outline" size={16} color={colors.textMuted} />
-                      <View style={styles.searchResultInfo}>
-                        <Text style={styles.cardTitle}>{room.title}</Text>
-                        <Text style={styles.metaText}>{room.category}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                    </Pressable>
-                  ))
-                )
-              ) : null}
-              {searchScope === 'businesses' ? (
-                filteredBusinesses.length === 0 ? (
-                  <Text style={styles.metaText}>No businesses found.</Text>
-                ) : (
-                  filteredBusinesses.slice(0, 5).map((business) => (
-                    <Pressable
-                      key={business.id}
-                      style={styles.searchResultRow}
-                      onPress={() => {
-                        setSearchOpen(false);
-                        navigation.navigate('Business', { businessId: business.id });
-                      }}
-                    >
-                      <Ionicons name="storefront-outline" size={16} color={colors.textMuted} />
-                      <View style={styles.searchResultInfo}>
-                        <Text style={styles.cardTitle}>{business.name}</Text>
-                        <Text style={styles.metaText}>{business.category}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                    </Pressable>
-                  ))
-                )
-              ) : null}
-              {searchScope === 'posts' ? (
-                <View style={styles.searchPostWrap}>
-                  {postSearchResults.length === 0 ? (
-                    <Text style={styles.metaText}>No posts match yet.</Text>
-                  ) : (
-                    postSearchResults.slice(0, 4).map((post) => (
-                      <View key={post.id} style={styles.searchResultRow}>
-                        <Ionicons name="newspaper-outline" size={16} color={colors.textMuted} />
-                        <View style={styles.searchResultInfo}>
-                          <Text style={styles.cardTitle}>@{post.authorHandle}</Text>
-                          <Text style={styles.metaText}>{post.body}</Text>
-                        </View>
-                      </View>
-                    ))
-                  )}
-                  <Pressable
-                    style={styles.primaryButton}
-                    onPress={() => {
-                      setSearchOpen(false);
-                      navigation.navigate('Feed', { search: searchQuery });
-                    }}
-                  >
-                    <Text style={styles.primaryButtonText}>Open feed results</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
           </View>
         ) : null}
         <View style={styles.mapShell}>
           {Platform.OS === 'web' ? (
             <View style={styles.webPlaceholder}>
-              <Text style={styles.mapLabel}>
-                Web support parity is pending. Map is mobile-only for now.
-              </Text>
+              <Text style={styles.mapLabel}>Map is mobile-only for now.</Text>
             </View>
           ) : (
             <MapView
@@ -1919,7 +1314,7 @@ const HomeScreen = () => {
                       }}
                     >
                       <View style={styles.pinWrap}>
-                        <PulseRing color={colors.danger} size={36} />
+                        <PulseRing color="#FF3B30" size={36} />
                         <View style={styles.userPin}>
                           {item.avatarUrl ? (
                             <Image source={{ uri: item.avatarUrl }} style={styles.userPinImage} />
@@ -2014,7 +1409,7 @@ const HomeScreen = () => {
                     onPress={() => setSpiderfy(null)}
                   >
                     <View style={styles.pinWrap}>
-                      <PulseRing color={colors.danger} size={36} />
+                      <PulseRing color="#FF3B30" size={36} />
                       <View style={styles.userPin}>
                         {pin.avatarUrl ? (
                           <Image source={{ uri: pin.avatarUrl }} style={styles.userPinImage} />
@@ -2128,26 +1523,20 @@ const HomeScreen = () => {
           </Pressable>
         </View>
       </View>
-      <BottomNav />
       <StatusBar style="auto" />
     </SafeAreaView>
   );
 };
-type FeedProps = NativeStackScreenProps<RootStackParamList, 'Feed'>;
-
-const FeedScreen = ({ route }: FeedProps) => {
+const FeedScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
-  const { userId } = useAuth();
   const [posts, setPosts] = useState<PostEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [storiesNotice, setStoriesNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'trending' | 'forYou' | 'newest'>('trending');
-  const [searchValue, setSearchValue] = useState(route.params?.search ?? '');
+  const [searchValue, setSearchValue] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const tags = ['food', 'events', 'jobs', 'deals', 'study'];
-  const storyLabels = ['Food finds', 'Events', 'Deals', 'Study'];
 
   const loadPosts = async () => {
     if (!supabase) {
@@ -2161,7 +1550,7 @@ const FeedScreen = ({ route }: FeedProps) => {
     setNotice(null);
     const { data, error } = await supabase
       .from('posts')
-      .select('id, author_handle, body, created_at, media_type, media_url')
+      .select('id, author_handle, body, created_at')
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) {
@@ -2175,8 +1564,6 @@ const FeedScreen = ({ route }: FeedProps) => {
         authorHandle: row.author_handle ?? 'blip',
         body: row.body ?? '',
         createdAt: row.created_at ?? '',
-        mediaUrl: row.media_url ?? null,
-        mediaType: row.media_type ?? null,
       }))
     );
     setLoading(false);
@@ -2203,16 +1590,6 @@ const FeedScreen = ({ route }: FeedProps) => {
       channel.unsubscribe();
     };
   }, []);
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'feed' }, userId);
-  }, [userId]);
-
-  useEffect(() => {
-    if (route.params?.search !== undefined) {
-      setSearchValue(route.params.search ?? '');
-    }
-  }, [route.params?.search]);
 
   const filteredPosts = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
@@ -2257,26 +1634,6 @@ const FeedScreen = ({ route }: FeedProps) => {
                   </Text>
                 </Pressable>
               ))}
-            </View>
-            <View style={styles.card}>
-              <SectionTitle icon="sparkles-outline" label="Stories (coming soon)" />
-              <Text style={styles.cardBody}>
-                Quick local highlights from rooms and businesses.
-              </Text>
-              <View style={styles.storyRow}>
-                {storyLabels.map((label) => (
-                  <View key={label} style={styles.storyPill}>
-                    <Text style={styles.storyPillText}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-              {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null}
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => setStoriesNotice('Stories are coming soon.')}
-              >
-                <Text style={styles.secondaryButtonText}>Get notified</Text>
-              </Pressable>
             </View>
             <View style={styles.searchInputWrap}>
               <Ionicons name="search" size={18} color={colors.textMuted} />
@@ -2325,16 +1682,13 @@ const FeedScreen = ({ route }: FeedProps) => {
               </View>
               <View style={styles.postHeaderInfo}>
                 <Text style={styles.cardTitle}>@{item.authorHandle}</Text>
-                <Text style={styles.metaText}>Level 3 | XP 120</Text>
+                <Text style={styles.metaText}>Level 3 · XP 120</Text>
               </View>
               <View style={styles.postBadge}>
                 <Text style={styles.postBadgeText}>Local</Text>
               </View>
             </View>
             <Text style={styles.cardBody}>{item.body}</Text>
-            {item.mediaUrl ? (
-              <Image source={{ uri: item.mediaUrl }} style={styles.feedMediaImage} />
-            ) : null}
             <View style={styles.postContext}>
               <Ionicons name="location-outline" size={14} color={colors.textMuted} />
               <Text style={styles.metaText}>Room / Business context</Text>
@@ -2359,17 +1713,7 @@ const FeedScreen = ({ route }: FeedProps) => {
             </View>
           </View>
         )}
-        ListEmptyComponent={
-          loading ? (
-            <View style={styles.skeletonStack}>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <SkeletonCard key={`feed-skel-${index}`} />
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.listEmpty}>No posts yet.</Text>
-          )
-        }
+        ListEmptyComponent={<Text style={styles.listEmpty}>No posts yet.</Text>}
       />
       <BottomNav />
       <StatusBar style="auto" />
@@ -2384,30 +1728,6 @@ const CreateScreen = () => {
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [mediaUploading, setMediaUploading] = useState(false);
-  const [mediaNotice, setMediaNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'create' }, userId);
-  }, [userId]);
-
-  const handleAttachPostMedia = async () => {
-    if (!userId) {
-      setMediaNotice('Sign in to attach media.');
-      return;
-    }
-    setMediaUploading(true);
-    setMediaNotice(null);
-    const upload = await pickAndUploadImage('post-media', `posts/${userId}`);
-    if (!upload.url) {
-      setMediaNotice(upload.error === 'permission' ? 'Photo permission denied.' : 'Upload canceled.');
-      setMediaUploading(false);
-      return;
-    }
-    setMediaUrl(upload.url);
-    setMediaUploading(false);
-  };
 
   const handleSubmit = async () => {
     if (!supabase) {
@@ -2422,32 +1742,18 @@ const CreateScreen = () => {
       setNotice('Write something to share.');
       return;
     }
-    const moderation = await runModerationCheck({
-      content_type: 'post',
-      text: body.trim(),
-      image_url: mediaUrl ?? undefined,
-    });
-    if (!moderation.allowed) {
-      setNotice('Post blocked by safety checks.');
-      return;
-    }
-    const safetyWarning = moderation.status !== 'ok';
     setSubmitting(true);
     setNotice(null);
     const { error } = await supabase.from('posts').insert({
       user_id: userId,
       author_handle: profile?.handle ?? 'blip',
       body: body.trim(),
-      media_type: mediaUrl ? 'image' : null,
-      media_url: mediaUrl,
     });
     if (error) {
       setNotice('Unable to create post.');
     } else {
       setBody('');
-      setMediaUrl(null);
-      setNotice(safetyWarning ? 'Posted (safety check unavailable).' : 'Posted!');
-      void trackAnalyticsEvent('post_create', { length: body.trim().length, media: Boolean(mediaUrl) }, userId);
+      setNotice('Posted!');
     }
     setSubmitting(false);
   };
@@ -2468,21 +1774,6 @@ const CreateScreen = () => {
           placeholderTextColor={colors.placeholder}
           multiline
         />
-        {mediaNotice ? <Text style={styles.metaText}>{mediaNotice}</Text> : null}
-        {mediaUrl ? (
-          <View style={styles.postMediaPreview}>
-            <Image source={{ uri: mediaUrl }} style={styles.feedMediaImage} />
-            <Pressable style={styles.secondaryButton} onPress={() => setMediaUrl(null)}>
-              <Text style={styles.secondaryButtonText}>Remove media</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable style={styles.secondaryButton} onPress={() => void handleAttachPostMedia()}>
-            <Text style={styles.secondaryButtonText}>
-              {mediaUploading ? 'Uploading...' : 'Attach image'}
-            </Text>
-          </Pressable>
-        )}
         {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
         <Pressable style={styles.primaryButton} onPress={() => void handleSubmit()} disabled={submitting}>
           <Text style={styles.primaryButtonText}>{submitting ? 'Posting...' : 'Post'}</Text>
@@ -2499,10 +1790,6 @@ const MessagesScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { businesses: businessList } = useBusinesses();
   const { userId, loading } = useAuth();
-  const { colors } = useTheme();
-  const [messagesTab, setMessagesTab] = useState<'business' | 'direct'>('business');
-  const [searchValue, setSearchValue] = useState('');
-  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const [directThreads, setDirectThreads] = useState<
     { id: string; handle: string; lastMessage: string; time: string }[]
   >([]);
@@ -2612,9 +1899,6 @@ const MessagesScreen = () => {
       channel?.unsubscribe();
     };
   }, [userId]);
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'messages' }, userId);
-  }, [userId]);
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -2628,119 +1912,47 @@ const MessagesScreen = () => {
             </Pressable>
           </View>
         ) : null}
-        <View style={styles.messagesHeader}>
-          <View style={styles.feedTabs}>
-            <Pressable
-              style={[styles.tabPill, messagesTab === 'business' && styles.tabPillActive]}
-              onPress={() => setMessagesTab('business')}
-            >
-              <Text style={[styles.tabPillText, messagesTab === 'business' && styles.tabPillTextActive]}>
-                Business
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.tabPill, messagesTab === 'direct' && styles.tabPillActive]}
-              onPress={() => setMessagesTab('direct')}
-            >
-              <Text style={[styles.tabPillText, messagesTab === 'direct' && styles.tabPillTextActive]}>
-                Direct
-              </Text>
-            </Pressable>
-          </View>
-          <View style={styles.searchInputWrap}>
-            <Ionicons name="search" size={18} color={colors.textMuted} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search chats"
-              placeholderTextColor={colors.placeholder}
-              value={searchValue}
-              onChangeText={setSearchValue}
-            />
-          </View>
+        <View style={styles.card}>
+          <SectionTitle icon="chatbubbles-outline" label="Business chats" />
+          <Text style={styles.cardBody}>
+            Every business has a chatroom for customers. Preview before joining.
+          </Text>
+          {businessList.map((business) => (
+            <View key={business.id} style={styles.listRow}>
+              <View style={styles.listRowInfo}>
+                <Text style={styles.cardTitle}>{business.name}</Text>
+                <Text style={styles.metaText}>{business.category}</Text>
+              </View>
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => navigation.navigate('Business', { businessId: business.id, tab: 'qa' })}
+              >
+                <Text style={styles.secondaryButtonText}>View</Text>
+              </Pressable>
+            </View>
+          ))}
         </View>
         <View style={styles.card}>
-          <SectionTitle icon="mic-outline" label="Voice rooms (coming soon)" />
-          <Text style={styles.cardBody}>
-            Drop-in audio rooms for your neighborhood and favorite spots.
-          </Text>
-          {voiceNotice ? <Text style={styles.metaText}>{voiceNotice}</Text> : null}
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => setVoiceNotice('Voice rooms are coming soon.')}
-          >
-            <Text style={styles.secondaryButtonText}>Notify me</Text>
-          </Pressable>
+          <SectionTitle icon="chatbox-ellipses-outline" label="Direct messages" />
+          {loading || threadsLoading ? (
+            <Text style={styles.metaText}>Loading threads...</Text>
+          ) : null}
+          {directThreads.map((thread) => (
+            <Pressable
+              key={thread.id}
+              style={styles.listRow}
+              onPress={() =>
+                navigation.navigate('DirectChat', { threadId: thread.id, title: thread.handle })
+              }
+            >
+              <View style={styles.listRowInfo}>
+                <Text style={styles.cardTitle}>@{thread.handle}</Text>
+                <Text style={styles.metaText}>{thread.lastMessage}</Text>
+              </View>
+              <Text style={styles.metaText}>{thread.time}</Text>
+            </Pressable>
+          ))}
         </View>
-        {messagesTab === 'business' ? (
-          <View style={styles.card}>
-            <SectionTitle icon="chatbubbles-outline" label="Business chats" />
-            <Text style={styles.cardBody}>
-              Every business has a chatroom for customers. Preview before joining.
-            </Text>
-            {businessList.length === 0 ? (
-              <View style={styles.skeletonStack}>
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <SkeletonRowItem key={`biz-skel-${index}`} />
-                ))}
-              </View>
-            ) : (
-              businessList
-                .filter((business) =>
-                  searchValue ? business.name.toLowerCase().includes(searchValue.toLowerCase()) : true
-                )
-                .map((business) => (
-                  <Pressable
-                    key={business.id}
-                    style={styles.messageRow}
-                    onPress={() => navigation.navigate('Business', { businessId: business.id, tab: 'qa' })}
-                  >
-                    <View style={styles.messageAvatar}>
-                      <Ionicons name="storefront-outline" size={16} color={colors.text} />
-                    </View>
-                    <View style={styles.listRowInfo}>
-                      <Text style={styles.cardTitle}>{business.name}</Text>
-                      <Text style={styles.metaText}>{business.category}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                  </Pressable>
-                ))
-            )}
-          </View>
-        ) : (
-          <View style={styles.card}>
-            <SectionTitle icon="chatbox-ellipses-outline" label="Direct messages" />
-            {loading || threadsLoading ? (
-              <View style={styles.skeletonStack}>
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <SkeletonRowItem key={`dm-skel-${index}`} />
-                ))}
-              </View>
-            ) : (
-              directThreads
-                .filter((thread) =>
-                  searchValue ? thread.handle.toLowerCase().includes(searchValue.toLowerCase()) : true
-                )
-                .map((thread) => (
-                  <Pressable
-                    key={thread.id}
-                    style={styles.messageRow}
-                    onPress={() =>
-                      navigation.navigate('DirectChat', { threadId: thread.id, title: thread.handle })
-                    }
-                  >
-                    <View style={styles.messageAvatar}>
-                      <Ionicons name="person-outline" size={16} color={colors.text} />
-                    </View>
-                    <View style={styles.listRowInfo}>
-                      <Text style={styles.cardTitle}>@{thread.handle}</Text>
-                      <Text style={styles.metaText}>{thread.lastMessage}</Text>
-                    </View>
-                    <Text style={styles.metaText}>{thread.time}</Text>
-                  </Pressable>
-                ))
-            )}
-          </View>
-        )}
       </ScrollView>
       <BottomNav />
       <StatusBar style="auto" />
@@ -2752,28 +1964,12 @@ type DirectChatProps = NativeStackScreenProps<RootStackParamList, 'DirectChat'>;
 
 const DirectChatScreen = ({ route }: DirectChatProps) => {
   const styles = useStyles();
-  const { colors } = useTheme();
   const { userId } = useAuth();
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sendNotice, setSendNotice] = useState<string | null>(null);
-  const [mediaUploading, setMediaUploading] = useState(false);
   const threadId = route.params?.threadId ?? '';
   const title = route.params?.title ?? 'Chat';
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'direct_chat' }, userId);
-  }, [userId]);
-  const formatTime = (value?: string | null) => {
-    if (!value) {
-      return '';
-    }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return '';
-    }
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
 
   useEffect(() => {
     let isMounted = true;
@@ -2786,7 +1982,7 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
       setLoading(true);
       const { data, error } = await supabase
         .from('direct_messages')
-        .select('id, body, created_at, sender_id, media_type, media_url')
+        .select('id, body, created_at, sender_id')
         .eq('thread_id', threadId)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -2800,8 +1996,6 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
             body: row.body ?? '',
             senderId: row.sender_id ?? null,
             createdAt: row.created_at ?? '',
-            mediaUrl: row.media_url ?? null,
-            mediaType: row.media_type ?? null,
           }))
         );
       }
@@ -2832,58 +2026,11 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
     }
     const body = draft.trim();
     setDraft('');
-    setSendNotice(null);
-    const moderation = await runModerationCheck({
-      content_type: 'direct_message',
-      content_id: threadId,
-      text: body,
-    });
-    if (!moderation.allowed) {
-      setSendNotice('Message blocked by safety checks.');
-      return;
-    }
-    if (moderation.status !== 'ok') {
-      setSendNotice('Safety check unavailable. Message sent.');
-    }
     await supabase.from('direct_messages').insert({
       thread_id: threadId,
       sender_id: userId,
       body,
     });
-    void trackAnalyticsEvent('message_send', { channel: 'direct' }, userId);
-  };
-
-  const handleAttachDirectMedia = async () => {
-    if (!supabase || !userId || !threadId) {
-      setSendNotice('Sign in to share media.');
-      return;
-    }
-    setMediaUploading(true);
-    setSendNotice(null);
-    const upload = await pickAndUploadImage('chat-media', `direct/${threadId}`);
-    if (!upload.url) {
-      setSendNotice(upload.error === 'permission' ? 'Photo permission denied.' : 'Upload canceled.');
-      setMediaUploading(false);
-      return;
-    }
-    const moderation = await runModerationCheck({
-      content_type: 'direct_message',
-      content_id: threadId,
-      image_url: upload.url,
-    });
-    if (!moderation.allowed) {
-      setSendNotice('Media blocked by safety checks.');
-      setMediaUploading(false);
-      return;
-    }
-    await supabase.from('direct_messages').insert({
-      thread_id: threadId,
-      sender_id: userId,
-      media_type: 'image',
-      media_url: upload.url,
-    });
-    void trackAnalyticsEvent('message_send', { channel: 'direct', media: true }, userId);
-    setMediaUploading(false);
   };
 
   return (
@@ -2893,48 +2040,27 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
         <View style={styles.card}>
           <SectionTitle icon="chatbox-ellipses-outline" label={title} />
           {loading ? <Text style={styles.metaText}>Loading messages...</Text> : null}
-          {sendNotice ? <Text style={styles.metaText}>{sendNotice}</Text> : null}
-          {[...messages].reverse().map((message) => {
-            const isMine = message.senderId === userId;
-            return (
-              <View
-                key={message.id}
-                style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}
-              >
-                <View
-                  style={[
-                    styles.messageBubble,
-                    isMine ? styles.messageBubbleMine : styles.messageBubbleOther,
-                  ]}
-                >
-                  {message.body ? (
-                    <Text style={[styles.messageText, isMine && styles.messageTextMine]}>
-                      {message.body}
-                    </Text>
-                  ) : null}
-                  {message.mediaUrl ? (
-                    <Image source={{ uri: message.mediaUrl }} style={styles.chatMediaImage} />
-                  ) : null}
-                </View>
-                <Text style={styles.messageTimestamp}>{formatTime(message.createdAt)}</Text>
+          {messages.map((message) => (
+            <View key={message.id} style={styles.listRow}>
+              <View style={styles.listRowInfo}>
+                <Text style={styles.cardTitle}>
+                  {message.senderId === userId ? 'You' : 'Them'}
+                </Text>
+                <Text style={styles.metaText}>{message.body}</Text>
               </View>
-            );
-          })}
+              <Text style={styles.metaText}>{message.createdAt}</Text>
+            </View>
+          ))}
           <View style={styles.inputRow}>
-            <Pressable style={styles.iconButtonSm} onPress={() => void handleAttachDirectMedia()}>
-              <Ionicons name="attach-outline" size={18} color={colors.text} />
-            </Pressable>
             <TextInput
               style={styles.input}
               value={draft}
               onChangeText={setDraft}
               placeholder="Type a message"
-              placeholderTextColor={colors.placeholder}
+              placeholderTextColor="#9E90B4"
             />
             <Pressable style={styles.primaryButton} onPress={handleSend}>
-              <Text style={styles.primaryButtonText}>
-                {mediaUploading ? 'Uploading...' : 'Send'}
-              </Text>
+              <Text style={styles.primaryButtonText}>Send</Text>
             </Pressable>
           </View>
         </View>
@@ -2954,22 +2080,9 @@ const OrdersScreen = () => {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [orderNotes, setOrderNotes] = useState('');
-  const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]);
-  const [menuLoading, setMenuLoading] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItemEntry[]>([]);
-  const [lastReceipt, setLastReceipt] = useState<{
-    orderId: string;
-    businessName: string;
-    items: CartItemEntry[];
-    totalCents: number;
-  } | null>(null);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
     businessList[0]?.id ?? null
   );
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'orders' }, userId);
-  }, [userId]);
 
   const businessIndex = useMemo(() => {
     const map = new Map<string, string>();
@@ -2984,78 +2097,6 @@ const OrdersScreen = () => {
       setSelectedBusinessId(businessList[0].id);
     }
   }, [businessList, selectedBusinessId]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadMenu = async () => {
-      if (!supabase || !selectedBusinessId) {
-        setMenuItems([]);
-        return;
-      }
-      setMenuLoading(true);
-      const { data, error } = await supabase
-        .from('menu_items')
-        .select('id, name, price_cents, available')
-        .eq('business_id', selectedBusinessId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (!isMounted) {
-        return;
-      }
-      if (!error && Array.isArray(data)) {
-        setMenuItems(
-          data.map((row) => ({
-            id: String(row.id ?? ''),
-            businessId: selectedBusinessId,
-            name: row.name ?? 'Menu item',
-            priceCents: typeof row.price_cents === 'number' ? row.price_cents : null,
-            available: row.available !== false,
-          }))
-        );
-      } else {
-        setMenuItems([]);
-      }
-      setMenuLoading(false);
-    };
-    setCartItems([]);
-    void loadMenu();
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedBusinessId]);
-
-  const cartTotalCents = useMemo(
-    () =>
-      cartItems.reduce((sum, item) => sum + (item.priceCents ?? 0) * item.quantity, 0),
-    [cartItems]
-  );
-
-  const updateCart = (item: MenuItemEntry, delta: number) => {
-    setCartItems((prev) => {
-      const existing = prev.find((entry) => entry.id === item.id);
-      if (!existing && delta > 0) {
-        return [
-          ...prev,
-          {
-            id: item.id,
-            name: item.name,
-            priceCents: item.priceCents ?? null,
-            quantity: 1,
-          },
-        ];
-      }
-      if (!existing) {
-        return prev;
-      }
-      const nextQty = existing.quantity + delta;
-      if (nextQty <= 0) {
-        return prev.filter((entry) => entry.id !== item.id);
-      }
-      return prev.map((entry) =>
-        entry.id === item.id ? { ...entry, quantity: nextQty } : entry
-      );
-    });
-  };
 
   const refreshOrders = async () => {
     if (!supabase || !userId) {
@@ -3163,66 +2204,18 @@ const OrdersScreen = () => {
       setNotice('Select a business first.');
       return;
     }
-    if (cartItems.length === 0) {
-      setNotice('Add at least one item.');
-      return;
-    }
     setNotice(null);
-    const { data, error } = await supabase
-      .from('orders')
-      .insert({
-        business_id: selectedBusinessId,
-        user_id: userId,
-        status: 'requested',
-        notes: orderNotes.trim() ? orderNotes.trim() : null,
-      })
-      .select('id')
-      .maybeSingle();
-    if (error || !data?.id) {
+    const { error } = await supabase.from('orders').insert({
+      business_id: selectedBusinessId,
+      user_id: userId,
+      status: 'requested',
+      notes: orderNotes.trim() ? orderNotes.trim() : null,
+    });
+    if (error) {
       setNotice('Unable to create order.');
     } else {
-      const orderId = String(data.id);
-      await supabase.from('order_items').insert(
-        cartItems.map((item) => ({
-          order_id: orderId,
-          menu_item_id: item.id,
-          quantity: item.quantity,
-          price_cents: item.priceCents,
-        }))
-      );
       setOrderNotes('');
-      setLastReceipt({
-        orderId,
-        businessName: selectedBusinessId
-          ? businessIndex.get(selectedBusinessId) ?? 'Business'
-          : 'Business',
-        items: cartItems,
-        totalCents: cartTotalCents,
-      });
-      setCartItems([]);
       setNotice('Order requested.');
-      void trackAnalyticsEvent('order_place', { business_id: selectedBusinessId }, userId);
-      if (selectedBusinessId) {
-        const { data: ownerRow } = await supabase
-          .from('businesses')
-          .select('owner_id')
-          .eq('id', selectedBusinessId)
-          .maybeSingle();
-        const ownerId = ownerRow?.owner_id ?? null;
-        const recipients = [userId, ownerId].filter(
-          (entry): entry is string => typeof entry === 'string' && entry.length > 0
-        );
-        if (recipients.length > 0) {
-          await supabase.functions.invoke('push-send', {
-            body: {
-              user_ids: recipients,
-              title: 'BLIP',
-              body: 'New order received.',
-              data: { type: 'order', order_id: orderId },
-            },
-          });
-        }
-      }
       void refreshOrders();
     }
   };
@@ -3236,16 +2229,11 @@ const OrdersScreen = () => {
         keyExtractor={(item) => item.id}
         ListHeaderComponent={
           <View style={styles.card}>
-            <SectionTitle icon="receipt-outline" label="Order flow" />
+            <SectionTitle icon="receipt-outline" label="Orders" />
             <Text style={styles.cardBody}>Pickup-only. Delivery handled outside BLIP.</Text>
-            {!userId ? <Text style={styles.metaText}>Sign in to place an order.</Text> : null}
+            {!userId ? <Text style={styles.metaText}>Sign in to view your orders.</Text> : null}
             {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-            <View style={styles.stepRow}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>1</Text>
-              </View>
-              <Text style={styles.metaText}>Select business</Text>
-            </View>
+            <Text style={styles.cardTitle}>Request pickup order</Text>
             <View style={styles.filterRow}>
               {businessList.map((business) => (
                 <Pressable
@@ -3267,49 +2255,6 @@ const OrdersScreen = () => {
                 </Pressable>
               ))}
             </View>
-            <View style={styles.stepRow}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>2</Text>
-              </View>
-              <Text style={styles.metaText}>Add items (menu tab)</Text>
-            </View>
-            {menuLoading ? <Text style={styles.metaText}>Loading menu...</Text> : null}
-            {menuItems.length === 0 ? (
-              <Text style={styles.metaText}>No menu items yet.</Text>
-            ) : (
-              menuItems.map((item) => {
-                const inCart = cartItems.find((entry) => entry.id === item.id);
-                return (
-                  <View key={item.id} style={styles.cartRow}>
-                    <View style={styles.listRowInfo}>
-                      <Text style={styles.cardTitle}>{item.name}</Text>
-                      <Text style={styles.metaText}>
-                        {item.priceCents ? `Rs ${(item.priceCents / 100).toFixed(0)}` : 'Price TBD'}
-                      </Text>
-                    </View>
-                    <View style={styles.cartControls}>
-                      <Pressable style={styles.cartButton} onPress={() => updateCart(item, -1)}>
-                        <Ionicons name="remove" size={16} color={colors.text} />
-                      </Pressable>
-                      <Text style={styles.cardTitle}>{inCart?.quantity ?? 0}</Text>
-                      <Pressable style={styles.cartButton} onPress={() => updateCart(item, 1)}>
-                        <Ionicons name="add" size={16} color={colors.text} />
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-            <View style={styles.stepRow}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>3</Text>
-              </View>
-              <Text style={styles.metaText}>Add pickup notes</Text>
-            </View>
-            <View style={styles.cartSummary}>
-              <Text style={styles.cardTitle}>Cart total</Text>
-              <Text style={styles.cardTitle}>Rs {(cartTotalCents / 100).toFixed(0)}</Text>
-            </View>
             <TextInput
               style={styles.input}
               value={orderNotes}
@@ -3318,33 +2263,7 @@ const OrdersScreen = () => {
               placeholderTextColor={colors.placeholder}
             />
             <Pressable style={styles.primaryButton} onPress={() => void handleCreateOrder()}>
-              <Text style={styles.primaryButtonText}>Submit pickup order</Text>
-            </Pressable>
-            {lastReceipt ? (
-              <View style={styles.receiptCard}>
-                <Text style={styles.cardTitle}>Receipt</Text>
-                <Text style={styles.metaText}>Order #{lastReceipt.orderId.slice(0, 6)}</Text>
-                <Text style={styles.metaText}>{lastReceipt.businessName}</Text>
-                {lastReceipt.items.map((item) => (
-                  <View key={item.id} style={styles.rowBetween}>
-                    <Text style={styles.metaText}>{item.name}</Text>
-                    <Text style={styles.metaText}>
-                      x{item.quantity} • Rs{' '}
-                      {item.priceCents ? ((item.priceCents * item.quantity) / 100).toFixed(0) : '0'}
-                    </Text>
-                  </View>
-                ))}
-                <View style={styles.rowBetween}>
-                  <Text style={styles.cardTitle}>Total</Text>
-                  <Text style={styles.cardTitle}>Rs {(lastReceipt.totalCents / 100).toFixed(0)}</Text>
-                </View>
-              </View>
-            ) : null}
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => setNotice('Email/SMS receipt setup pending. Coming soon.')}
-            >
-              <Text style={styles.secondaryButtonText}>Email/SMS receipt</Text>
+              <Text style={styles.primaryButtonText}>Request order</Text>
             </Pressable>
           </View>
         }
@@ -3371,171 +2290,27 @@ const OrdersScreen = () => {
   );
 };
 
-const BillingScreen = () => {
-  const styles = useStyles();
-  const [notice, setNotice] = useState<string | null>(null);
-  const handlePending = (label: string) => {
-    setNotice(`${label} setup pending. Coming soon.`);
-  };
-  return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <SectionTitle icon="card-outline" label="Billing" />
-          <Text style={styles.cardBody}>
-            Payments, subscriptions, and invoices are not enabled yet.
-          </Text>
-          <Text style={styles.metaText}>This will unlock before rollout.</Text>
-          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Payments')}>
-            <Text style={styles.secondaryButtonText}>Connect payments provider</Text>
-          </Pressable>
-          <View style={styles.sectionDivider} />
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Paid tiers')}>
-            <Text style={styles.secondaryButtonText}>Paid tiers (users)</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Invite-only access')}>
-            <Text style={styles.secondaryButtonText}>Invite-only access</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Paid invites')}>
-            <Text style={styles.secondaryButtonText}>Paid invites</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-      <BottomNav />
-      <StatusBar style="auto" />
-    </SafeAreaView>
-  );
-};
-
 const ProfileScreen = () => {
   const styles = useStyles();
-  const { colors, toggle, mode } = useTheme();
+  const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { userId, email, deviceId, profile, signOut, loading } = useAuth();
-  const { businesses: businessList } = useBusinesses();
-  const [identity, setIdentity] = useState<'personal' | 'business'>('personal');
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [pushToken, setPushToken] = useState<string | null>(null);
-  const [pushStatus, setPushStatus] = useState<string | null>(null);
-  const [pushNotice, setPushNotice] = useState<string | null>(null);
-  const activeBusiness = businessList[0];
-  const reputationScore = useMemo(() => {
-    const xp = profile?.xp ?? 0;
-    const level = profile?.level ?? 1;
-    const raw = xp / 10 + level * 5;
-    return Math.max(0, Math.min(100, Math.round(raw)));
-  }, [profile?.level, profile?.xp]);
-  const trustLabel = useMemo(() => {
-    if (profile?.shadowbanned) {
-      return 'Restricted';
-    }
-    if (profile?.u2uLocked) {
-      return 'Limited';
-    }
-    if ((profile?.level ?? 1) >= 6) {
-      return 'High';
-    }
-    if ((profile?.level ?? 1) >= 3) {
-      return 'Growing';
-    }
-    return 'New';
-  }, [profile?.level, profile?.shadowbanned, profile?.u2uLocked]);
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'profile' }, userId);
-  }, [userId]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const register = async () => {
-      if (!userId || !pushEnabled) {
-        return;
-      }
-      const result = await registerForPushAsync();
-      if (!isMounted) {
-        return;
-      }
-      setPushStatus(result.status);
-      setPushToken(result.token);
-      if (result.token && supabase) {
-        await supabase.from('device_tokens').upsert(
-          {
-            user_id: userId,
-            device_id: deviceId,
-            platform: Platform.OS,
-            token: result.token,
-            last_seen_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id,token' }
-        );
-        setPushNotice('Push enabled.');
-      } else if (result.status === 'denied') {
-        setPushNotice('Push permissions denied.');
-      } else if (result.status === 'expo') {
-        setPushNotice('Expo push token saved (native keys needed).');
-      } else {
-        setPushNotice('Push not available on this device.');
-      }
-    };
-    void register();
-    return () => {
-      isMounted = false;
-    };
-  }, [deviceId, pushEnabled, userId]);
-
-  const sendTestPush = async () => {
-    if (!supabase || !userId) {
-      setPushNotice('Sign in to test push.');
-      return;
-    }
-    const { data, error } = await supabase.functions.invoke('push-send', {
-      body: {
-        user_ids: [userId],
-        title: 'BLIP',
-        body: 'Test notification',
-        data: { type: 'test' },
-      },
-    });
-    if (error) {
-      setPushNotice('Unable to send push.');
-      return;
-    }
-    setPushNotice(`Push queued (${data?.sent ?? 0} sent).`);
-  };
+  const { userId, email, profile, signOut, loading } = useAuth();
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
-          <SectionTitle icon="person-circle-outline" label="Active identity" />
-          <View style={styles.tabRow}>
-            <Pressable
-              style={[styles.tabPill, identity === 'personal' && styles.tabPillActive]}
-              onPress={() => setIdentity('personal')}
-            >
-              <Text style={[styles.tabPillText, identity === 'personal' && styles.tabPillTextActive]}>
-                Personal
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.tabPill, identity === 'business' && styles.tabPillActive]}
-              onPress={() => setIdentity('business')}
-            >
-              <Text style={[styles.tabPillText, identity === 'business' && styles.tabPillTextActive]}>
-                Business
-              </Text>
-            </Pressable>
-          </View>
+          <SectionTitle icon="person-circle-outline" label="Your handle" />
           {loading ? (
             <Text style={styles.metaText}>Loading...</Text>
           ) : userId ? (
             <>
-              <Text style={styles.cardTitle}>
-                {identity === 'business' ? activeBusiness?.name ?? 'Business' : profile?.handle ?? userId.slice(0, 6)}
-              </Text>
+              <Text style={styles.cardTitle}>{profile?.handle ?? userId.slice(0, 6)}...</Text>
               <Text style={styles.metaText}>{email ?? 'Signed in'}</Text>
+              <View style={styles.metaRow}>
+                <Ionicons name="sparkles-outline" size={14} color={colors.textMuted} />
+                <Text style={styles.metaText}>XP {profile?.xp ?? 0} | Level {profile?.level ?? 1}</Text>
+              </View>
               {profile?.shadowbanned || profile?.u2uLocked ? (
                 <Text style={styles.metaText}>Account review in progress.</Text>
               ) : null}
@@ -3543,34 +2318,14 @@ const ProfileScreen = () => {
           ) : (
             <>
               <Text style={styles.metaText}>Not signed in</Text>
-              <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Auth')}>
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => navigation.navigate('Auth')}
+              >
                 <Text style={styles.secondaryButtonText}>Sign in</Text>
               </Pressable>
             </>
           )}
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="sparkles-outline" label="Stats" />
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaText}>Level</Text>
-            <Text style={styles.cardTitle}>{profile?.level ?? 1}</Text>
-          </View>
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaText}>XP</Text>
-            <Text style={styles.cardTitle}>{profile?.xp ?? 0}</Text>
-          </View>
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaText}>Reputation</Text>
-            <Text style={styles.cardTitle}>{reputationScore}</Text>
-          </View>
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaText}>Trust</Text>
-            <Text style={styles.cardTitle}>{trustLabel}</Text>
-          </View>
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="bookmark-outline" label="Saved" />
-          <Text style={styles.cardBody}>Saved posts, rooms, and businesses.</Text>
         </View>
         <View style={styles.card}>
           <SectionTitle icon="shield-checkmark-outline" label="Safety & verification" />
@@ -3581,64 +2336,38 @@ const ProfileScreen = () => {
             </View>
             <Text style={styles.metaText}>Not verified</Text>
           </View>
-          <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Auth')}>
-            <Text style={styles.secondaryButtonText}>Verify phone (OTP)</Text>
-          </Pressable>
           <View style={styles.rowBetween}>
             <View style={styles.metaRow}>
               <Ionicons name="hardware-chip-outline" size={14} color={colors.textMuted} />
               <Text style={styles.metaText}>Device ID</Text>
             </View>
-            <Text style={styles.metaText}>{deviceId ?? 'Pending'}</Text>
+            <Text style={styles.metaText}>Pending</Text>
           </View>
         </View>
         <View style={styles.card}>
-          <SectionTitle icon="card-outline" label="Billing" />
-          <Text style={styles.cardBody}>Subscriptions and payments are coming soon.</Text>
-          <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Billing')}>
-            <Text style={styles.secondaryButtonText}>Open billing</Text>
-          </Pressable>
+          <SectionTitle icon="briefcase-outline" label="Business admin" />
+          <Text style={styles.cardBody}>Manage staff, menus, offers, and orders.</Text>
         </View>
         <View style={styles.card}>
-          <SectionTitle icon="settings-outline" label="Settings" />
+          <SectionTitle icon="shield-checkmark-outline" label="Admin ops" />
+          <Text style={styles.cardBody}>Moderation queue, feature flags, and verification.</Text>
           <View style={styles.rowBetween}>
-            <Text style={styles.metaText}>Dark mode</Text>
-            <Pressable style={styles.secondaryButton} onPress={toggle}>
-              <Text style={styles.secondaryButtonText}>{mode === 'dark' ? 'On' : 'Off'}</Text>
+            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('AdminPortal')}>
+              <Text style={styles.secondaryButtonText}>Admin portal</Text>
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Moderation')}>
+              <Text style={styles.secondaryButtonText}>Moderation</Text>
             </Pressable>
           </View>
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaText}>Push notifications</Text>
-            <Switch
-              value={pushEnabled}
-              onValueChange={setPushEnabled}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={colors.surface}
-            />
-          </View>
-          {pushToken ? (
-            <Text style={styles.metaText}>
-              Token: {pushToken.slice(0, 10)}...{pushToken.slice(-6)}
-            </Text>
-          ) : null}
-          {pushStatus ? <Text style={styles.metaText}>Status: {pushStatus}</Text> : null}
-          {pushNotice ? <Text style={styles.metaText}>{pushNotice}</Text> : null}
-          <Pressable style={styles.secondaryButton} onPress={sendTestPush}>
-            <Text style={styles.secondaryButtonText}>Send test push</Text>
+        </View>
+        {userId ? (
+          <Pressable style={styles.secondaryButton} onPress={signOut}>
+            <Text style={styles.secondaryButtonText}>Sign out</Text>
           </Pressable>
-          <View style={styles.rowBetween}>
-            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('BugReport')}>
-              <Text style={styles.secondaryButtonText}>Report a bug</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Onboarding')}>
-              <Text style={styles.secondaryButtonText}>Onboarding</Text>
-            </Pressable>
-            {userId ? (
-              <Pressable style={styles.secondaryButton} onPress={signOut}>
-                <Text style={styles.secondaryButtonText}>Log out</Text>
-              </Pressable>
-            ) : null}
-          </View>
+        ) : null}
+        <View style={styles.card}>
+          <SectionTitle icon="color-palette-outline" label="Appearance" />
+          <Text style={styles.cardBody}>Palette applied globally.</Text>
         </View>
       </ScrollView>
       <BottomNav />
@@ -3650,151 +2379,60 @@ const ProfileScreen = () => {
 const AuthScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { signIn, signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [authMode, setAuthMode] = useState<'personal' | 'business' | 'fleet'>('personal');
+  const [isSignUp, setIsSignUp] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const authHint =
-    authMode === 'business'
-      ? 'Business sign-in opens the Business Admin Portal.'
-      : authMode === 'fleet'
-        ? 'Fleet access is not live yet.'
-        : 'Personal sign-in takes you to the map.';
 
-  const handleLogin = async () => {
+  const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
       setNotice('Email and password are required.');
       return;
     }
-    if (authMode === 'fleet') {
-      setNotice('Fleet login setup pending. Coming soon.');
-      return;
-    }
     setSubmitting(true);
     setNotice(null);
-    const ok = await signIn(email.trim(), password);
+    const ok = isSignUp ? await signUp(email.trim(), password) : await signIn(email.trim(), password);
     if (!ok) {
       setNotice('Unable to authenticate. Check your credentials.');
     } else {
-      setNotice('Signed in.');
-      if (authMode === 'business') {
-        navigation.navigate('BusinessAdmin');
-      } else {
-        navigation.navigate('Home');
-      }
+      setNotice(isSignUp ? 'Account created.' : 'Signed in.');
     }
     setSubmitting(false);
-  };
-
-  const handleSignup = async () => {
-    if (!email.trim() || !password.trim()) {
-      setNotice('Email and password are required.');
-      return;
-    }
-    if (authMode === 'fleet') {
-      setNotice('Fleet signup setup pending. Coming soon.');
-      return;
-    }
-    setSubmitting(true);
-    setNotice(null);
-    const ok = await signUp(email.trim(), password);
-    if (!ok) {
-      setNotice('Unable to create account.');
-    } else {
-      setNotice('Account created.');
-      if (authMode === 'business') {
-        navigation.navigate('BusinessAdmin');
-      } else {
-        navigation.navigate('Home');
-      }
-    }
-    setSubmitting(false);
-  };
-
-  const handlePending = (label: string) => {
-    setNotice(`${label} setup pending. Coming soon.`);
   };
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
-      <View style={styles.authBody}>
-        <View style={styles.card}>
-          <SectionTitle icon="key-outline" label="Sign in" />
-          <Text style={styles.authSubhead}>Choose your access type</Text>
-          <View style={styles.tabRow}>
-            {[
-              { key: 'personal', label: 'Personal' },
-              { key: 'business', label: 'Business' },
-              { key: 'fleet', label: 'Fleet' },
-            ].map((item) => (
-              <Pressable
-                key={item.key}
-                style={[styles.tabPill, authMode === item.key && styles.tabPillActive]}
-                onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
-              >
-                <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.authHint}>{authHint}</Text>
-          <Text style={styles.authSubhead}>
-            Email + password for demo access. Magic link and Google OAuth are coming soon.
+      <View style={styles.card}>
+        <SectionTitle icon="key-outline" label={isSignUp ? 'Create account' : 'Sign in'} />
+        <TextInput
+          style={styles.input}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email"
+          placeholderTextColor={colors.placeholder}
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Password"
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry
+        />
+        {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+        <Pressable style={styles.primaryButton} onPress={handleSubmit} disabled={submitting}>
+          <Text style={styles.primaryButtonText}>
+            {submitting ? 'Please wait...' : isSignUp ? 'Create account' : 'Sign in'}
           </Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            placeholderTextColor={colors.placeholder}
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            placeholderTextColor={colors.placeholder}
-            secureTextEntry
-          />
-          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleLogin}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>{submitting ? 'Please wait...' : 'Sign in'}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleSignup}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>Sign up</Text>
-          </Pressable>
-          <View style={styles.sectionDivider} />
-          <Text style={styles.authSubhead}>Other sign-in options</Text>
-          <View style={styles.filterRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Magic link / OTP')}>
-              <Text style={styles.secondaryButtonText}>Magic link / OTP</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Google OAuth')}>
-              <Text style={styles.secondaryButtonText}>Google OAuth</Text>
-            </Pressable>
-          </View>
-        </View>
-        <View style={styles.authFooterLinks}>
-          <Pressable onPress={() => navigation.navigate('AdminPortal')}>
-            <Text style={styles.linkText}>Admin</Text>
-          </Pressable>
-          <Pressable onPress={() => navigation.navigate('Demo')}>
-            <Text style={styles.linkText}>Demo</Text>
-          </Pressable>
-        </View>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => setIsSignUp((prev) => !prev)}>
+          <Text style={styles.secondaryButtonText}>
+            {isSignUp ? 'Have an account? Sign in' : 'New here? Create an account'}
+          </Text>
+        </Pressable>
       </View>
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -3816,41 +2454,15 @@ const BusinessScreen = ({ route }: BusinessProps) => {
     businessList[0] ??
     demoBusinesses[0];
   const [chatMessages, setChatMessages] = useState<
-    { id: string; body: string; author: string; createdAt: string; mediaUrl?: string | null; mediaType?: string | null }[]
+    { id: string; body: string; author: string; createdAt: string }[]
   >([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatDraft, setChatDraft] = useState('');
-  const [chatNotice, setChatNotice] = useState<string | null>(null);
-  const [chatUploading, setChatUploading] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
   const [offers, setOffers] = useState<BusinessOfferEntry[]>([]);
   const [offersLoading, setOffersLoading] = useState(false);
-  const [coupons, setCoupons] = useState<BusinessCouponEntry[]>([]);
-  const [couponsLoading, setCouponsLoading] = useState(false);
-  const [exceptions, setExceptions] = useState<BusinessHoursException[]>([]);
-  const [exceptionsLoading, setExceptionsLoading] = useState(false);
-  const [reviews, setReviews] = useState<BusinessReviewEntry[]>([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewDraft, setReviewDraft] = useState('');
-  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
-  const [joinedChats, setJoinedChats] = useState<Record<string, boolean>>({});
   const isChatRestricted = Boolean(profile?.shadowbanned || profile?.u2uLocked);
-  const averageRating = useMemo(() => {
-    if (reviews.length === 0) {
-      return business.rating;
-    }
-    const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
-    return sum / reviews.length;
-  }, [business.rating, reviews]);
-  const hasJoinedChat = Boolean(joinedChats[business.id]);
-
-  useEffect(() => {
-    if (business?.id) {
-      void trackAnalyticsEvent('screen_view', { screen: 'business', business_id: business.id }, userId);
-    }
-  }, [business?.id, userId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -3863,7 +2475,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
       setChatLoading(true);
       const { data, error } = await supabase
         .from('business_messages')
-        .select('id, body, created_at, author_handle, media_type, media_url')
+        .select('id, body, created_at, author_handle')
         .eq('business_id', business.id)
         .order('created_at', { ascending: false })
         .limit(30);
@@ -3877,8 +2489,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
             body: row.body ?? '',
             author: row.author_handle ?? 'Guest',
             createdAt: row.created_at ?? '',
-            mediaUrl: row.media_url ?? null,
-            mediaType: row.media_type ?? null,
           }))
         );
       }
@@ -3937,34 +2547,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
       }
       setMenuLoading(false);
     };
-    const loadExceptions = async () => {
-      setExceptionsLoading(true);
-      const { data, error } = await supabase
-        .from('business_hours_exceptions')
-        .select('id, business_id, date, is_closed, open_time, close_time, note')
-        .eq('business_id', business.id)
-        .order('date', { ascending: true })
-        .limit(10);
-      if (!isMounted) {
-        return;
-      }
-      if (!error && Array.isArray(data)) {
-        setExceptions(
-          data.map((row) => ({
-            id: String(row.id ?? ''),
-            businessId: String(row.business_id ?? ''),
-            date: row.date ?? '',
-            isClosed: Boolean(row.is_closed),
-            openTime: row.open_time ?? null,
-            closeTime: row.close_time ?? null,
-            note: row.note ?? null,
-          }))
-        );
-      } else {
-        setExceptions([]);
-      }
-      setExceptionsLoading(false);
-    };
     const loadOffers = async () => {
       setOffersLoading(true);
       const { data, error } = await supabase
@@ -3989,171 +2571,25 @@ const BusinessScreen = ({ route }: BusinessProps) => {
       }
       setOffersLoading(false);
     };
-    const loadCoupons = async () => {
-      setCouponsLoading(true);
-      const { data, error } = await supabase
-        .from('business_coupons')
-        .select('id, business_id, code, details, active, created_at')
-        .eq('business_id', business.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      if (!isMounted) {
-        return;
-      }
-      if (!error && Array.isArray(data)) {
-        setCoupons(
-          data.map((row) => ({
-            id: String(row.id ?? ''),
-            businessId: String(row.business_id ?? ''),
-            code: row.code ?? '',
-            details: row.details ?? '',
-            active: row.active !== false,
-            createdAt: row.created_at ?? '',
-          }))
-        );
-      } else {
-        setCoupons([]);
-      }
-      setCouponsLoading(false);
-    };
     void loadMenu();
-    void loadExceptions();
     void loadOffers();
-    void loadCoupons();
     return () => {
       isMounted = false;
     };
   }, [business?.id]);
 
-  useEffect(() => {
-    let isMounted = true;
-    if (!supabase || !business?.id || tab !== 'reviews') {
-      return () => {
-        isMounted = false;
-      };
-    }
-    const loadReviews = async () => {
-      setReviewsLoading(true);
-      const { data, error } = await supabase
-        .from('business_reviews')
-        .select('id, business_id, author_handle, rating, body, created_at')
-        .eq('business_id', business.id)
-        .order('created_at', { ascending: false })
-        .limit(25);
-      if (!isMounted) {
-        return;
-      }
-      if (!error && Array.isArray(data)) {
-        setReviews(
-          data.map((row) => ({
-            id: String(row.id ?? ''),
-            businessId: String(row.business_id ?? ''),
-            author: row.author_handle ?? 'Guest',
-            rating: typeof row.rating === 'number' ? row.rating : 5,
-            body: row.body ?? '',
-            createdAt: row.created_at ?? '',
-          }))
-        );
-      }
-      setReviewsLoading(false);
-    };
-    void loadReviews();
-    return () => {
-      isMounted = false;
-    };
-  }, [business?.id, tab]);
-
   const handleSendBusinessMessage = async () => {
-    if (!supabase || !userId || !chatDraft.trim() || isChatRestricted || !hasJoinedChat) {
+    if (!supabase || !userId || !chatDraft.trim() || isChatRestricted) {
       return;
     }
     const body = chatDraft.trim();
     setChatDraft('');
-    setChatNotice(null);
-    const moderation = await runModerationCheck({
-      content_type: 'business_message',
-      content_id: business.id,
-      text: body,
-    });
-    if (!moderation.allowed) {
-      setChatNotice('Message blocked by safety checks.');
-      return;
-    }
-    if (moderation.status !== 'ok') {
-      setChatNotice('Safety check unavailable. Message sent.');
-    }
     await supabase.from('business_messages').insert({
       business_id: business.id,
       user_id: userId,
       body,
       author_handle: profile?.handle ?? undefined,
     });
-    void trackAnalyticsEvent('message_send', { channel: 'business', business_id: business.id }, userId);
-  };
-
-  const handleAttachBusinessMedia = async () => {
-    if (!supabase || !userId || !business?.id || isChatRestricted || !hasJoinedChat) {
-      setChatNotice('Join the chatroom to share media.');
-      return;
-    }
-    setChatUploading(true);
-    setChatNotice(null);
-    const upload = await pickAndUploadImage('chat-media', `business/${business.id}`);
-    if (!upload.url) {
-      setChatNotice(upload.error === 'permission' ? 'Photo permission denied.' : 'Upload canceled.');
-      setChatUploading(false);
-      return;
-    }
-    const moderation = await runModerationCheck({
-      content_type: 'business_message',
-      content_id: business.id,
-      image_url: upload.url,
-    });
-    if (!moderation.allowed) {
-      setChatNotice('Media blocked by safety checks.');
-      setChatUploading(false);
-      return;
-    }
-    await supabase.from('business_messages').insert({
-      business_id: business.id,
-      user_id: userId,
-      author_handle: profile?.handle ?? undefined,
-      media_type: 'image',
-      media_url: upload.url,
-    });
-    void trackAnalyticsEvent('message_send', { channel: 'business', business_id: business.id, media: true }, userId);
-    setChatUploading(false);
-  };
-
-  const handleSubmitReview = async () => {
-    if (!supabase || !business?.id) {
-      setReviewNotice('Supabase not configured.');
-      return;
-    }
-    if (!userId) {
-      setReviewNotice('Sign in to leave a review.');
-      return;
-    }
-    if (!reviewDraft.trim()) {
-      setReviewNotice('Add a short review.');
-      return;
-    }
-    setReviewNotice(null);
-    const { error } = await supabase.from('business_reviews').insert({
-      business_id: business.id,
-      user_id: userId,
-      author_handle: profile?.handle ?? 'Guest',
-      rating: reviewRating,
-      body: reviewDraft.trim(),
-    });
-    if (error) {
-      setReviewNotice('Unable to submit review.');
-      return;
-    }
-    setReviewDraft('');
-    setReviewRating(5);
-    setReviewNotice('Review submitted.');
-    void trackAnalyticsEvent('review_submit', { business_id: business.id, rating: reviewRating }, userId);
   };
 
   return (
@@ -4190,24 +2626,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
               ))}
             </View>
             <Text style={styles.metaText}>{business.hours ?? 'Hours not set'}</Text>
-            {exceptionsLoading ? (
-              <Text style={styles.metaText}>Loading hour exceptions...</Text>
-            ) : exceptions.length > 0 ? (
-              <View style={styles.exceptionList}>
-                {exceptions.slice(0, 2).map((entry) => (
-                  <View key={entry.id} style={styles.exceptionRow}>
-                    <Text style={styles.metaText}>{entry.date}</Text>
-                    <Text style={styles.metaText}>
-                      {entry.isClosed
-                        ? 'Closed'
-                        : entry.openTime && entry.closeTime
-                          ? `${entry.openTime} - ${entry.closeTime}`
-                          : 'Adjusted hours'}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
           </View>
         </View>
         <View style={styles.tabRow}>
@@ -4263,51 +2681,32 @@ const BusinessScreen = ({ route }: BusinessProps) => {
               <Text style={styles.cardBody}>
                 Chat is unavailable while your account is under review.
               </Text>
-            ) : hasJoinedChat ? (
-              <Text style={styles.cardBody}>You're in this chatroom. Say hello!</Text>
             ) : (
               <Text style={styles.cardBody}>
                 This business has a chatroom for customers. Preview before joining.
               </Text>
             )}
             {chatLoading ? <Text style={styles.metaText}>Loading messages...</Text> : null}
-            {chatNotice ? <Text style={styles.metaText}>{chatNotice}</Text> : null}
             {chatMessages.map((message) => (
               <View key={message.id} style={styles.listRow}>
                 <View style={styles.listRowInfo}>
                   <Text style={styles.cardTitle}>{message.author}</Text>
-                  {message.body ? <Text style={styles.metaText}>{message.body}</Text> : null}
-                  {message.mediaUrl ? (
-                    <Image source={{ uri: message.mediaUrl }} style={styles.chatMediaImage} />
-                  ) : null}
+                  <Text style={styles.metaText}>{message.body}</Text>
                 </View>
                 <Text style={styles.metaText}>{message.createdAt}</Text>
               </View>
             ))}
-            {userId && !isChatRestricted && !hasJoinedChat ? (
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => setJoinedChats((prev) => ({ ...prev, [business.id]: true }))}
-              >
-                <Text style={styles.secondaryButtonText}>Join chatroom</Text>
-              </Pressable>
-            ) : null}
-            {userId && !isChatRestricted && hasJoinedChat ? (
+            {userId && !isChatRestricted ? (
               <View style={styles.inputRow}>
-                <Pressable style={styles.iconButtonSm} onPress={() => void handleAttachBusinessMedia()}>
-                  <Ionicons name="attach-outline" size={18} color={colors.text} />
-                </Pressable>
                 <TextInput
                   style={styles.input}
                   value={chatDraft}
                   onChangeText={setChatDraft}
                   placeholder="Ask a question"
-                  placeholderTextColor={colors.placeholder}
+                  placeholderTextColor="#9E90B4"
                 />
                 <Pressable style={styles.primaryButton} onPress={handleSendBusinessMessage}>
-                  <Text style={styles.primaryButtonText}>
-                    {chatUploading ? 'Uploading...' : 'Send'}
-                  </Text>
+                  <Text style={styles.primaryButtonText}>Send</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -4316,69 +2715,8 @@ const BusinessScreen = ({ route }: BusinessProps) => {
         {tab === 'reviews' ? (
           <View style={styles.card}>
             <SectionTitle icon="star-outline" label="Reviews" />
-            <View style={styles.rowBetween}>
-              <Text style={styles.cardTitle}>Average rating</Text>
-              <Text style={styles.cardTitle}>{averageRating.toFixed(1)}</Text>
-            </View>
-            <Text style={styles.metaText}>{reviews.length} reviews</Text>
-            {userId ? (
-              <View style={styles.reviewComposer}>
-                <Text style={styles.metaText}>Your rating</Text>
-                <View style={styles.ratingRow}>
-                  {[1, 2, 3, 4, 5].map((rating) => (
-                    <Pressable
-                      key={rating}
-                      style={styles.ratingStar}
-                      onPress={() => setReviewRating(rating)}
-                    >
-                      <Ionicons
-                        name={rating <= reviewRating ? 'star' : 'star-outline'}
-                        size={18}
-                        color={rating <= reviewRating ? colors.primary : colors.textMuted}
-                      />
-                    </Pressable>
-                  ))}
-                </View>
-                <TextInput
-                  style={[styles.input, styles.multilineInput]}
-                  value={reviewDraft}
-                  onChangeText={setReviewDraft}
-                  placeholder="Share your experience"
-                  placeholderTextColor={colors.placeholder}
-                  multiline
-                />
-                {reviewNotice ? <Text style={styles.metaText}>{reviewNotice}</Text> : null}
-                <Pressable style={styles.primaryButton} onPress={handleSubmitReview}>
-                  <Text style={styles.primaryButtonText}>Submit review</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <Text style={styles.cardBody}>Sign in to leave a review.</Text>
-            )}
-            {reviewsLoading ? <Text style={styles.metaText}>Loading reviews...</Text> : null}
-            {reviews.length === 0 ? (
-              <Text style={styles.metaText}>No reviews yet.</Text>
-            ) : (
-              reviews.map((review) => (
-                <View key={review.id} style={styles.reviewRow}>
-                  <View style={styles.reviewHeader}>
-                    <Text style={styles.cardTitle}>@{review.author}</Text>
-                    <View style={styles.ratingRow}>
-                      {[1, 2, 3, 4, 5].map((rating) => (
-                        <Ionicons
-                          key={`${review.id}-star-${rating}`}
-                          name={rating <= review.rating ? 'star' : 'star-outline'}
-                          size={14}
-                          color={rating <= review.rating ? colors.primary : colors.textMuted}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                  <Text style={styles.metaText}>{review.body}</Text>
-                  <Text style={styles.metaText}>{review.createdAt}</Text>
-                </View>
-              ))
-            )}
+            <Text style={styles.cardBody}>Ratings and reviews will appear here.</Text>
+            <Text style={styles.metaText}>Average rating {business.rating.toFixed(1)}</Text>
           </View>
         ) : null}
         {tab === 'offers' ? (
@@ -4395,22 +2733,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
                     <Text style={styles.metaText}>{offer.details}</Text>
                   </View>
                   <Text style={styles.metaText}>{offer.createdAt}</Text>
-                </View>
-              ))
-            )}
-            <View style={styles.sectionDivider} />
-            <SectionTitle icon="ticket-outline" label="Coupons" />
-            {couponsLoading ? <Text style={styles.metaText}>Loading coupons...</Text> : null}
-            {coupons.length === 0 ? (
-              <Text style={styles.metaText}>No coupons yet.</Text>
-            ) : (
-              coupons.map((coupon) => (
-                <View key={coupon.id} style={styles.listRow}>
-                  <View style={styles.listRowInfo}>
-                    <Text style={styles.cardTitle}>{coupon.code}</Text>
-                    <Text style={styles.metaText}>{coupon.details}</Text>
-                  </View>
-                  <Text style={styles.metaText}>{coupon.active ? 'Active' : 'Inactive'}</Text>
                 </View>
               ))
             )}
@@ -4431,20 +2753,11 @@ const RoomScreen = ({ route }: RoomProps) => {
   const { userId, profile } = useAuth();
   const [room, setRoom] = useState<Room | null>(null);
   const [messages, setMessages] = useState<
-    { id: string; body: string; author: string; createdAt: string; mediaUrl?: string | null; mediaType?: string | null }[]
+    { id: string; body: string; author: string; createdAt: string }[]
   >([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sendNotice, setSendNotice] = useState<string | null>(null);
-  const [mediaUploading, setMediaUploading] = useState(false);
-  const [distanceMeters, setDistanceMeters] = useState<number | null>(null);
-  const [withinRadius, setWithinRadius] = useState(true);
-  const [distanceNote, setDistanceNote] = useState<string | null>(null);
   const roomId = route.params?.roomId ?? '';
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'room', room_id: roomId }, userId);
-  }, [roomId, userId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -4458,7 +2771,7 @@ const RoomScreen = ({ route }: RoomProps) => {
     const loadRoom = async () => {
       const { data, error } = await supabase
         .from('rooms')
-        .select('id, title, category, latitude, longitude, radius_meters, created_by')
+        .select('id, title, category, latitude, longitude, radius_meters')
         .eq('id', roomId)
         .maybeSingle();
       if (!isMounted) {
@@ -4475,7 +2788,6 @@ const RoomScreen = ({ route }: RoomProps) => {
         latitude: typeof data.latitude === 'number' ? data.latitude : null,
         longitude: typeof data.longitude === 'number' ? data.longitude : null,
         distanceMeters: typeof data.radius_meters === 'number' ? data.radius_meters : undefined,
-        createdBy: data.created_by ? String(data.created_by) : null,
       });
     };
     void loadRoom();
@@ -4483,59 +2795,6 @@ const RoomScreen = ({ route }: RoomProps) => {
       isMounted = false;
     };
   }, [roomId]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const checkDistance = async () => {
-      if (!room?.latitude || !room?.longitude) {
-        setDistanceMeters(null);
-        setWithinRadius(true);
-        setDistanceNote(null);
-        return;
-      }
-      if (Platform.OS === 'web') {
-        setDistanceMeters(null);
-        setWithinRadius(true);
-        setDistanceNote(null);
-        return;
-      }
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (!isMounted) {
-          return;
-        }
-        if (status !== 'granted') {
-          setWithinRadius(false);
-          setDistanceNote('Enable location to chat in this room.');
-          return;
-        }
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        if (!isMounted) {
-          return;
-        }
-        const distance = distanceKm(position.coords, {
-          latitude: room.latitude,
-          longitude: room.longitude,
-        });
-        const distanceMetersValue = Math.round(distance * 1000);
-        const radius = room.distanceMeters ?? 500;
-        setDistanceMeters(distanceMetersValue);
-        setWithinRadius(distanceMetersValue <= radius);
-        setDistanceNote(null);
-      } catch {
-        if (isMounted) {
-          setWithinRadius(false);
-          setDistanceNote('Location unavailable. Try again.');
-        }
-      }
-    };
-    void checkDistance();
-    return () => {
-      isMounted = false;
-    };
-  }, [room?.latitude, room?.longitude, room?.distanceMeters]);
 
   useEffect(() => {
     let isMounted = true;
@@ -4548,7 +2807,7 @@ const RoomScreen = ({ route }: RoomProps) => {
       setLoading(true);
       const { data, error } = await supabase
         .from('room_messages')
-        .select('id, body, created_at, author_handle, media_type, media_url')
+        .select('id, body, created_at, author_handle')
         .eq('room_id', roomId)
         .order('created_at', { ascending: false })
         .limit(40);
@@ -4562,8 +2821,6 @@ const RoomScreen = ({ route }: RoomProps) => {
             body: row.body ?? '',
             author: row.author_handle ?? 'Guest',
             createdAt: row.created_at ?? '',
-            mediaUrl: row.media_url ?? null,
-            mediaType: row.media_type ?? null,
           }))
         );
       }
@@ -4587,70 +2844,20 @@ const RoomScreen = ({ route }: RoomProps) => {
   }, [roomId]);
 
   const handleSend = async () => {
-    if (!supabase || !userId || !draft.trim() || !roomId || !withinRadius) {
+    if (!supabase || !userId || !draft.trim() || !roomId) {
       return;
     }
     const body = draft.trim();
     setDraft('');
-    setSendNotice(null);
-    const moderation = await runModerationCheck({
-      content_type: 'room_message',
-      content_id: roomId,
-      text: body,
-    });
-    if (!moderation.allowed) {
-      setSendNotice('Message blocked by safety checks.');
-      return;
-    }
-    if (moderation.status !== 'ok') {
-      setSendNotice('Safety check unavailable. Message sent.');
-    }
     await supabase.from('room_messages').insert({
       room_id: roomId,
       user_id: userId,
       author_handle: profile?.handle ?? undefined,
       body,
     });
-    void trackAnalyticsEvent('message_send', { channel: 'room', room_id: roomId }, userId);
   };
 
-  const handleAttach = async () => {
-    if (!supabase || !userId || !roomId || !withinRadius) {
-      setSendNotice('Sign in and stay within radius to send media.');
-      return;
-    }
-    setMediaUploading(true);
-    setSendNotice(null);
-    const upload = await pickAndUploadImage('chat-media', `rooms/${roomId}`);
-    if (!upload.url) {
-      setSendNotice(upload.error === 'permission' ? 'Photo permission denied.' : 'Upload canceled.');
-      setMediaUploading(false);
-      return;
-    }
-    const moderation = await runModerationCheck({
-      content_type: 'room_message',
-      content_id: roomId,
-      image_url: upload.url,
-    });
-    if (!moderation.allowed) {
-      setSendNotice('Media blocked by safety checks.');
-      setMediaUploading(false);
-      return;
-    }
-    await supabase.from('room_messages').insert({
-      room_id: roomId,
-      user_id: userId,
-      author_handle: profile?.handle ?? undefined,
-      media_type: 'image',
-      media_url: upload.url,
-    });
-    void trackAnalyticsEvent('message_send', { channel: 'room', room_id: roomId, media: true }, userId);
-    setMediaUploading(false);
-  };
-
-  const radiusMeters = room?.distanceMeters ?? 500;
-  const canChat = Boolean(userId && withinRadius);
-  const isModerator = Boolean(profile?.isAdmin || (userId && room?.createdBy === userId));
+  const isWithinRadius = true;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -4658,42 +2865,28 @@ const RoomScreen = ({ route }: RoomProps) => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
           <SectionTitle icon="chatbubbles-outline" label={room?.title ?? 'Room'} />
-          {isModerator ? (
-            <View style={styles.postBadge}>
-              <Text style={styles.postBadgeText}>Moderator</Text>
-            </View>
-          ) : null}
           <View style={styles.metaRow}>
             <Ionicons name="navigate-outline" size={14} color={colors.textMuted} />
             <Text style={styles.metaText}>{room?.category ?? 'local'}</Text>
           </View>
           <Text style={styles.metaText}>
-            {distanceMeters !== null ? `${distanceMeters}m away` : 'Distance unknown'}
+            {room?.distanceMeters ? `${room.distanceMeters}m away` : 'Nearby'}
           </Text>
-          <Text style={styles.metaText}>Room radius {radiusMeters}m</Text>
-          {distanceNote ? <Text style={styles.metaText}>{distanceNote}</Text> : null}
         </View>
         <View style={styles.card}>
           <SectionTitle icon="people-outline" label="Live chat" />
           {loading ? <Text style={styles.metaText}>Loading messages...</Text> : null}
-          {sendNotice ? <Text style={styles.metaText}>{sendNotice}</Text> : null}
           {messages.map((message) => (
             <View key={message.id} style={styles.listRow}>
               <View style={styles.listRowInfo}>
                 <Text style={styles.cardTitle}>{message.author}</Text>
-                {message.body ? <Text style={styles.metaText}>{message.body}</Text> : null}
-                {message.mediaUrl ? (
-                  <Image source={{ uri: message.mediaUrl }} style={styles.chatMediaImage} />
-                ) : null}
+                <Text style={styles.metaText}>{message.body}</Text>
               </View>
               <Text style={styles.metaText}>{message.createdAt}</Text>
             </View>
           ))}
-          {canChat ? (
+          {userId && isWithinRadius ? (
             <View style={styles.inputRow}>
-              <Pressable style={styles.iconButtonSm} onPress={() => void handleAttach()}>
-                <Ionicons name="attach-outline" size={18} color={colors.text} />
-              </Pressable>
               <TextInput
                 style={styles.input}
                 value={draft}
@@ -4702,15 +2895,11 @@ const RoomScreen = ({ route }: RoomProps) => {
                 placeholderTextColor={colors.placeholder}
               />
               <Pressable style={styles.primaryButton} onPress={handleSend}>
-                <Text style={styles.primaryButtonText}>
-                  {mediaUploading ? 'Uploading...' : 'Send'}
-                </Text>
+                <Text style={styles.primaryButtonText}>Send</Text>
               </Pressable>
             </View>
-          ) : userId ? (
-            <Text style={styles.metaText}>Too far to message.</Text>
           ) : (
-            <Text style={styles.metaText}>Sign in to join this room.</Text>
+            <Text style={styles.metaText}>Too far to message.</Text>
           )}
         </View>
       </ScrollView>
@@ -4720,128 +2909,17 @@ const RoomScreen = ({ route }: RoomProps) => {
   );
 };
 
-const OnboardingScreen = () => {
-  const styles = useStyles();
-  const { colors } = useTheme();
-  const [stepIndex, setStepIndex] = useState(0);
-  const [interests, setInterests] = useState<string[]>([]);
-  const steps = [
-    {
-      key: 'welcome',
-      title: 'Welcome to Blip',
-      body: 'Pseudonymity first. You control what to share.',
-    },
-    {
-      key: 'location',
-      title: 'Enable location',
-      body: 'Map access powers local discovery. You can adjust privacy anytime.',
-    },
-    {
-      key: 'privacy',
-      title: 'Privacy basics',
-      body: 'We show approximate areas by default. Exact pins are opt-in.',
-    },
-    {
-      key: 'interests',
-      title: 'Choose interests',
-      body: 'Pick a few topics to personalize your feed.',
-    },
-    {
-      key: 'done',
-      title: 'You are in',
-      body: 'Your map is ready. Start exploring local rooms.',
-    },
-  ];
-  const current = steps[stepIndex];
-  const tags = ['food', 'events', 'jobs', 'study', 'fitness', 'deals'];
-
-  const toggleInterest = (tag: string) => {
-    setInterests((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
-  };
-
-  const handleNext = () => {
-    setStepIndex((prev) => Math.min(prev + 1, steps.length - 1));
-  };
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader />
-      <View style={styles.card}>
-        <SectionTitle icon="sparkles-outline" label={current.title} />
-        <Text style={styles.cardBody}>{current.body}</Text>
-        {current.key === 'interests' ? (
-          <View style={styles.filterRow}>
-            {tags.map((tag) => (
-              <Pressable
-                key={tag}
-                style={[
-                  styles.filterChip,
-                  interests.includes(tag) && styles.filterChipActive,
-                ]}
-                onPress={() => toggleInterest(tag)}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    interests.includes(tag) && styles.filterChipTextActive,
-                  ]}
-                >
-                  #{tag}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-        <View style={styles.rowBetween}>
-          <Text style={styles.metaText}>
-            Step {stepIndex + 1} of {steps.length}
-          </Text>
-          <Pressable style={styles.primaryButton} onPress={handleNext}>
-            <Text style={styles.primaryButtonText}>
-              {stepIndex === steps.length - 1 ? 'Finish' : 'Next'}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    </SafeAreaView>
-  );
-};
-
 const BusinessAdminScreen = () => {
   const styles = useStyles();
-  const { colors } = useTheme();
   const { userId } = useAuth();
-  const { businesses, setBusinesses } = useBusinesses();
-  const [ownedBusinesses, setOwnedBusinesses] = useState<OwnedBusinessEntry[]>([]);
-  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
+  const [ownedBusinesses, setOwnedBusinesses] = useState<{ id: string; name: string }[]>([]);
   const [staff, setStaff] = useState<BusinessStaffEntry[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]);
   const [offers, setOffers] = useState<BusinessOfferEntry[]>([]);
   const [orders, setOrders] = useState<OrderEntry[]>([]);
   const [auditLog, setAuditLog] = useState<BusinessAuditEntry[]>([]);
-  const [exceptions, setExceptions] = useState<BusinessHoursException[]>([]);
-  const [coupons, setCoupons] = useState<BusinessCouponEntry[]>([]);
-  const [couponCode, setCouponCode] = useState('');
-  const [couponDetails, setCouponDetails] = useState('');
-  const [couponActive, setCouponActive] = useState(true);
-  const [exceptionDate, setExceptionDate] = useState('');
-  const [exceptionOpen, setExceptionOpen] = useState('');
-  const [exceptionClose, setExceptionClose] = useState('');
-  const [exceptionNote, setExceptionNote] = useState('');
-  const [exceptionClosed, setExceptionClosed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [mediaUploading, setMediaUploading] = useState(false);
-  const activeBusiness =
-    ownedBusinesses.find((entry) => entry.id === selectedBusinessId) ?? ownedBusinesses[0] ?? null;
-  const activeExceptions = useMemo(
-    () => exceptions.filter((entry) => entry.businessId === activeBusiness?.id),
-    [activeBusiness?.id, exceptions]
-  );
-  const activeCoupons = useMemo(
-    () => coupons.filter((entry) => entry.businessId === activeBusiness?.id),
-    [activeBusiness?.id, coupons]
-  );
 
   useEffect(() => {
     let isMounted = true;
@@ -4853,7 +2931,7 @@ const BusinessAdminScreen = () => {
       setNotice(null);
       const { data: businessRows, error: businessError } = await supabase
         .from('businesses')
-        .select('id, name, image_url, logo_url, card_image_url, pin_icon_url')
+        .select('id, name')
         .eq('owner_id', userId);
       if (!isMounted) {
         return;
@@ -4864,28 +2942,16 @@ const BusinessAdminScreen = () => {
         return;
       }
       const businesses = (businessRows ?? [])
-        .map((row) => {
-          const imageUrl = row.card_image_url ?? row.image_url ?? null;
-          const logoUrl = row.pin_icon_url ?? row.logo_url ?? null;
-          return {
-            id: String(row.id ?? ''),
-            name: row.name ?? 'Business',
-            imageUrl: typeof imageUrl === 'string' ? imageUrl : null,
-            logoUrl: typeof logoUrl === 'string' ? logoUrl : null,
-          };
-        })
+        .map((row) => ({ id: String(row.id ?? ''), name: row.name ?? 'Business' }))
         .filter((row) => row.id.length > 0);
       setOwnedBusinesses(businesses);
-      if (!selectedBusinessId && businesses.length > 0) {
-        setSelectedBusinessId(businesses[0].id);
-      }
       const businessIds = businesses.map((row) => row.id);
       if (businessIds.length === 0) {
         setLoading(false);
         return;
       }
 
-      const [staffRes, menuRes, offersRes, ordersRes, auditRes, exceptionsRes, couponsRes] = await Promise.all([
+      const [staffRes, menuRes, offersRes, ordersRes, auditRes] = await Promise.all([
         supabase
           .from('business_staff')
           .select('id, business_id, user_id, role, permissions, created_at')
@@ -4910,32 +2976,12 @@ const BusinessAdminScreen = () => {
           .in('business_id', businessIds)
           .order('created_at', { ascending: false })
           .limit(20),
-        supabase
-          .from('business_hours_exceptions')
-          .select('id, business_id, date, is_closed, open_time, close_time, note')
-          .in('business_id', businessIds)
-          .order('date', { ascending: true })
-          .limit(20),
-        supabase
-          .from('business_coupons')
-          .select('id, business_id, code, details, active, created_at')
-          .in('business_id', businessIds)
-          .order('created_at', { ascending: false })
-          .limit(20),
       ]);
 
       if (!isMounted) {
         return;
       }
-      if (
-        staffRes.error ||
-        menuRes.error ||
-        offersRes.error ||
-        ordersRes.error ||
-        auditRes.error ||
-        exceptionsRes.error ||
-        couponsRes.error
-      ) {
+      if (staffRes.error || menuRes.error || offersRes.error || ordersRes.error || auditRes.error) {
         setNotice('Some business admin data failed to load.');
       }
 
@@ -4988,27 +3034,6 @@ const BusinessAdminScreen = () => {
           createdAt: row.created_at ?? '',
         }))
       );
-      setExceptions(
-        (exceptionsRes.data ?? []).map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          date: row.date ?? '',
-          isClosed: Boolean(row.is_closed),
-          openTime: row.open_time ?? null,
-          closeTime: row.close_time ?? null,
-          note: row.note ?? null,
-        }))
-      );
-      setCoupons(
-        (couponsRes.data ?? []).map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          code: row.code ?? '',
-          details: row.details ?? '',
-          active: row.active !== false,
-          createdAt: row.created_at ?? '',
-        }))
-      );
       setLoading(false);
     };
     void loadBusinessAdmin();
@@ -5016,184 +3041,6 @@ const BusinessAdminScreen = () => {
       isMounted = false;
     };
   }, [userId]);
-
-  const handlePickImage = async (kind: 'hero' | 'logo') => {
-    if (!supabase || !activeBusiness) {
-      setNotice('Select a business first.');
-      return;
-    }
-    setMediaUploading(true);
-    setNotice(null);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permission.status !== 'granted') {
-      setNotice('Permission to access photos is required.');
-      setMediaUploading(false);
-      return;
-    }
-    const picker = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: kind === 'logo' ? [1, 1] : [16, 9],
-      quality: 0.8,
-    });
-    if (picker.canceled || !picker.assets?.length) {
-      setMediaUploading(false);
-      return;
-    }
-    const asset = picker.assets[0];
-    if (!asset.uri) {
-      setMediaUploading(false);
-      return;
-    }
-    try {
-      const extension = asset.uri.split('.').pop() ?? 'jpg';
-      const filePath = `businesses/${activeBusiness.id}/${kind}-${Date.now()}.${extension}`;
-      const response = await fetch(asset.uri);
-      const blob = await response.blob();
-      const upload = await supabase.storage.from('business-media').upload(filePath, blob, {
-        upsert: true,
-        contentType: asset.type ?? 'image/jpeg',
-      });
-      if (upload.error) {
-        setNotice('Upload failed.');
-        setMediaUploading(false);
-        return;
-      }
-      const { data } = supabase.storage.from('business-media').getPublicUrl(filePath);
-      const publicUrl = data.publicUrl;
-      const updates =
-        kind === 'hero'
-          ? { image_url: publicUrl, card_image_url: publicUrl }
-          : { logo_url: publicUrl, pin_icon_url: publicUrl };
-      const { error: updateError } = await supabase
-        .from('businesses')
-        .update(updates)
-        .eq('id', activeBusiness.id);
-      if (updateError) {
-        setNotice('Unable to save image.');
-        setMediaUploading(false);
-        return;
-      }
-      setOwnedBusinesses((prev) =>
-        prev.map((entry) =>
-          entry.id === activeBusiness.id
-            ? {
-                ...entry,
-                imageUrl: kind === 'hero' ? publicUrl : entry.imageUrl,
-                logoUrl: kind === 'logo' ? publicUrl : entry.logoUrl,
-              }
-            : entry
-        )
-      );
-      setBusinesses(
-        businesses.map((entry) =>
-          entry.id === activeBusiness.id
-            ? {
-                ...entry,
-                imageUrl: kind === 'hero' ? publicUrl : entry.imageUrl,
-                logoUrl: kind === 'logo' ? publicUrl : entry.logoUrl,
-              }
-            : entry
-        )
-      );
-      setNotice(kind === 'hero' ? 'Hero image updated.' : 'Logo updated.');
-    } catch {
-      setNotice('Upload failed.');
-    } finally {
-      setMediaUploading(false);
-    }
-  };
-
-  const handleAddException = async () => {
-    if (!supabase || !activeBusiness) {
-      setNotice('Select a business first.');
-      return;
-    }
-    if (!exceptionDate.trim()) {
-      setNotice('Enter a date (YYYY-MM-DD).');
-      return;
-    }
-    const { error } = await supabase.from('business_hours_exceptions').insert({
-      business_id: activeBusiness.id,
-      date: exceptionDate.trim(),
-      is_closed: exceptionClosed,
-      open_time: exceptionOpen.trim() ? exceptionOpen.trim() : null,
-      close_time: exceptionClose.trim() ? exceptionClose.trim() : null,
-      note: exceptionNote.trim() ? exceptionNote.trim() : null,
-    });
-    if (error) {
-      setNotice('Unable to add hours exception.');
-      return;
-    }
-    const { data } = await supabase
-      .from('business_hours_exceptions')
-      .select('id, business_id, date, is_closed, open_time, close_time, note')
-      .eq('business_id', activeBusiness.id)
-      .order('date', { ascending: true })
-      .limit(20);
-    if (Array.isArray(data)) {
-      setExceptions(
-        data.map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          date: row.date ?? '',
-          isClosed: Boolean(row.is_closed),
-          openTime: row.open_time ?? null,
-          closeTime: row.close_time ?? null,
-          note: row.note ?? null,
-        }))
-      );
-    }
-    setExceptionDate('');
-    setExceptionOpen('');
-    setExceptionClose('');
-    setExceptionNote('');
-    setExceptionClosed(false);
-    setNotice('Hours exception added.');
-  };
-
-  const handleAddCoupon = async () => {
-    if (!supabase || !activeBusiness) {
-      setNotice('Select a business first.');
-      return;
-    }
-    if (!couponCode.trim()) {
-      setNotice('Enter a coupon code.');
-      return;
-    }
-    const { error } = await supabase.from('business_coupons').insert({
-      business_id: activeBusiness.id,
-      code: couponCode.trim().toUpperCase(),
-      details: couponDetails.trim() ? couponDetails.trim() : 'Discount available',
-      active: couponActive,
-    });
-    if (error) {
-      setNotice('Unable to add coupon.');
-      return;
-    }
-    const { data } = await supabase
-      .from('business_coupons')
-      .select('id, business_id, code, details, active, created_at')
-      .eq('business_id', activeBusiness.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    if (Array.isArray(data)) {
-      setCoupons(
-        data.map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          code: row.code ?? '',
-          details: row.details ?? '',
-          active: row.active !== false,
-          createdAt: row.created_at ?? '',
-        }))
-      );
-    }
-    setCouponCode('');
-    setCouponDetails('');
-    setCouponActive(true);
-    setNotice('Coupon added.');
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -5206,194 +3053,6 @@ const BusinessAdminScreen = () => {
           {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
           {!userId ? <Text style={styles.metaText}>Sign in to manage your business.</Text> : null}
         </View>
-        {ownedBusinesses.length > 0 ? (
-          <View style={styles.card}>
-            <SectionTitle icon="storefront-outline" label="Business selection" />
-            <View style={styles.filterRow}>
-              {ownedBusinesses.map((biz) => (
-                <Pressable
-                  key={biz.id}
-                  style={[
-                    styles.filterChip,
-                    selectedBusinessId === biz.id && styles.filterChipActive,
-                  ]}
-                  onPress={() => setSelectedBusinessId(biz.id)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      selectedBusinessId === biz.id && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {biz.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : null}
-        {activeBusiness ? (
-          <View style={styles.card}>
-            <SectionTitle icon="image-outline" label="Media" />
-            <Text style={styles.cardBody}>Upload a hero image and logo for your listing.</Text>
-            <View style={styles.mediaRow}>
-              <View style={styles.mediaPreview}>
-                {activeBusiness.imageUrl ? (
-                  <Image source={{ uri: activeBusiness.imageUrl }} style={styles.mediaImage} />
-                ) : (
-                  <View style={styles.mediaPlaceholder}>
-                    <Ionicons name="image-outline" size={20} color={colors.textMuted} />
-                    <Text style={styles.metaText}>Hero image</Text>
-                  </View>
-                )}
-              </View>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => void handlePickImage('hero')}
-                disabled={mediaUploading}
-              >
-                <Text style={styles.secondaryButtonText}>
-                  {mediaUploading ? 'Uploading...' : 'Upload hero'}
-                </Text>
-              </Pressable>
-            </View>
-            <View style={styles.mediaRow}>
-              <View style={styles.mediaPreviewSmall}>
-                {activeBusiness.logoUrl ? (
-                  <Image source={{ uri: activeBusiness.logoUrl }} style={styles.mediaImage} />
-                ) : (
-                  <View style={styles.mediaPlaceholder}>
-                    <Ionicons name="image-outline" size={20} color={colors.textMuted} />
-                    <Text style={styles.metaText}>Logo</Text>
-                  </View>
-                )}
-              </View>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => void handlePickImage('logo')}
-                disabled={mediaUploading}
-              >
-                <Text style={styles.secondaryButtonText}>
-                  {mediaUploading ? 'Uploading...' : 'Upload logo'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
-        {activeBusiness ? (
-          <View style={styles.card}>
-            <SectionTitle icon="time-outline" label="Hours exceptions" />
-            <Text style={styles.cardBody}>Add holiday hours or temporary closures.</Text>
-            <TextInput
-              style={styles.input}
-              value={exceptionDate}
-              onChangeText={setExceptionDate}
-              placeholder="Date (YYYY-MM-DD)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <View style={styles.rowBetween}>
-              <Text style={styles.metaText}>Closed</Text>
-              <Switch
-                value={exceptionClosed}
-                onValueChange={setExceptionClosed}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.surface}
-              />
-            </View>
-            {!exceptionClosed ? (
-              <>
-                <TextInput
-                  style={styles.input}
-                  value={exceptionOpen}
-                  onChangeText={setExceptionOpen}
-                  placeholder="Open time (e.g., 10:00)"
-                  placeholderTextColor={colors.placeholder}
-                />
-                <TextInput
-                  style={styles.input}
-                  value={exceptionClose}
-                  onChangeText={setExceptionClose}
-                  placeholder="Close time (e.g., 18:00)"
-                  placeholderTextColor={colors.placeholder}
-                />
-              </>
-            ) : null}
-            <TextInput
-              style={styles.input}
-              value={exceptionNote}
-              onChangeText={setExceptionNote}
-              placeholder="Note (optional)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <Pressable style={styles.primaryButton} onPress={() => void handleAddException()}>
-              <Text style={styles.primaryButtonText}>Add exception</Text>
-            </Pressable>
-            {activeExceptions.length === 0 ? (
-              <Text style={styles.metaText}>No exceptions yet.</Text>
-            ) : (
-              activeExceptions.map((entry) => (
-                <View key={entry.id} style={styles.listRow}>
-                  <View style={styles.listRowInfo}>
-                    <Text style={styles.cardTitle}>{entry.date}</Text>
-                    <Text style={styles.metaText}>
-                      {entry.isClosed
-                        ? 'Closed'
-                        : entry.openTime && entry.closeTime
-                          ? `${entry.openTime} - ${entry.closeTime}`
-                          : 'Adjusted hours'}
-                    </Text>
-                  </View>
-                  {entry.note ? <Text style={styles.metaText}>{entry.note}</Text> : null}
-                </View>
-              ))
-            )}
-          </View>
-        ) : null}
-        {activeBusiness ? (
-          <View style={styles.card}>
-            <SectionTitle icon="ticket-outline" label="Coupons" />
-            <Text style={styles.cardBody}>Create loyalty or promo codes for customers.</Text>
-            <TextInput
-              style={styles.input}
-              value={couponCode}
-              onChangeText={setCouponCode}
-              placeholder="Code (e.g., BLIP10)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <TextInput
-              style={styles.input}
-              value={couponDetails}
-              onChangeText={setCouponDetails}
-              placeholder="Details (e.g., 10% off)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <View style={styles.rowBetween}>
-              <Text style={styles.metaText}>Active</Text>
-              <Switch
-                value={couponActive}
-                onValueChange={setCouponActive}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.surface}
-              />
-            </View>
-            <Pressable style={styles.primaryButton} onPress={() => void handleAddCoupon()}>
-              <Text style={styles.primaryButtonText}>Add coupon</Text>
-            </Pressable>
-            {activeCoupons.length === 0 ? (
-              <Text style={styles.metaText}>No coupons yet.</Text>
-            ) : (
-              activeCoupons.map((coupon) => (
-                <View key={coupon.id} style={styles.listRow}>
-                  <View style={styles.listRowInfo}>
-                    <Text style={styles.cardTitle}>{coupon.code}</Text>
-                    <Text style={styles.metaText}>{coupon.details}</Text>
-                  </View>
-                  <Text style={styles.metaText}>{coupon.active ? 'Active' : 'Inactive'}</Text>
-                </View>
-              ))
-            )}
-          </View>
-        ) : null}
         {ownedBusinesses.length === 0 ? (
           <View style={styles.card}>
             <Text style={styles.metaText}>No businesses linked to this account.</Text>
@@ -5702,36 +3361,23 @@ const AdminPortalScreen = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
           <SectionTitle icon="shield-checkmark-outline" label="Blip Admin Portal" />
-          <Text style={styles.cardBody}>Feature toggles, safety, and verification ops.</Text>
+          <Text style={styles.cardBody}>Feature toggles and verification ops.</Text>
           {loading ? <Text style={styles.metaText}>Refreshing data...</Text> : null}
           {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          {loading ? (
-            <View style={styles.adminStatRow}>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <View key={`stat-skel-${index}`} style={styles.adminStatCard}>
-                  <View style={[styles.skeleton, styles.skeletonLineShort]} />
-                  <View style={[styles.skeleton, styles.skeletonLineWide]} />
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.adminStatRow}>
-              <View style={styles.adminStatCard}>
-                <Text style={styles.metaText}>Open reports</Text>
-                <Text style={styles.adminStatValue}>{reportsCount}</Text>
-              </View>
-              <View style={styles.adminStatCard}>
-                <Text style={styles.metaText}>Open appeals</Text>
-                <Text style={styles.adminStatValue}>{appealsCount}</Text>
-              </View>
-              <View style={styles.adminStatCard}>
-                <Text style={styles.metaText}>Verifications</Text>
-                <Text style={styles.adminStatValue}>{verificationRequests.length}</Text>
-              </View>
-            </View>
-          )}
+          <View style={styles.listRow}>
+            <Text style={styles.metaText}>Open reports</Text>
+            <Text style={styles.cardTitle}>{reportsCount}</Text>
+          </View>
+          <View style={styles.listRow}>
+            <Text style={styles.metaText}>Open appeals</Text>
+            <Text style={styles.cardTitle}>{appealsCount}</Text>
+          </View>
+          <View style={styles.listRow}>
+            <Text style={styles.metaText}>Pending verifications</Text>
+            <Text style={styles.cardTitle}>{verificationRequests.length}</Text>
+          </View>
         </View>
-        <View style={styles.adminSectionCard}>
+        <View style={styles.card}>
           <SectionTitle icon="toggle-outline" label="Feature flags" />
           {FEATURE_FLAG_DEFINITIONS.map((flag) => (
             <View key={flag.key} style={styles.rowBetween}>
@@ -5748,15 +3394,9 @@ const AdminPortalScreen = () => {
             </View>
           ))}
         </View>
-        <View style={styles.adminSectionCard}>
+        <View style={styles.card}>
           <SectionTitle icon="checkmark-circle-outline" label="Verification queue" />
-          {loading ? (
-            <View style={styles.skeletonStack}>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <SkeletonRowItem key={`verify-skel-${index}`} />
-              ))}
-            </View>
-          ) : verificationRequests.length === 0 ? (
+          {verificationRequests.length === 0 ? (
             <Text style={styles.metaText}>No pending verification requests.</Text>
           ) : (
             verificationRequests.map((request) => (
@@ -5784,15 +3424,9 @@ const AdminPortalScreen = () => {
             ))
           )}
         </View>
-        <View style={styles.adminSectionCard}>
+        <View style={styles.card}>
           <SectionTitle icon="bug-outline" label="Bug reports" />
-          {loading ? (
-            <View style={styles.skeletonStack}>
-              {Array.from({ length: 2 }).map((_, index) => (
-                <SkeletonRowItem key={`bug-skel-${index}`} />
-              ))}
-            </View>
-          ) : bugReports.length === 0 ? (
+          {bugReports.length === 0 ? (
             <Text style={styles.metaText}>No bug reports yet.</Text>
           ) : (
             bugReports.map((report) => (
@@ -5806,15 +3440,9 @@ const AdminPortalScreen = () => {
             ))
           )}
         </View>
-        <View style={styles.adminSectionCard}>
+        <View style={styles.card}>
           <SectionTitle icon="ban-outline" label="Flagged users" />
-          {loading ? (
-            <View style={styles.skeletonStack}>
-              {Array.from({ length: 2 }).map((_, index) => (
-                <SkeletonRowItem key={`flag-skel-${index}`} />
-              ))}
-            </View>
-          ) : flaggedUsers.length === 0 ? (
+          {flaggedUsers.length === 0 ? (
             <Text style={styles.metaText}>No flagged users.</Text>
           ) : (
             flaggedUsers.map((user) => (
@@ -5830,15 +3458,9 @@ const AdminPortalScreen = () => {
             ))
           )}
         </View>
-        <View style={styles.adminSectionCard}>
+        <View style={styles.card}>
           <SectionTitle icon="receipt-outline" label="Recent orders" />
-          {loading ? (
-            <View style={styles.skeletonStack}>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <SkeletonRowItem key={`orders-skel-${index}`} />
-              ))}
-            </View>
-          ) : recentOrders.length === 0 ? (
+          {recentOrders.length === 0 ? (
             <Text style={styles.metaText}>No orders yet.</Text>
           ) : (
             recentOrders.map((order) => (
@@ -5852,15 +3474,9 @@ const AdminPortalScreen = () => {
             ))
           )}
         </View>
-        <View style={styles.adminSectionCard}>
+        <View style={styles.card}>
           <SectionTitle icon="pulse-outline" label="Audit log" />
-          {loading ? (
-            <View style={styles.skeletonStack}>
-              {Array.from({ length: 2 }).map((_, index) => (
-                <SkeletonRowItem key={`audit-skel-${index}`} />
-              ))}
-            </View>
-          ) : auditLog.length === 0 ? (
+          {auditLog.length === 0 ? (
             <Text style={styles.metaText}>No audit events yet.</Text>
           ) : (
             auditLog.map((entry) => (
@@ -5949,26 +3565,10 @@ const ModerationScreen = () => {
           <Text style={styles.cardBody}>Reports and appeals queue.</Text>
           {loading ? <Text style={styles.metaText}>Loading...</Text> : null}
           {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <View style={styles.moderationStats}>
-            <View style={styles.adminStatCard}>
-              <Text style={styles.metaText}>Open reports</Text>
-              <Text style={styles.adminStatValue}>{reports.length}</Text>
-            </View>
-            <View style={styles.adminStatCard}>
-              <Text style={styles.metaText}>Open appeals</Text>
-              <Text style={styles.adminStatValue}>{appeals.length}</Text>
-            </View>
-          </View>
         </View>
-        <View style={styles.adminSectionCard}>
+        <View style={styles.card}>
           <SectionTitle icon="alert-outline" label="Reports" />
-          {loading ? (
-            <View style={styles.skeletonStack}>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <SkeletonRowItem key={`report-skel-${index}`} />
-              ))}
-            </View>
-          ) : reports.length === 0 ? (
+          {reports.length === 0 ? (
             <Text style={styles.metaText}>No reports yet.</Text>
           ) : (
             reports.map((report) => (
@@ -5982,15 +3582,9 @@ const ModerationScreen = () => {
             ))
           )}
         </View>
-        <View style={styles.adminSectionCard}>
+        <View style={styles.card}>
           <SectionTitle icon="document-text-outline" label="Appeals" />
-          {loading ? (
-            <View style={styles.skeletonStack}>
-              {Array.from({ length: 2 }).map((_, index) => (
-                <SkeletonRowItem key={`appeal-skel-${index}`} />
-              ))}
-            </View>
-          ) : appeals.length === 0 ? (
+          {appeals.length === 0 ? (
             <Text style={styles.metaText}>No appeals yet.</Text>
           ) : (
             appeals.map((appeal) => (
@@ -6013,60 +3607,13 @@ const ModerationScreen = () => {
 
 const HelpScreen = () => {
   const styles = useStyles();
-  const { colors } = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <SectionTitle icon="help-circle-outline" label="Help & support" />
-          <Text style={styles.cardBody}>Guides, contact support, and safety resources.</Text>
-        </View>
-        <View style={styles.adminSectionCard}>
-          <SectionTitle icon="book-outline" label="Quick guides" />
-            <View style={styles.listRow}>
-              <View style={styles.listRowInfo}>
-                <Text style={styles.cardTitle}>Getting started</Text>
-                <Text style={styles.metaText}>Map basics, rooms, and privacy.</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </View>
-            <View style={styles.listRow}>
-              <View style={styles.listRowInfo}>
-                <Text style={styles.cardTitle}>Orders & pickup</Text>
-                <Text style={styles.metaText}>How pickup orders work.</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </View>
-            <View style={styles.listRow}>
-              <View style={styles.listRowInfo}>
-                <Text style={styles.cardTitle}>Safety & trust</Text>
-                <Text style={styles.metaText}>Reporting, appeals, and verification.</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </View>
-        </View>
-        <View style={styles.adminSectionCard}>
-          <SectionTitle icon="mail-outline" label="Contact support" />
-          <Text style={styles.cardBody}>Need help? Reach our team.</Text>
-          <View style={styles.rowBetween}>
-            <Pressable style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Email support</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Live chat</Text>
-            </Pressable>
-          </View>
-        </View>
-        <View style={styles.adminSectionCard}>
-          <SectionTitle icon="bug-outline" label="Report a bug" />
-          <Text style={styles.cardBody}>Send diagnostics and screenshots.</Text>
-          <Pressable style={styles.primaryButton} onPress={() => navigation.navigate('BugReport')}>
-            <Text style={styles.primaryButtonText}>Open bug report</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
+      <View style={styles.card}>
+        <SectionTitle icon="help-circle-outline" label="Help & support" />
+        <Text style={styles.cardBody}>Contact support or report a bug.</Text>
+      </View>
       <BottomNav />
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -6165,14 +3712,12 @@ export default function App() {
           <NavigationContainer>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
               <Stack.Screen name="Home" component={HomeScreen} />
-              <Stack.Screen name="Feed" component={FeedScreen} />
-              <Stack.Screen name="Create" component={CreateScreen} />
-              <Stack.Screen name="Messages" component={MessagesScreen} />
-              <Stack.Screen name="DirectChat" component={DirectChatScreen} />
-              <Stack.Screen name="Orders" component={OrdersScreen} />
-              <Stack.Screen name="Billing" component={BillingScreen} />
-              <Stack.Screen name="Room" component={RoomScreen} />
-              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="Feed" component={FeedScreen} />
+            <Stack.Screen name="Create" component={CreateScreen} />
+            <Stack.Screen name="Messages" component={MessagesScreen} />
+            <Stack.Screen name="DirectChat" component={DirectChatScreen} />
+            <Stack.Screen name="Orders" component={OrdersScreen} />
+            <Stack.Screen name="Room" component={RoomScreen} />
               <Stack.Screen name="Profile" component={ProfileScreen} />
               <Stack.Screen name="Auth" component={AuthScreen} />
               <Stack.Screen name="Business" component={BusinessScreen} />
@@ -6245,8 +3790,8 @@ const useStyles = () => {
           paddingVertical: 2,
           paddingHorizontal: 8,
           borderWidth: 1,
-          borderColor: 'rgba(59, 130, 246, 0.35)',
-          backgroundColor: 'rgba(59, 130, 246, 0.12)',
+          borderColor: 'rgba(132, 89, 183, 0.22)',
+          backgroundColor: 'rgba(132, 89, 183, 0.12)',
         },
         betaPillText: {
           fontSize: 10,
@@ -6267,7 +3812,6 @@ const useStyles = () => {
         },
         mapRoot: {
           flex: 1,
-          paddingBottom: 70,
         },
         mapHeader: {
           flexDirection: 'row',
@@ -6296,16 +3840,6 @@ const useStyles = () => {
           width: 38,
           height: 38,
           borderRadius: 19,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: colors.border,
-        },
-        iconButtonSm: {
-          width: 32,
-          height: 32,
-          borderRadius: 16,
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: colors.surface,
@@ -6370,28 +3904,6 @@ const useStyles = () => {
           gap: 8,
           marginTop: 8,
         },
-        searchResults: {
-          marginTop: 10,
-          gap: 8,
-        },
-        searchResultRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-          paddingVertical: 8,
-          paddingHorizontal: 10,
-          borderRadius: 12,
-          backgroundColor: colors.surfaceMuted,
-          borderWidth: 1,
-          borderColor: colors.border,
-        },
-        searchResultInfo: {
-          flex: 1,
-          gap: 2,
-        },
-        searchPostWrap: {
-          gap: 10,
-        },
         filterChip: {
           paddingVertical: 6,
           paddingHorizontal: 12,
@@ -6416,7 +3928,7 @@ const useStyles = () => {
           flex: 1,
           marginHorizontal: 16,
           marginTop: 10,
-          marginBottom: 90,
+          marginBottom: 12,
           borderRadius: 24,
           borderWidth: 1,
           borderColor: colors.border,
@@ -6544,7 +4056,7 @@ const useStyles = () => {
           position: 'absolute',
           left: 16,
           right: 16,
-          bottom: 90,
+          bottom: 18,
           flexDirection: 'row',
           gap: 8,
           justifyContent: 'space-between',
@@ -6635,7 +4147,7 @@ const useStyles = () => {
           width: 26,
           height: 26,
           borderRadius: 13,
-          backgroundColor: colors.danger,
+          backgroundColor: '#FF3B30',
           borderWidth: 2,
           borderColor: '#FFFFFF',
           alignItems: 'center',
@@ -6678,9 +4190,6 @@ const useStyles = () => {
         feedTabs: {
           flexDirection: 'row',
           gap: 8,
-        },
-        messagesHeader: {
-          gap: 12,
         },
         tabBar: {
           flexDirection: 'row',
@@ -6742,140 +4251,6 @@ const useStyles = () => {
         listRowInfo: {
           flex: 1,
           gap: 4,
-        },
-        chatMediaImage: {
-          width: 180,
-          height: 120,
-          borderRadius: 12,
-          marginTop: 6,
-        },
-        mediaRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginTop: 10,
-        },
-        mediaPreview: {
-          width: 140,
-          height: 84,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        mediaPreviewSmall: {
-          width: 84,
-          height: 84,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        mediaImage: {
-          width: '100%',
-          height: '100%',
-        },
-        mediaPlaceholder: {
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 4,
-        },
-        reviewComposer: {
-          marginTop: 12,
-          gap: 10,
-        },
-        ratingRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-        },
-        ratingStar: {
-          padding: 2,
-        },
-        reviewRow: {
-          marginTop: 12,
-          padding: 12,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-          gap: 6,
-        },
-        reviewHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        },
-        sectionDivider: {
-          height: 1,
-          backgroundColor: colors.border,
-          marginVertical: 12,
-        },
-        exceptionList: {
-          marginTop: 8,
-          gap: 4,
-        },
-        exceptionRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        },
-        messageRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 12,
-          paddingVertical: 10,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-        },
-        messageRowMine: {
-          alignSelf: 'flex-end',
-          alignItems: 'flex-end',
-        },
-        messageRowOther: {
-          alignSelf: 'flex-start',
-          alignItems: 'flex-start',
-        },
-        messageBubble: {
-          maxWidth: '80%',
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-          borderRadius: 16,
-        },
-        messageBubbleMine: {
-          backgroundColor: colors.primary,
-        },
-        messageBubbleOther: {
-          backgroundColor: colors.surfaceMuted,
-        },
-        messageText: {
-          fontSize: 14,
-          color: colors.text,
-        },
-        messageTextMine: {
-          color: colors.primaryText,
-        },
-        messageTimestamp: {
-          fontSize: 11,
-          color: colors.textMuted,
-          marginTop: 4,
-        },
-        messageAvatar: {
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.surfaceMuted,
-          borderWidth: 1,
-          borderColor: colors.border,
         },
         businessHeroCard: {
           borderRadius: 20,
@@ -6959,19 +4334,10 @@ const useStyles = () => {
           alignItems: 'center',
           gap: 6,
         },
-        feedMediaImage: {
-          marginTop: 10,
-          width: '100%',
-          height: 180,
-          borderRadius: 14,
-        },
         postActions: {
           flexDirection: 'row',
           flexWrap: 'wrap',
           gap: 10,
-        },
-        postMediaPreview: {
-          gap: 8,
         },
         postActionButton: {
           flexDirection: 'row',
@@ -6989,55 +4355,6 @@ const useStyles = () => {
           fontWeight: '600',
           color: colors.textMuted,
         },
-        skeletonStack: {
-          gap: 12,
-        },
-        skeletonCard: {
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surface,
-          padding: 14,
-          gap: 10,
-        },
-        skeletonRowCard: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 12,
-          paddingVertical: 10,
-        },
-        skeletonRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-        },
-        skeletonColumn: {
-          flex: 1,
-          gap: 6,
-        },
-        skeleton: {
-          backgroundColor: colors.surfaceMuted,
-          borderRadius: 999,
-        },
-        skeletonAvatar: {
-          width: 34,
-          height: 34,
-          borderRadius: 17,
-        },
-        skeletonLine: {
-          height: 10,
-          borderRadius: 6,
-        },
-        skeletonLineWide: {
-          height: 10,
-          borderRadius: 6,
-          width: '70%',
-        },
-        skeletonLineShort: {
-          height: 8,
-          borderRadius: 6,
-          width: '50%',
-        },
         badge: {
           fontSize: 12,
           fontWeight: '600',
@@ -7052,97 +4369,6 @@ const useStyles = () => {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 8,
-        },
-        stepRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-        },
-        stepBadge: {
-          width: 26,
-          height: 26,
-          borderRadius: 13,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.surfaceMuted,
-          borderWidth: 1,
-          borderColor: colors.border,
-        },
-        stepBadgeText: {
-          fontSize: 12,
-          fontWeight: '700',
-          color: colors.text,
-        },
-        cartRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingVertical: 8,
-          gap: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-        },
-        cartControls: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 8,
-        },
-        cartButton: {
-          width: 28,
-          height: 28,
-          borderRadius: 14,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-        },
-        cartSummary: {
-          marginTop: 10,
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        },
-        receiptCard: {
-          marginTop: 12,
-          padding: 12,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-          gap: 6,
-        },
-        adminStatRow: {
-          flexDirection: 'row',
-          gap: 10,
-        },
-        adminStatCard: {
-          flex: 1,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-          padding: 10,
-          alignItems: 'center',
-          gap: 6,
-        },
-        adminStatValue: {
-          fontSize: 18,
-          fontWeight: '800',
-          color: colors.text,
-        },
-        moderationStats: {
-          flexDirection: 'row',
-          gap: 12,
-          marginTop: 6,
-        },
-        adminSectionCard: {
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surface,
-          padding: 14,
-          gap: 10,
         },
         metaRow: {
           flexDirection: 'row',
@@ -7174,20 +4400,13 @@ const useStyles = () => {
         },
         primaryButton: {
           flex: 1,
-          borderRadius: 22,
+          borderRadius: 14,
           backgroundColor: colors.primary,
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          minHeight: 46,
-          justifyContent: 'center',
+          paddingVertical: 10,
           alignItems: 'center',
         },
-        primaryButtonFull: {
-          flex: 0,
-          alignSelf: 'stretch',
-        },
         primaryButtonText: {
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: '700',
           color: colors.primaryText,
         },
@@ -7203,48 +4422,6 @@ const useStyles = () => {
         secondaryButtonText: {
           fontSize: 14,
           fontWeight: '600',
-          color: colors.text,
-        },
-        authBody: {
-          flex: 1,
-          paddingHorizontal: 16,
-          paddingBottom: 12,
-          justifyContent: 'space-between',
-          gap: 12,
-        },
-        authSubhead: {
-          fontSize: 12,
-          color: colors.textMuted,
-        },
-        authHint: {
-          fontSize: 13,
-          fontWeight: '600',
-          color: colors.text,
-        },
-        authFooterLinks: {
-          paddingHorizontal: 8,
-          flexDirection: 'row',
-          justifyContent: 'flex-end',
-          gap: 16,
-        },
-        linkText: {
-          fontSize: 12,
-          fontWeight: '600',
-          color: colors.textMuted,
-        },
-        storyRow: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: 8,
-        },
-        storyPill: {
-          paddingHorizontal: 10,
-          paddingVertical: 6,
-          borderRadius: 16,
-          backgroundColor: colors.surfaceMuted,
-        },
-        storyPillText: {
-          fontSize: 12,
           color: colors.text,
         },
       }),

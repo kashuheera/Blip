@@ -19,8 +19,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
-import * as ImagePicker from 'expo-image-picker';
 import MapView, { Circle, Marker, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,16 +31,6 @@ import {
 import { createClient } from '@supabase/supabase-js';
 
 const APP_VERSION = Constants.expoConfig?.version ?? 'dev';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
 
 type RootStackParamList = {
   Home: undefined;
@@ -155,8 +143,6 @@ type DirectMessage = {
   body: string;
   senderId: string | null;
   createdAt: string;
-  mediaUrl?: string | null;
-  mediaType?: string | null;
 };
 
 type BusinessMessage = {
@@ -180,8 +166,6 @@ type PostEntry = {
   authorHandle: string;
   body: string;
   createdAt: string;
-  mediaUrl?: string | null;
-  mediaType?: string | null;
 };
 
 type OrderEntry = {
@@ -234,25 +218,6 @@ type BusinessReviewEntry = {
   createdAt: string;
 };
 
-type BusinessHoursException = {
-  id: string;
-  businessId: string;
-  date: string;
-  isClosed: boolean;
-  openTime: string | null;
-  closeTime: string | null;
-  note: string | null;
-};
-
-type BusinessCouponEntry = {
-  id: string;
-  businessId: string;
-  code: string;
-  details: string;
-  active: boolean;
-  createdAt: string;
-};
-
 type BusinessAuditEntry = {
   id: string;
   businessId: string;
@@ -260,13 +225,6 @@ type BusinessAuditEntry = {
   entityType: string | null;
   entityId: string | null;
   createdAt: string;
-};
-
-type OwnedBusinessEntry = {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  logoUrl: string | null;
 };
 
 type BugReportEntry = {
@@ -665,28 +623,6 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (!supabase || !userId || !deviceId) {
-      return;
-    }
-    void supabase.from('device_fingerprints').upsert(
-      {
-        user_id: userId,
-        device_id: deviceId,
-        platform: Platform.OS,
-        last_seen_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,device_id' }
-    );
-  }, [deviceId, userId]);
-
-  useEffect(() => {
-    if (!userId) {
-      return;
-    }
-    void flushAnalyticsQueue();
-  }, [userId]);
-
-  useEffect(() => {
     let isMounted = true;
     const loadDeviceId = async () => {
       try {
@@ -728,7 +664,6 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUserId(data.user?.id ?? null);
     setEmail(data.user?.email ?? null);
     void loadProfile(data.user?.id ?? null);
-    void trackAnalyticsEvent('auth_sign_in', { method: 'password' }, data.user?.id ?? null);
     return true;
   };
 
@@ -746,7 +681,6 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUserId(data.user?.id ?? null);
     setEmail(data.user?.email ?? null);
     void loadProfile(data.user?.id ?? null);
-    void trackAnalyticsEvent('auth_sign_up', { method: 'password' }, data.user?.id ?? null);
     return true;
   };
 
@@ -1063,154 +997,6 @@ const runModerationCheck = async (payload: {
   }
 };
 
-const ANALYTICS_QUEUE_KEY = 'blip.analytics.queue.v1';
-const ANALYTICS_ANON_KEY = 'blip.analytics.anon.v1';
-let analyticsSessionId = `sess_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-
-const getAnalyticsAnonId = async () => {
-  try {
-    const existing = await AsyncStorage.getItem(ANALYTICS_ANON_KEY);
-    if (existing) {
-      return existing;
-    }
-    const nextId = `anon_${Math.random().toString(36).slice(2, 10)}`;
-    await AsyncStorage.setItem(ANALYTICS_ANON_KEY, nextId);
-    return nextId;
-  } catch {
-    return null;
-  }
-};
-
-const enqueueAnalyticsEvent = async (event: Record<string, unknown>) => {
-  try {
-    const raw = await AsyncStorage.getItem(ANALYTICS_QUEUE_KEY);
-    const nextQueue = raw ? (JSON.parse(raw) as Record<string, unknown>[]) : [];
-    nextQueue.push(event);
-    const trimmed = nextQueue.slice(-100);
-    await AsyncStorage.setItem(ANALYTICS_QUEUE_KEY, JSON.stringify(trimmed));
-  } catch {
-    // ignore queue errors
-  }
-};
-
-const sendAnalyticsEvents = async (events: Record<string, unknown>[]) => {
-  if (!supabase) {
-    return false;
-  }
-  try {
-    const { error } = await supabase.functions.invoke('analytics-ingest', {
-      body: { events },
-    });
-    return !error;
-  } catch {
-    return false;
-  }
-};
-
-const trackAnalyticsEvent = async (
-  name: string,
-  props: Record<string, unknown>,
-  userId?: string | null
-) => {
-  const anonId = await getAnalyticsAnonId();
-  const event = {
-    name,
-    session_id: analyticsSessionId,
-    ts: Date.now(),
-    anon_id: anonId ?? undefined,
-    props,
-  };
-  if (!userId) {
-    await enqueueAnalyticsEvent(event);
-    return;
-  }
-  const ok = await sendAnalyticsEvents([event]);
-  if (!ok) {
-    await enqueueAnalyticsEvent(event);
-  }
-};
-
-const flushAnalyticsQueue = async () => {
-  try {
-    const raw = await AsyncStorage.getItem(ANALYTICS_QUEUE_KEY);
-    if (!raw) {
-      return;
-    }
-    const queue = JSON.parse(raw) as Record<string, unknown>[];
-    if (!Array.isArray(queue) || queue.length === 0) {
-      return;
-    }
-    const ok = await sendAnalyticsEvents(queue);
-    if (ok) {
-      await AsyncStorage.removeItem(ANALYTICS_QUEUE_KEY);
-    }
-  } catch {
-    // ignore
-  }
-};
-
-const pickAndUploadImage = async (bucket: string, pathPrefix: string) => {
-  if (!supabase) {
-    return { url: null, error: 'no_supabase' };
-  }
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (permission.status !== 'granted') {
-    return { url: null, error: 'permission' };
-  }
-  const picker = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: true,
-    quality: 0.8,
-  });
-  if (picker.canceled || !picker.assets?.length) {
-    return { url: null, error: 'canceled' };
-  }
-  const asset = picker.assets[0];
-  const extension = asset.uri.split('.').pop() ?? 'jpg';
-  const filePath = `${pathPrefix}/${Date.now()}.${extension}`;
-  try {
-    const response = await fetch(asset.uri);
-    const blob = await response.blob();
-    const upload = await supabase.storage.from(bucket).upload(filePath, blob, {
-      upsert: true,
-      contentType: asset.type ?? 'image/jpeg',
-    });
-    if (upload.error) {
-      return { url: null, error: 'upload' };
-    }
-    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-    return { url: data.publicUrl, error: null };
-  } catch {
-    return { url: null, error: 'upload' };
-  }
-};
-
-const registerForPushAsync = async () => {
-  if (Platform.OS === 'web') {
-    return { token: null, status: 'unsupported' as const };
-  }
-  const settings = await Notifications.getPermissionsAsync();
-  let status = settings.status;
-  if (status !== 'granted') {
-    const request = await Notifications.requestPermissionsAsync();
-    status = request.status;
-  }
-  if (status !== 'granted') {
-    return { token: null, status: 'denied' as const };
-  }
-  try {
-    const deviceToken = await Notifications.getDevicePushTokenAsync();
-    return { token: deviceToken.data, status: 'granted' as const };
-  } catch {
-    try {
-      const expoToken = await Notifications.getExpoPushTokenAsync();
-      return { token: expoToken.data, status: 'expo' as const };
-    } catch {
-      return { token: null, status: 'error' as const };
-    }
-  }
-};
-
 const buildSpiderfyPins = (
   pins: MapPin[],
   center: { latitude: number; longitude: number }
@@ -1236,7 +1022,7 @@ const HomeScreen = () => {
   const { colors, resolvedMode } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { businesses: businessList, setBusinesses } = useBusinesses();
-  const { profile, userId } = useAuth();
+  const { profile } = useAuth();
   const initialRegion = useMemo<Region>(
     () => ({
       latitude: 31.4498226,
@@ -1262,9 +1048,6 @@ const HomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchScope, setSearchScope] = useState<'rooms' | 'businesses' | 'posts'>('businesses');
-  const [filterOpenNow, setFilterOpenNow] = useState(false);
-  const [filterVerified, setFilterVerified] = useState(false);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
   const showUsers = true;
   const [userPins, setUserPins] = useState<MapPin[]>(demoUserPins);
   const [rooms, setRooms] = useState<Room[]>(demoRooms);
@@ -1275,24 +1058,12 @@ const HomeScreen = () => {
       if (query && !business.name.toLowerCase().includes(query)) {
         return false;
       }
-      if (filterOpenNow && !business.openNow) {
-        return false;
-      }
-      if (filterVerified && !business.verified) {
-        return false;
-      }
-      if (activeTag) {
-        const tag = activeTag.toLowerCase();
-        const tags = [business.category, ...(business.categories ?? [])]
-          .filter(Boolean)
-          .map((entry) => String(entry).toLowerCase());
-        if (!tags.includes(tag)) {
-          return false;
-        }
-      }
       return true;
     });
-  }, [activeTag, businessList, filterOpenNow, filterVerified, searchQuery]);
+  }, [
+    businessList,
+    searchQuery,
+  ]);
 
   const businessPins = useMemo(
     () =>
@@ -1321,41 +1092,9 @@ const HomeScreen = () => {
       if (query && !room.title.toLowerCase().includes(query)) {
         return false;
       }
-      if (activeTag && room.category.toLowerCase() !== activeTag.toLowerCase()) {
-        return false;
-      }
       return true;
     });
-  }, [activeTag, rooms, searchQuery]);
-
-  const tagOptions = useMemo(() => {
-    if (searchScope === 'rooms') {
-      return Array.from(
-        new Set(
-          rooms
-            .map((room) => room.category)
-            .filter((entry): entry is string => Boolean(entry))
-        )
-      ).slice(0, 8);
-    }
-    if (searchScope === 'businesses') {
-      return Array.from(
-        new Set(
-          businessList.flatMap((business) => [
-            business.category,
-            ...(business.categories ?? []),
-          ])
-        )
-      ).slice(0, 8);
-    }
-    return [];
-  }, [businessList, rooms, searchScope]);
-
-  useEffect(() => {
-    if (activeTag && tagOptions.length > 0 && !tagOptions.includes(activeTag)) {
-      setActiveTag(null);
-    }
-  }, [activeTag, tagOptions]);
+  }, [rooms, searchQuery]);
   const postSearchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return demoSearchPosts.filter((post) => {
@@ -1523,10 +1262,6 @@ const HomeScreen = () => {
     };
   }, [setBusinesses]);
 
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'home' }, userId);
-  }, [userId]);
-
   const handleClusterPress = (cluster: MapCluster) => {
     setSelectedBusinessId(null);
     setSelectedRoomId(null);
@@ -1595,33 +1330,18 @@ const HomeScreen = () => {
         </View>
         {searchOpen ? (
           <View style={styles.searchOverlay}>
-          <View style={styles.searchOverlayHeader}>
-            <View style={styles.searchInputWrap}>
-              <Ionicons name="search" size={18} color={colors.textMuted} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search rooms, businesses, posts"
+            <View style={styles.searchOverlayHeader}>
+              <View style={styles.searchInputWrap}>
+                <Ionicons name="search" size={18} color={colors.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search rooms, businesses, posts"
                   placeholderTextColor={colors.placeholder}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                 />
               </View>
-              <Pressable
-                style={styles.iconButton}
-                onPress={() => {
-                  setSearchOpen(false);
-                  if (searchQuery.trim()) {
-                    void trackAnalyticsEvent(
-                      'search_query',
-                      {
-                        scope: searchScope,
-                        length: searchQuery.trim().length,
-                      },
-                      userId
-                    );
-                  }
-                }}
-              >
+              <Pressable style={styles.iconButton} onPress={() => setSearchOpen(false)}>
                 <Ionicons name="close" size={20} color={colors.text} />
               </Pressable>
             </View>
@@ -1638,11 +1358,6 @@ const HomeScreen = () => {
                     setSelectedBusinessId(null);
                     setSelectedRoomId(null);
                     setSpiderfy(null);
-                    void trackAnalyticsEvent(
-                      'filter_toggle',
-                      { filter: 'scope', value: scope },
-                      userId
-                    );
                   }}
                 >
                   <Text
@@ -1656,88 +1371,6 @@ const HomeScreen = () => {
                 </Pressable>
               ))}
             </View>
-            {searchScope === 'businesses' ? (
-              <View style={styles.filterRow}>
-                <Pressable
-                  style={[
-                    styles.filterChip,
-                    filterOpenNow && styles.filterChipActive,
-                  ]}
-                  onPress={() => {
-                    const nextValue = !filterOpenNow;
-                    setFilterOpenNow(nextValue);
-                    void trackAnalyticsEvent(
-                      'filter_toggle',
-                      { filter: 'open_now', value: nextValue },
-                      userId
-                    );
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      filterOpenNow && styles.filterChipTextActive,
-                    ]}
-                  >
-                    Open now
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.filterChip,
-                    filterVerified && styles.filterChipActive,
-                  ]}
-                  onPress={() => {
-                    setFilterVerified((prev) => !prev);
-                    void trackAnalyticsEvent(
-                      'filter_toggle',
-                      { filter: 'verified', value: !filterVerified },
-                      userId
-                    );
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      filterVerified && styles.filterChipTextActive,
-                    ]}
-                  >
-                    Verified
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
-            {tagOptions.length > 0 ? (
-              <View style={styles.filterRow}>
-                {tagOptions.map((tag) => (
-                  <Pressable
-                    key={tag}
-                    style={[
-                      styles.filterChip,
-                      activeTag === tag && styles.filterChipActive,
-                    ]}
-                    onPress={() => {
-                      const nextTag = activeTag === tag ? null : tag;
-                      setActiveTag(nextTag);
-                      void trackAnalyticsEvent(
-                        'filter_toggle',
-                        { filter: 'tag', value: nextTag ?? 'none' },
-                        userId
-                      );
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.filterChipText,
-                        activeTag === tag && styles.filterChipTextActive,
-                      ]}
-                    >
-                      #{tag}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
             <View style={styles.searchResults}>
               {searchScope === 'rooms' ? (
                 filteredRooms.length === 0 ? (
@@ -1817,9 +1450,7 @@ const HomeScreen = () => {
         <View style={styles.mapShell}>
           {Platform.OS === 'web' ? (
             <View style={styles.webPlaceholder}>
-              <Text style={styles.mapLabel}>
-                Web support parity is pending. Map is mobile-only for now.
-              </Text>
+              <Text style={styles.mapLabel}>Map is mobile-only for now.</Text>
             </View>
           ) : (
             <MapView
@@ -2138,16 +1769,13 @@ type FeedProps = NativeStackScreenProps<RootStackParamList, 'Feed'>;
 const FeedScreen = ({ route }: FeedProps) => {
   const styles = useStyles();
   const { colors } = useTheme();
-  const { userId } = useAuth();
   const [posts, setPosts] = useState<PostEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [storiesNotice, setStoriesNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'trending' | 'forYou' | 'newest'>('trending');
   const [searchValue, setSearchValue] = useState(route.params?.search ?? '');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const tags = ['food', 'events', 'jobs', 'deals', 'study'];
-  const storyLabels = ['Food finds', 'Events', 'Deals', 'Study'];
 
   const loadPosts = async () => {
     if (!supabase) {
@@ -2161,7 +1789,7 @@ const FeedScreen = ({ route }: FeedProps) => {
     setNotice(null);
     const { data, error } = await supabase
       .from('posts')
-      .select('id, author_handle, body, created_at, media_type, media_url')
+      .select('id, author_handle, body, created_at')
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) {
@@ -2175,8 +1803,6 @@ const FeedScreen = ({ route }: FeedProps) => {
         authorHandle: row.author_handle ?? 'blip',
         body: row.body ?? '',
         createdAt: row.created_at ?? '',
-        mediaUrl: row.media_url ?? null,
-        mediaType: row.media_type ?? null,
       }))
     );
     setLoading(false);
@@ -2203,10 +1829,6 @@ const FeedScreen = ({ route }: FeedProps) => {
       channel.unsubscribe();
     };
   }, []);
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'feed' }, userId);
-  }, [userId]);
 
   useEffect(() => {
     if (route.params?.search !== undefined) {
@@ -2257,26 +1879,6 @@ const FeedScreen = ({ route }: FeedProps) => {
                   </Text>
                 </Pressable>
               ))}
-            </View>
-            <View style={styles.card}>
-              <SectionTitle icon="sparkles-outline" label="Stories (coming soon)" />
-              <Text style={styles.cardBody}>
-                Quick local highlights from rooms and businesses.
-              </Text>
-              <View style={styles.storyRow}>
-                {storyLabels.map((label) => (
-                  <View key={label} style={styles.storyPill}>
-                    <Text style={styles.storyPillText}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-              {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null}
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => setStoriesNotice('Stories are coming soon.')}
-              >
-                <Text style={styles.secondaryButtonText}>Get notified</Text>
-              </Pressable>
             </View>
             <View style={styles.searchInputWrap}>
               <Ionicons name="search" size={18} color={colors.textMuted} />
@@ -2332,9 +1934,6 @@ const FeedScreen = ({ route }: FeedProps) => {
               </View>
             </View>
             <Text style={styles.cardBody}>{item.body}</Text>
-            {item.mediaUrl ? (
-              <Image source={{ uri: item.mediaUrl }} style={styles.feedMediaImage} />
-            ) : null}
             <View style={styles.postContext}>
               <Ionicons name="location-outline" size={14} color={colors.textMuted} />
               <Text style={styles.metaText}>Room / Business context</Text>
@@ -2384,30 +1983,6 @@ const CreateScreen = () => {
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [mediaUploading, setMediaUploading] = useState(false);
-  const [mediaNotice, setMediaNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'create' }, userId);
-  }, [userId]);
-
-  const handleAttachPostMedia = async () => {
-    if (!userId) {
-      setMediaNotice('Sign in to attach media.');
-      return;
-    }
-    setMediaUploading(true);
-    setMediaNotice(null);
-    const upload = await pickAndUploadImage('post-media', `posts/${userId}`);
-    if (!upload.url) {
-      setMediaNotice(upload.error === 'permission' ? 'Photo permission denied.' : 'Upload canceled.');
-      setMediaUploading(false);
-      return;
-    }
-    setMediaUrl(upload.url);
-    setMediaUploading(false);
-  };
 
   const handleSubmit = async () => {
     if (!supabase) {
@@ -2425,7 +2000,6 @@ const CreateScreen = () => {
     const moderation = await runModerationCheck({
       content_type: 'post',
       text: body.trim(),
-      image_url: mediaUrl ?? undefined,
     });
     if (!moderation.allowed) {
       setNotice('Post blocked by safety checks.');
@@ -2438,16 +2012,12 @@ const CreateScreen = () => {
       user_id: userId,
       author_handle: profile?.handle ?? 'blip',
       body: body.trim(),
-      media_type: mediaUrl ? 'image' : null,
-      media_url: mediaUrl,
     });
     if (error) {
       setNotice('Unable to create post.');
     } else {
       setBody('');
-      setMediaUrl(null);
       setNotice(safetyWarning ? 'Posted (safety check unavailable).' : 'Posted!');
-      void trackAnalyticsEvent('post_create', { length: body.trim().length, media: Boolean(mediaUrl) }, userId);
     }
     setSubmitting(false);
   };
@@ -2468,21 +2038,6 @@ const CreateScreen = () => {
           placeholderTextColor={colors.placeholder}
           multiline
         />
-        {mediaNotice ? <Text style={styles.metaText}>{mediaNotice}</Text> : null}
-        {mediaUrl ? (
-          <View style={styles.postMediaPreview}>
-            <Image source={{ uri: mediaUrl }} style={styles.feedMediaImage} />
-            <Pressable style={styles.secondaryButton} onPress={() => setMediaUrl(null)}>
-              <Text style={styles.secondaryButtonText}>Remove media</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable style={styles.secondaryButton} onPress={() => void handleAttachPostMedia()}>
-            <Text style={styles.secondaryButtonText}>
-              {mediaUploading ? 'Uploading...' : 'Attach image'}
-            </Text>
-          </Pressable>
-        )}
         {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
         <Pressable style={styles.primaryButton} onPress={() => void handleSubmit()} disabled={submitting}>
           <Text style={styles.primaryButtonText}>{submitting ? 'Posting...' : 'Post'}</Text>
@@ -2502,7 +2057,6 @@ const MessagesScreen = () => {
   const { colors } = useTheme();
   const [messagesTab, setMessagesTab] = useState<'business' | 'direct'>('business');
   const [searchValue, setSearchValue] = useState('');
-  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const [directThreads, setDirectThreads] = useState<
     { id: string; handle: string; lastMessage: string; time: string }[]
   >([]);
@@ -2612,9 +2166,6 @@ const MessagesScreen = () => {
       channel?.unsubscribe();
     };
   }, [userId]);
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'messages' }, userId);
-  }, [userId]);
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -2657,19 +2208,6 @@ const MessagesScreen = () => {
               onChangeText={setSearchValue}
             />
           </View>
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="mic-outline" label="Voice rooms (coming soon)" />
-          <Text style={styles.cardBody}>
-            Drop-in audio rooms for your neighborhood and favorite spots.
-          </Text>
-          {voiceNotice ? <Text style={styles.metaText}>{voiceNotice}</Text> : null}
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => setVoiceNotice('Voice rooms are coming soon.')}
-          >
-            <Text style={styles.secondaryButtonText}>Notify me</Text>
-          </Pressable>
         </View>
         {messagesTab === 'business' ? (
           <View style={styles.card}>
@@ -2758,12 +2296,8 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
-  const [mediaUploading, setMediaUploading] = useState(false);
   const threadId = route.params?.threadId ?? '';
   const title = route.params?.title ?? 'Chat';
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'direct_chat' }, userId);
-  }, [userId]);
   const formatTime = (value?: string | null) => {
     if (!value) {
       return '';
@@ -2786,7 +2320,7 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
       setLoading(true);
       const { data, error } = await supabase
         .from('direct_messages')
-        .select('id, body, created_at, sender_id, media_type, media_url')
+        .select('id, body, created_at, sender_id')
         .eq('thread_id', threadId)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -2800,8 +2334,6 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
             body: row.body ?? '',
             senderId: row.sender_id ?? null,
             createdAt: row.created_at ?? '',
-            mediaUrl: row.media_url ?? null,
-            mediaType: row.media_type ?? null,
           }))
         );
       }
@@ -2850,40 +2382,6 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
       sender_id: userId,
       body,
     });
-    void trackAnalyticsEvent('message_send', { channel: 'direct' }, userId);
-  };
-
-  const handleAttachDirectMedia = async () => {
-    if (!supabase || !userId || !threadId) {
-      setSendNotice('Sign in to share media.');
-      return;
-    }
-    setMediaUploading(true);
-    setSendNotice(null);
-    const upload = await pickAndUploadImage('chat-media', `direct/${threadId}`);
-    if (!upload.url) {
-      setSendNotice(upload.error === 'permission' ? 'Photo permission denied.' : 'Upload canceled.');
-      setMediaUploading(false);
-      return;
-    }
-    const moderation = await runModerationCheck({
-      content_type: 'direct_message',
-      content_id: threadId,
-      image_url: upload.url,
-    });
-    if (!moderation.allowed) {
-      setSendNotice('Media blocked by safety checks.');
-      setMediaUploading(false);
-      return;
-    }
-    await supabase.from('direct_messages').insert({
-      thread_id: threadId,
-      sender_id: userId,
-      media_type: 'image',
-      media_url: upload.url,
-    });
-    void trackAnalyticsEvent('message_send', { channel: 'direct', media: true }, userId);
-    setMediaUploading(false);
   };
 
   return (
@@ -2907,23 +2405,15 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
                     isMine ? styles.messageBubbleMine : styles.messageBubbleOther,
                   ]}
                 >
-                  {message.body ? (
-                    <Text style={[styles.messageText, isMine && styles.messageTextMine]}>
-                      {message.body}
-                    </Text>
-                  ) : null}
-                  {message.mediaUrl ? (
-                    <Image source={{ uri: message.mediaUrl }} style={styles.chatMediaImage} />
-                  ) : null}
+                  <Text style={[styles.messageText, isMine && styles.messageTextMine]}>
+                    {message.body}
+                  </Text>
                 </View>
                 <Text style={styles.messageTimestamp}>{formatTime(message.createdAt)}</Text>
               </View>
             );
           })}
           <View style={styles.inputRow}>
-            <Pressable style={styles.iconButtonSm} onPress={() => void handleAttachDirectMedia()}>
-              <Ionicons name="attach-outline" size={18} color={colors.text} />
-            </Pressable>
             <TextInput
               style={styles.input}
               value={draft}
@@ -2932,9 +2422,7 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
               placeholderTextColor={colors.placeholder}
             />
             <Pressable style={styles.primaryButton} onPress={handleSend}>
-              <Text style={styles.primaryButtonText}>
-                {mediaUploading ? 'Uploading...' : 'Send'}
-              </Text>
+              <Text style={styles.primaryButtonText}>Send</Text>
             </Pressable>
           </View>
         </View>
@@ -2957,19 +2445,9 @@ const OrdersScreen = () => {
   const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
   const [cartItems, setCartItems] = useState<CartItemEntry[]>([]);
-  const [lastReceipt, setLastReceipt] = useState<{
-    orderId: string;
-    businessName: string;
-    items: CartItemEntry[];
-    totalCents: number;
-  } | null>(null);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
     businessList[0]?.id ?? null
   );
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'orders' }, userId);
-  }, [userId]);
 
   const businessIndex = useMemo(() => {
     const map = new Map<string, string>();
@@ -3191,38 +2669,8 @@ const OrdersScreen = () => {
         }))
       );
       setOrderNotes('');
-      setLastReceipt({
-        orderId,
-        businessName: selectedBusinessId
-          ? businessIndex.get(selectedBusinessId) ?? 'Business'
-          : 'Business',
-        items: cartItems,
-        totalCents: cartTotalCents,
-      });
       setCartItems([]);
       setNotice('Order requested.');
-      void trackAnalyticsEvent('order_place', { business_id: selectedBusinessId }, userId);
-      if (selectedBusinessId) {
-        const { data: ownerRow } = await supabase
-          .from('businesses')
-          .select('owner_id')
-          .eq('id', selectedBusinessId)
-          .maybeSingle();
-        const ownerId = ownerRow?.owner_id ?? null;
-        const recipients = [userId, ownerId].filter(
-          (entry): entry is string => typeof entry === 'string' && entry.length > 0
-        );
-        if (recipients.length > 0) {
-          await supabase.functions.invoke('push-send', {
-            body: {
-              user_ids: recipients,
-              title: 'BLIP',
-              body: 'New order received.',
-              data: { type: 'order', order_id: orderId },
-            },
-          });
-        }
-      }
       void refreshOrders();
     }
   };
@@ -3320,32 +2768,6 @@ const OrdersScreen = () => {
             <Pressable style={styles.primaryButton} onPress={() => void handleCreateOrder()}>
               <Text style={styles.primaryButtonText}>Submit pickup order</Text>
             </Pressable>
-            {lastReceipt ? (
-              <View style={styles.receiptCard}>
-                <Text style={styles.cardTitle}>Receipt</Text>
-                <Text style={styles.metaText}>Order #{lastReceipt.orderId.slice(0, 6)}</Text>
-                <Text style={styles.metaText}>{lastReceipt.businessName}</Text>
-                {lastReceipt.items.map((item) => (
-                  <View key={item.id} style={styles.rowBetween}>
-                    <Text style={styles.metaText}>{item.name}</Text>
-                    <Text style={styles.metaText}>
-                      x{item.quantity} • Rs{' '}
-                      {item.priceCents ? ((item.priceCents * item.quantity) / 100).toFixed(0) : '0'}
-                    </Text>
-                  </View>
-                ))}
-                <View style={styles.rowBetween}>
-                  <Text style={styles.cardTitle}>Total</Text>
-                  <Text style={styles.cardTitle}>Rs {(lastReceipt.totalCents / 100).toFixed(0)}</Text>
-                </View>
-              </View>
-            ) : null}
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => setNotice('Email/SMS receipt setup pending. Coming soon.')}
-            >
-              <Text style={styles.secondaryButtonText}>Email/SMS receipt</Text>
-            </Pressable>
           </View>
         }
         renderItem={({ item }) => (
@@ -3373,10 +2795,6 @@ const OrdersScreen = () => {
 
 const BillingScreen = () => {
   const styles = useStyles();
-  const [notice, setNotice] = useState<string | null>(null);
-  const handlePending = (label: string) => {
-    setNotice(`${label} setup pending. Coming soon.`);
-  };
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -3387,20 +2805,6 @@ const BillingScreen = () => {
             Payments, subscriptions, and invoices are not enabled yet.
           </Text>
           <Text style={styles.metaText}>This will unlock before rollout.</Text>
-          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Payments')}>
-            <Text style={styles.secondaryButtonText}>Connect payments provider</Text>
-          </Pressable>
-          <View style={styles.sectionDivider} />
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Paid tiers')}>
-            <Text style={styles.secondaryButtonText}>Paid tiers (users)</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Invite-only access')}>
-            <Text style={styles.secondaryButtonText}>Invite-only access</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Paid invites')}>
-            <Text style={styles.secondaryButtonText}>Paid invites</Text>
-          </Pressable>
         </View>
       </ScrollView>
       <BottomNav />
@@ -3417,9 +2821,6 @@ const ProfileScreen = () => {
   const { businesses: businessList } = useBusinesses();
   const [identity, setIdentity] = useState<'personal' | 'business'>('personal');
   const [pushEnabled, setPushEnabled] = useState(true);
-  const [pushToken, setPushToken] = useState<string | null>(null);
-  const [pushStatus, setPushStatus] = useState<string | null>(null);
-  const [pushNotice, setPushNotice] = useState<string | null>(null);
   const activeBusiness = businessList[0];
   const reputationScore = useMemo(() => {
     const xp = profile?.xp ?? 0;
@@ -3442,68 +2843,6 @@ const ProfileScreen = () => {
     }
     return 'New';
   }, [profile?.level, profile?.shadowbanned, profile?.u2uLocked]);
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'profile' }, userId);
-  }, [userId]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const register = async () => {
-      if (!userId || !pushEnabled) {
-        return;
-      }
-      const result = await registerForPushAsync();
-      if (!isMounted) {
-        return;
-      }
-      setPushStatus(result.status);
-      setPushToken(result.token);
-      if (result.token && supabase) {
-        await supabase.from('device_tokens').upsert(
-          {
-            user_id: userId,
-            device_id: deviceId,
-            platform: Platform.OS,
-            token: result.token,
-            last_seen_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id,token' }
-        );
-        setPushNotice('Push enabled.');
-      } else if (result.status === 'denied') {
-        setPushNotice('Push permissions denied.');
-      } else if (result.status === 'expo') {
-        setPushNotice('Expo push token saved (native keys needed).');
-      } else {
-        setPushNotice('Push not available on this device.');
-      }
-    };
-    void register();
-    return () => {
-      isMounted = false;
-    };
-  }, [deviceId, pushEnabled, userId]);
-
-  const sendTestPush = async () => {
-    if (!supabase || !userId) {
-      setPushNotice('Sign in to test push.');
-      return;
-    }
-    const { data, error } = await supabase.functions.invoke('push-send', {
-      body: {
-        user_ids: [userId],
-        title: 'BLIP',
-        body: 'Test notification',
-        data: { type: 'test' },
-      },
-    });
-    if (error) {
-      setPushNotice('Unable to send push.');
-      return;
-    }
-    setPushNotice(`Push queued (${data?.sent ?? 0} sent).`);
-  };
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -3616,16 +2955,6 @@ const ProfileScreen = () => {
               thumbColor={colors.surface}
             />
           </View>
-          {pushToken ? (
-            <Text style={styles.metaText}>
-              Token: {pushToken.slice(0, 10)}...{pushToken.slice(-6)}
-            </Text>
-          ) : null}
-          {pushStatus ? <Text style={styles.metaText}>Status: {pushStatus}</Text> : null}
-          {pushNotice ? <Text style={styles.metaText}>{pushNotice}</Text> : null}
-          <Pressable style={styles.secondaryButton} onPress={sendTestPush}>
-            <Text style={styles.secondaryButtonText}>Send test push</Text>
-          </Pressable>
           <View style={styles.rowBetween}>
             <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('BugReport')}>
               <Text style={styles.secondaryButtonText}>Report a bug</Text>
@@ -3650,151 +2979,60 @@ const ProfileScreen = () => {
 const AuthScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { signIn, signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [authMode, setAuthMode] = useState<'personal' | 'business' | 'fleet'>('personal');
+  const [isSignUp, setIsSignUp] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const authHint =
-    authMode === 'business'
-      ? 'Business sign-in opens the Business Admin Portal.'
-      : authMode === 'fleet'
-        ? 'Fleet access is not live yet.'
-        : 'Personal sign-in takes you to the map.';
 
-  const handleLogin = async () => {
+  const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
       setNotice('Email and password are required.');
       return;
     }
-    if (authMode === 'fleet') {
-      setNotice('Fleet login setup pending. Coming soon.');
-      return;
-    }
     setSubmitting(true);
     setNotice(null);
-    const ok = await signIn(email.trim(), password);
+    const ok = isSignUp ? await signUp(email.trim(), password) : await signIn(email.trim(), password);
     if (!ok) {
       setNotice('Unable to authenticate. Check your credentials.');
     } else {
-      setNotice('Signed in.');
-      if (authMode === 'business') {
-        navigation.navigate('BusinessAdmin');
-      } else {
-        navigation.navigate('Home');
-      }
+      setNotice(isSignUp ? 'Account created.' : 'Signed in.');
     }
     setSubmitting(false);
-  };
-
-  const handleSignup = async () => {
-    if (!email.trim() || !password.trim()) {
-      setNotice('Email and password are required.');
-      return;
-    }
-    if (authMode === 'fleet') {
-      setNotice('Fleet signup setup pending. Coming soon.');
-      return;
-    }
-    setSubmitting(true);
-    setNotice(null);
-    const ok = await signUp(email.trim(), password);
-    if (!ok) {
-      setNotice('Unable to create account.');
-    } else {
-      setNotice('Account created.');
-      if (authMode === 'business') {
-        navigation.navigate('BusinessAdmin');
-      } else {
-        navigation.navigate('Home');
-      }
-    }
-    setSubmitting(false);
-  };
-
-  const handlePending = (label: string) => {
-    setNotice(`${label} setup pending. Coming soon.`);
   };
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
-      <View style={styles.authBody}>
-        <View style={styles.card}>
-          <SectionTitle icon="key-outline" label="Sign in" />
-          <Text style={styles.authSubhead}>Choose your access type</Text>
-          <View style={styles.tabRow}>
-            {[
-              { key: 'personal', label: 'Personal' },
-              { key: 'business', label: 'Business' },
-              { key: 'fleet', label: 'Fleet' },
-            ].map((item) => (
-              <Pressable
-                key={item.key}
-                style={[styles.tabPill, authMode === item.key && styles.tabPillActive]}
-                onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
-              >
-                <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.authHint}>{authHint}</Text>
-          <Text style={styles.authSubhead}>
-            Email + password for demo access. Magic link and Google OAuth are coming soon.
+      <View style={styles.card}>
+        <SectionTitle icon="key-outline" label={isSignUp ? 'Create account' : 'Sign in'} />
+        <TextInput
+          style={styles.input}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email"
+          placeholderTextColor={colors.placeholder}
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Password"
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry
+        />
+        {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+        <Pressable style={styles.primaryButton} onPress={handleSubmit} disabled={submitting}>
+          <Text style={styles.primaryButtonText}>
+            {submitting ? 'Please wait...' : isSignUp ? 'Create account' : 'Sign in'}
           </Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            placeholderTextColor={colors.placeholder}
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            placeholderTextColor={colors.placeholder}
-            secureTextEntry
-          />
-          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleLogin}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>{submitting ? 'Please wait...' : 'Sign in'}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleSignup}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>Sign up</Text>
-          </Pressable>
-          <View style={styles.sectionDivider} />
-          <Text style={styles.authSubhead}>Other sign-in options</Text>
-          <View style={styles.filterRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Magic link / OTP')}>
-              <Text style={styles.secondaryButtonText}>Magic link / OTP</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Google OAuth')}>
-              <Text style={styles.secondaryButtonText}>Google OAuth</Text>
-            </Pressable>
-          </View>
-        </View>
-        <View style={styles.authFooterLinks}>
-          <Pressable onPress={() => navigation.navigate('AdminPortal')}>
-            <Text style={styles.linkText}>Admin</Text>
-          </Pressable>
-          <Pressable onPress={() => navigation.navigate('Demo')}>
-            <Text style={styles.linkText}>Demo</Text>
-          </Pressable>
-        </View>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => setIsSignUp((prev) => !prev)}>
+          <Text style={styles.secondaryButtonText}>
+            {isSignUp ? 'Have an account? Sign in' : 'New here? Create an account'}
+          </Text>
+        </Pressable>
       </View>
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -3816,20 +3054,15 @@ const BusinessScreen = ({ route }: BusinessProps) => {
     businessList[0] ??
     demoBusinesses[0];
   const [chatMessages, setChatMessages] = useState<
-    { id: string; body: string; author: string; createdAt: string; mediaUrl?: string | null; mediaType?: string | null }[]
+    { id: string; body: string; author: string; createdAt: string }[]
   >([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatDraft, setChatDraft] = useState('');
   const [chatNotice, setChatNotice] = useState<string | null>(null);
-  const [chatUploading, setChatUploading] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
   const [offers, setOffers] = useState<BusinessOfferEntry[]>([]);
   const [offersLoading, setOffersLoading] = useState(false);
-  const [coupons, setCoupons] = useState<BusinessCouponEntry[]>([]);
-  const [couponsLoading, setCouponsLoading] = useState(false);
-  const [exceptions, setExceptions] = useState<BusinessHoursException[]>([]);
-  const [exceptionsLoading, setExceptionsLoading] = useState(false);
   const [reviews, setReviews] = useState<BusinessReviewEntry[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
@@ -3847,12 +3080,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
   const hasJoinedChat = Boolean(joinedChats[business.id]);
 
   useEffect(() => {
-    if (business?.id) {
-      void trackAnalyticsEvent('screen_view', { screen: 'business', business_id: business.id }, userId);
-    }
-  }, [business?.id, userId]);
-
-  useEffect(() => {
     let isMounted = true;
     if (!supabase || tab !== 'qa' || !business?.id) {
       return () => {
@@ -3863,7 +3090,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
       setChatLoading(true);
       const { data, error } = await supabase
         .from('business_messages')
-        .select('id, body, created_at, author_handle, media_type, media_url')
+        .select('id, body, created_at, author_handle')
         .eq('business_id', business.id)
         .order('created_at', { ascending: false })
         .limit(30);
@@ -3877,8 +3104,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
             body: row.body ?? '',
             author: row.author_handle ?? 'Guest',
             createdAt: row.created_at ?? '',
-            mediaUrl: row.media_url ?? null,
-            mediaType: row.media_type ?? null,
           }))
         );
       }
@@ -3937,34 +3162,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
       }
       setMenuLoading(false);
     };
-    const loadExceptions = async () => {
-      setExceptionsLoading(true);
-      const { data, error } = await supabase
-        .from('business_hours_exceptions')
-        .select('id, business_id, date, is_closed, open_time, close_time, note')
-        .eq('business_id', business.id)
-        .order('date', { ascending: true })
-        .limit(10);
-      if (!isMounted) {
-        return;
-      }
-      if (!error && Array.isArray(data)) {
-        setExceptions(
-          data.map((row) => ({
-            id: String(row.id ?? ''),
-            businessId: String(row.business_id ?? ''),
-            date: row.date ?? '',
-            isClosed: Boolean(row.is_closed),
-            openTime: row.open_time ?? null,
-            closeTime: row.close_time ?? null,
-            note: row.note ?? null,
-          }))
-        );
-      } else {
-        setExceptions([]);
-      }
-      setExceptionsLoading(false);
-    };
     const loadOffers = async () => {
       setOffersLoading(true);
       const { data, error } = await supabase
@@ -3989,37 +3186,8 @@ const BusinessScreen = ({ route }: BusinessProps) => {
       }
       setOffersLoading(false);
     };
-    const loadCoupons = async () => {
-      setCouponsLoading(true);
-      const { data, error } = await supabase
-        .from('business_coupons')
-        .select('id, business_id, code, details, active, created_at')
-        .eq('business_id', business.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      if (!isMounted) {
-        return;
-      }
-      if (!error && Array.isArray(data)) {
-        setCoupons(
-          data.map((row) => ({
-            id: String(row.id ?? ''),
-            businessId: String(row.business_id ?? ''),
-            code: row.code ?? '',
-            details: row.details ?? '',
-            active: row.active !== false,
-            createdAt: row.created_at ?? '',
-          }))
-        );
-      } else {
-        setCoupons([]);
-      }
-      setCouponsLoading(false);
-    };
     void loadMenu();
-    void loadExceptions();
     void loadOffers();
-    void loadCoupons();
     return () => {
       isMounted = false;
     };
@@ -4088,41 +3256,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
       body,
       author_handle: profile?.handle ?? undefined,
     });
-    void trackAnalyticsEvent('message_send', { channel: 'business', business_id: business.id }, userId);
-  };
-
-  const handleAttachBusinessMedia = async () => {
-    if (!supabase || !userId || !business?.id || isChatRestricted || !hasJoinedChat) {
-      setChatNotice('Join the chatroom to share media.');
-      return;
-    }
-    setChatUploading(true);
-    setChatNotice(null);
-    const upload = await pickAndUploadImage('chat-media', `business/${business.id}`);
-    if (!upload.url) {
-      setChatNotice(upload.error === 'permission' ? 'Photo permission denied.' : 'Upload canceled.');
-      setChatUploading(false);
-      return;
-    }
-    const moderation = await runModerationCheck({
-      content_type: 'business_message',
-      content_id: business.id,
-      image_url: upload.url,
-    });
-    if (!moderation.allowed) {
-      setChatNotice('Media blocked by safety checks.');
-      setChatUploading(false);
-      return;
-    }
-    await supabase.from('business_messages').insert({
-      business_id: business.id,
-      user_id: userId,
-      author_handle: profile?.handle ?? undefined,
-      media_type: 'image',
-      media_url: upload.url,
-    });
-    void trackAnalyticsEvent('message_send', { channel: 'business', business_id: business.id, media: true }, userId);
-    setChatUploading(false);
   };
 
   const handleSubmitReview = async () => {
@@ -4153,7 +3286,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
     setReviewDraft('');
     setReviewRating(5);
     setReviewNotice('Review submitted.');
-    void trackAnalyticsEvent('review_submit', { business_id: business.id, rating: reviewRating }, userId);
   };
 
   return (
@@ -4190,24 +3322,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
               ))}
             </View>
             <Text style={styles.metaText}>{business.hours ?? 'Hours not set'}</Text>
-            {exceptionsLoading ? (
-              <Text style={styles.metaText}>Loading hour exceptions...</Text>
-            ) : exceptions.length > 0 ? (
-              <View style={styles.exceptionList}>
-                {exceptions.slice(0, 2).map((entry) => (
-                  <View key={entry.id} style={styles.exceptionRow}>
-                    <Text style={styles.metaText}>{entry.date}</Text>
-                    <Text style={styles.metaText}>
-                      {entry.isClosed
-                        ? 'Closed'
-                        : entry.openTime && entry.closeTime
-                          ? `${entry.openTime} - ${entry.closeTime}`
-                          : 'Adjusted hours'}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
           </View>
         </View>
         <View style={styles.tabRow}>
@@ -4276,10 +3390,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
               <View key={message.id} style={styles.listRow}>
                 <View style={styles.listRowInfo}>
                   <Text style={styles.cardTitle}>{message.author}</Text>
-                  {message.body ? <Text style={styles.metaText}>{message.body}</Text> : null}
-                  {message.mediaUrl ? (
-                    <Image source={{ uri: message.mediaUrl }} style={styles.chatMediaImage} />
-                  ) : null}
+                  <Text style={styles.metaText}>{message.body}</Text>
                 </View>
                 <Text style={styles.metaText}>{message.createdAt}</Text>
               </View>
@@ -4294,9 +3405,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
             ) : null}
             {userId && !isChatRestricted && hasJoinedChat ? (
               <View style={styles.inputRow}>
-                <Pressable style={styles.iconButtonSm} onPress={() => void handleAttachBusinessMedia()}>
-                  <Ionicons name="attach-outline" size={18} color={colors.text} />
-                </Pressable>
                 <TextInput
                   style={styles.input}
                   value={chatDraft}
@@ -4305,9 +3413,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
                   placeholderTextColor={colors.placeholder}
                 />
                 <Pressable style={styles.primaryButton} onPress={handleSendBusinessMessage}>
-                  <Text style={styles.primaryButtonText}>
-                    {chatUploading ? 'Uploading...' : 'Send'}
-                  </Text>
+                  <Text style={styles.primaryButtonText}>Send</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -4398,22 +3504,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
                 </View>
               ))
             )}
-            <View style={styles.sectionDivider} />
-            <SectionTitle icon="ticket-outline" label="Coupons" />
-            {couponsLoading ? <Text style={styles.metaText}>Loading coupons...</Text> : null}
-            {coupons.length === 0 ? (
-              <Text style={styles.metaText}>No coupons yet.</Text>
-            ) : (
-              coupons.map((coupon) => (
-                <View key={coupon.id} style={styles.listRow}>
-                  <View style={styles.listRowInfo}>
-                    <Text style={styles.cardTitle}>{coupon.code}</Text>
-                    <Text style={styles.metaText}>{coupon.details}</Text>
-                  </View>
-                  <Text style={styles.metaText}>{coupon.active ? 'Active' : 'Inactive'}</Text>
-                </View>
-              ))
-            )}
           </View>
         ) : null}
       </ScrollView>
@@ -4431,20 +3521,15 @@ const RoomScreen = ({ route }: RoomProps) => {
   const { userId, profile } = useAuth();
   const [room, setRoom] = useState<Room | null>(null);
   const [messages, setMessages] = useState<
-    { id: string; body: string; author: string; createdAt: string; mediaUrl?: string | null; mediaType?: string | null }[]
+    { id: string; body: string; author: string; createdAt: string }[]
   >([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
-  const [mediaUploading, setMediaUploading] = useState(false);
   const [distanceMeters, setDistanceMeters] = useState<number | null>(null);
   const [withinRadius, setWithinRadius] = useState(true);
   const [distanceNote, setDistanceNote] = useState<string | null>(null);
   const roomId = route.params?.roomId ?? '';
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'room', room_id: roomId }, userId);
-  }, [roomId, userId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -4548,7 +3633,7 @@ const RoomScreen = ({ route }: RoomProps) => {
       setLoading(true);
       const { data, error } = await supabase
         .from('room_messages')
-        .select('id, body, created_at, author_handle, media_type, media_url')
+        .select('id, body, created_at, author_handle')
         .eq('room_id', roomId)
         .order('created_at', { ascending: false })
         .limit(40);
@@ -4562,8 +3647,6 @@ const RoomScreen = ({ route }: RoomProps) => {
             body: row.body ?? '',
             author: row.author_handle ?? 'Guest',
             createdAt: row.created_at ?? '',
-            mediaUrl: row.media_url ?? null,
-            mediaType: row.media_type ?? null,
           }))
         );
       }
@@ -4611,41 +3694,6 @@ const RoomScreen = ({ route }: RoomProps) => {
       author_handle: profile?.handle ?? undefined,
       body,
     });
-    void trackAnalyticsEvent('message_send', { channel: 'room', room_id: roomId }, userId);
-  };
-
-  const handleAttach = async () => {
-    if (!supabase || !userId || !roomId || !withinRadius) {
-      setSendNotice('Sign in and stay within radius to send media.');
-      return;
-    }
-    setMediaUploading(true);
-    setSendNotice(null);
-    const upload = await pickAndUploadImage('chat-media', `rooms/${roomId}`);
-    if (!upload.url) {
-      setSendNotice(upload.error === 'permission' ? 'Photo permission denied.' : 'Upload canceled.');
-      setMediaUploading(false);
-      return;
-    }
-    const moderation = await runModerationCheck({
-      content_type: 'room_message',
-      content_id: roomId,
-      image_url: upload.url,
-    });
-    if (!moderation.allowed) {
-      setSendNotice('Media blocked by safety checks.');
-      setMediaUploading(false);
-      return;
-    }
-    await supabase.from('room_messages').insert({
-      room_id: roomId,
-      user_id: userId,
-      author_handle: profile?.handle ?? undefined,
-      media_type: 'image',
-      media_url: upload.url,
-    });
-    void trackAnalyticsEvent('message_send', { channel: 'room', room_id: roomId, media: true }, userId);
-    setMediaUploading(false);
   };
 
   const radiusMeters = room?.distanceMeters ?? 500;
@@ -4681,19 +3729,13 @@ const RoomScreen = ({ route }: RoomProps) => {
             <View key={message.id} style={styles.listRow}>
               <View style={styles.listRowInfo}>
                 <Text style={styles.cardTitle}>{message.author}</Text>
-                {message.body ? <Text style={styles.metaText}>{message.body}</Text> : null}
-                {message.mediaUrl ? (
-                  <Image source={{ uri: message.mediaUrl }} style={styles.chatMediaImage} />
-                ) : null}
+                <Text style={styles.metaText}>{message.body}</Text>
               </View>
               <Text style={styles.metaText}>{message.createdAt}</Text>
             </View>
           ))}
           {canChat ? (
             <View style={styles.inputRow}>
-              <Pressable style={styles.iconButtonSm} onPress={() => void handleAttach()}>
-                <Ionicons name="attach-outline" size={18} color={colors.text} />
-              </Pressable>
               <TextInput
                 style={styles.input}
                 value={draft}
@@ -4702,9 +3744,7 @@ const RoomScreen = ({ route }: RoomProps) => {
                 placeholderTextColor={colors.placeholder}
               />
               <Pressable style={styles.primaryButton} onPress={handleSend}>
-                <Text style={styles.primaryButtonText}>
-                  {mediaUploading ? 'Uploading...' : 'Send'}
-                </Text>
+                <Text style={styles.primaryButtonText}>Send</Text>
               </Pressable>
             </View>
           ) : userId ? (
@@ -4809,39 +3849,15 @@ const OnboardingScreen = () => {
 
 const BusinessAdminScreen = () => {
   const styles = useStyles();
-  const { colors } = useTheme();
   const { userId } = useAuth();
-  const { businesses, setBusinesses } = useBusinesses();
-  const [ownedBusinesses, setOwnedBusinesses] = useState<OwnedBusinessEntry[]>([]);
-  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
+  const [ownedBusinesses, setOwnedBusinesses] = useState<{ id: string; name: string }[]>([]);
   const [staff, setStaff] = useState<BusinessStaffEntry[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]);
   const [offers, setOffers] = useState<BusinessOfferEntry[]>([]);
   const [orders, setOrders] = useState<OrderEntry[]>([]);
   const [auditLog, setAuditLog] = useState<BusinessAuditEntry[]>([]);
-  const [exceptions, setExceptions] = useState<BusinessHoursException[]>([]);
-  const [coupons, setCoupons] = useState<BusinessCouponEntry[]>([]);
-  const [couponCode, setCouponCode] = useState('');
-  const [couponDetails, setCouponDetails] = useState('');
-  const [couponActive, setCouponActive] = useState(true);
-  const [exceptionDate, setExceptionDate] = useState('');
-  const [exceptionOpen, setExceptionOpen] = useState('');
-  const [exceptionClose, setExceptionClose] = useState('');
-  const [exceptionNote, setExceptionNote] = useState('');
-  const [exceptionClosed, setExceptionClosed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [mediaUploading, setMediaUploading] = useState(false);
-  const activeBusiness =
-    ownedBusinesses.find((entry) => entry.id === selectedBusinessId) ?? ownedBusinesses[0] ?? null;
-  const activeExceptions = useMemo(
-    () => exceptions.filter((entry) => entry.businessId === activeBusiness?.id),
-    [activeBusiness?.id, exceptions]
-  );
-  const activeCoupons = useMemo(
-    () => coupons.filter((entry) => entry.businessId === activeBusiness?.id),
-    [activeBusiness?.id, coupons]
-  );
 
   useEffect(() => {
     let isMounted = true;
@@ -4853,7 +3869,7 @@ const BusinessAdminScreen = () => {
       setNotice(null);
       const { data: businessRows, error: businessError } = await supabase
         .from('businesses')
-        .select('id, name, image_url, logo_url, card_image_url, pin_icon_url')
+        .select('id, name')
         .eq('owner_id', userId);
       if (!isMounted) {
         return;
@@ -4864,28 +3880,16 @@ const BusinessAdminScreen = () => {
         return;
       }
       const businesses = (businessRows ?? [])
-        .map((row) => {
-          const imageUrl = row.card_image_url ?? row.image_url ?? null;
-          const logoUrl = row.pin_icon_url ?? row.logo_url ?? null;
-          return {
-            id: String(row.id ?? ''),
-            name: row.name ?? 'Business',
-            imageUrl: typeof imageUrl === 'string' ? imageUrl : null,
-            logoUrl: typeof logoUrl === 'string' ? logoUrl : null,
-          };
-        })
+        .map((row) => ({ id: String(row.id ?? ''), name: row.name ?? 'Business' }))
         .filter((row) => row.id.length > 0);
       setOwnedBusinesses(businesses);
-      if (!selectedBusinessId && businesses.length > 0) {
-        setSelectedBusinessId(businesses[0].id);
-      }
       const businessIds = businesses.map((row) => row.id);
       if (businessIds.length === 0) {
         setLoading(false);
         return;
       }
 
-      const [staffRes, menuRes, offersRes, ordersRes, auditRes, exceptionsRes, couponsRes] = await Promise.all([
+      const [staffRes, menuRes, offersRes, ordersRes, auditRes] = await Promise.all([
         supabase
           .from('business_staff')
           .select('id, business_id, user_id, role, permissions, created_at')
@@ -4910,32 +3914,12 @@ const BusinessAdminScreen = () => {
           .in('business_id', businessIds)
           .order('created_at', { ascending: false })
           .limit(20),
-        supabase
-          .from('business_hours_exceptions')
-          .select('id, business_id, date, is_closed, open_time, close_time, note')
-          .in('business_id', businessIds)
-          .order('date', { ascending: true })
-          .limit(20),
-        supabase
-          .from('business_coupons')
-          .select('id, business_id, code, details, active, created_at')
-          .in('business_id', businessIds)
-          .order('created_at', { ascending: false })
-          .limit(20),
       ]);
 
       if (!isMounted) {
         return;
       }
-      if (
-        staffRes.error ||
-        menuRes.error ||
-        offersRes.error ||
-        ordersRes.error ||
-        auditRes.error ||
-        exceptionsRes.error ||
-        couponsRes.error
-      ) {
+      if (staffRes.error || menuRes.error || offersRes.error || ordersRes.error || auditRes.error) {
         setNotice('Some business admin data failed to load.');
       }
 
@@ -4988,27 +3972,6 @@ const BusinessAdminScreen = () => {
           createdAt: row.created_at ?? '',
         }))
       );
-      setExceptions(
-        (exceptionsRes.data ?? []).map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          date: row.date ?? '',
-          isClosed: Boolean(row.is_closed),
-          openTime: row.open_time ?? null,
-          closeTime: row.close_time ?? null,
-          note: row.note ?? null,
-        }))
-      );
-      setCoupons(
-        (couponsRes.data ?? []).map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          code: row.code ?? '',
-          details: row.details ?? '',
-          active: row.active !== false,
-          createdAt: row.created_at ?? '',
-        }))
-      );
       setLoading(false);
     };
     void loadBusinessAdmin();
@@ -5016,184 +3979,6 @@ const BusinessAdminScreen = () => {
       isMounted = false;
     };
   }, [userId]);
-
-  const handlePickImage = async (kind: 'hero' | 'logo') => {
-    if (!supabase || !activeBusiness) {
-      setNotice('Select a business first.');
-      return;
-    }
-    setMediaUploading(true);
-    setNotice(null);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permission.status !== 'granted') {
-      setNotice('Permission to access photos is required.');
-      setMediaUploading(false);
-      return;
-    }
-    const picker = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: kind === 'logo' ? [1, 1] : [16, 9],
-      quality: 0.8,
-    });
-    if (picker.canceled || !picker.assets?.length) {
-      setMediaUploading(false);
-      return;
-    }
-    const asset = picker.assets[0];
-    if (!asset.uri) {
-      setMediaUploading(false);
-      return;
-    }
-    try {
-      const extension = asset.uri.split('.').pop() ?? 'jpg';
-      const filePath = `businesses/${activeBusiness.id}/${kind}-${Date.now()}.${extension}`;
-      const response = await fetch(asset.uri);
-      const blob = await response.blob();
-      const upload = await supabase.storage.from('business-media').upload(filePath, blob, {
-        upsert: true,
-        contentType: asset.type ?? 'image/jpeg',
-      });
-      if (upload.error) {
-        setNotice('Upload failed.');
-        setMediaUploading(false);
-        return;
-      }
-      const { data } = supabase.storage.from('business-media').getPublicUrl(filePath);
-      const publicUrl = data.publicUrl;
-      const updates =
-        kind === 'hero'
-          ? { image_url: publicUrl, card_image_url: publicUrl }
-          : { logo_url: publicUrl, pin_icon_url: publicUrl };
-      const { error: updateError } = await supabase
-        .from('businesses')
-        .update(updates)
-        .eq('id', activeBusiness.id);
-      if (updateError) {
-        setNotice('Unable to save image.');
-        setMediaUploading(false);
-        return;
-      }
-      setOwnedBusinesses((prev) =>
-        prev.map((entry) =>
-          entry.id === activeBusiness.id
-            ? {
-                ...entry,
-                imageUrl: kind === 'hero' ? publicUrl : entry.imageUrl,
-                logoUrl: kind === 'logo' ? publicUrl : entry.logoUrl,
-              }
-            : entry
-        )
-      );
-      setBusinesses(
-        businesses.map((entry) =>
-          entry.id === activeBusiness.id
-            ? {
-                ...entry,
-                imageUrl: kind === 'hero' ? publicUrl : entry.imageUrl,
-                logoUrl: kind === 'logo' ? publicUrl : entry.logoUrl,
-              }
-            : entry
-        )
-      );
-      setNotice(kind === 'hero' ? 'Hero image updated.' : 'Logo updated.');
-    } catch {
-      setNotice('Upload failed.');
-    } finally {
-      setMediaUploading(false);
-    }
-  };
-
-  const handleAddException = async () => {
-    if (!supabase || !activeBusiness) {
-      setNotice('Select a business first.');
-      return;
-    }
-    if (!exceptionDate.trim()) {
-      setNotice('Enter a date (YYYY-MM-DD).');
-      return;
-    }
-    const { error } = await supabase.from('business_hours_exceptions').insert({
-      business_id: activeBusiness.id,
-      date: exceptionDate.trim(),
-      is_closed: exceptionClosed,
-      open_time: exceptionOpen.trim() ? exceptionOpen.trim() : null,
-      close_time: exceptionClose.trim() ? exceptionClose.trim() : null,
-      note: exceptionNote.trim() ? exceptionNote.trim() : null,
-    });
-    if (error) {
-      setNotice('Unable to add hours exception.');
-      return;
-    }
-    const { data } = await supabase
-      .from('business_hours_exceptions')
-      .select('id, business_id, date, is_closed, open_time, close_time, note')
-      .eq('business_id', activeBusiness.id)
-      .order('date', { ascending: true })
-      .limit(20);
-    if (Array.isArray(data)) {
-      setExceptions(
-        data.map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          date: row.date ?? '',
-          isClosed: Boolean(row.is_closed),
-          openTime: row.open_time ?? null,
-          closeTime: row.close_time ?? null,
-          note: row.note ?? null,
-        }))
-      );
-    }
-    setExceptionDate('');
-    setExceptionOpen('');
-    setExceptionClose('');
-    setExceptionNote('');
-    setExceptionClosed(false);
-    setNotice('Hours exception added.');
-  };
-
-  const handleAddCoupon = async () => {
-    if (!supabase || !activeBusiness) {
-      setNotice('Select a business first.');
-      return;
-    }
-    if (!couponCode.trim()) {
-      setNotice('Enter a coupon code.');
-      return;
-    }
-    const { error } = await supabase.from('business_coupons').insert({
-      business_id: activeBusiness.id,
-      code: couponCode.trim().toUpperCase(),
-      details: couponDetails.trim() ? couponDetails.trim() : 'Discount available',
-      active: couponActive,
-    });
-    if (error) {
-      setNotice('Unable to add coupon.');
-      return;
-    }
-    const { data } = await supabase
-      .from('business_coupons')
-      .select('id, business_id, code, details, active, created_at')
-      .eq('business_id', activeBusiness.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    if (Array.isArray(data)) {
-      setCoupons(
-        data.map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          code: row.code ?? '',
-          details: row.details ?? '',
-          active: row.active !== false,
-          createdAt: row.created_at ?? '',
-        }))
-      );
-    }
-    setCouponCode('');
-    setCouponDetails('');
-    setCouponActive(true);
-    setNotice('Coupon added.');
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -5206,194 +3991,6 @@ const BusinessAdminScreen = () => {
           {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
           {!userId ? <Text style={styles.metaText}>Sign in to manage your business.</Text> : null}
         </View>
-        {ownedBusinesses.length > 0 ? (
-          <View style={styles.card}>
-            <SectionTitle icon="storefront-outline" label="Business selection" />
-            <View style={styles.filterRow}>
-              {ownedBusinesses.map((biz) => (
-                <Pressable
-                  key={biz.id}
-                  style={[
-                    styles.filterChip,
-                    selectedBusinessId === biz.id && styles.filterChipActive,
-                  ]}
-                  onPress={() => setSelectedBusinessId(biz.id)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      selectedBusinessId === biz.id && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {biz.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : null}
-        {activeBusiness ? (
-          <View style={styles.card}>
-            <SectionTitle icon="image-outline" label="Media" />
-            <Text style={styles.cardBody}>Upload a hero image and logo for your listing.</Text>
-            <View style={styles.mediaRow}>
-              <View style={styles.mediaPreview}>
-                {activeBusiness.imageUrl ? (
-                  <Image source={{ uri: activeBusiness.imageUrl }} style={styles.mediaImage} />
-                ) : (
-                  <View style={styles.mediaPlaceholder}>
-                    <Ionicons name="image-outline" size={20} color={colors.textMuted} />
-                    <Text style={styles.metaText}>Hero image</Text>
-                  </View>
-                )}
-              </View>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => void handlePickImage('hero')}
-                disabled={mediaUploading}
-              >
-                <Text style={styles.secondaryButtonText}>
-                  {mediaUploading ? 'Uploading...' : 'Upload hero'}
-                </Text>
-              </Pressable>
-            </View>
-            <View style={styles.mediaRow}>
-              <View style={styles.mediaPreviewSmall}>
-                {activeBusiness.logoUrl ? (
-                  <Image source={{ uri: activeBusiness.logoUrl }} style={styles.mediaImage} />
-                ) : (
-                  <View style={styles.mediaPlaceholder}>
-                    <Ionicons name="image-outline" size={20} color={colors.textMuted} />
-                    <Text style={styles.metaText}>Logo</Text>
-                  </View>
-                )}
-              </View>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => void handlePickImage('logo')}
-                disabled={mediaUploading}
-              >
-                <Text style={styles.secondaryButtonText}>
-                  {mediaUploading ? 'Uploading...' : 'Upload logo'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
-        {activeBusiness ? (
-          <View style={styles.card}>
-            <SectionTitle icon="time-outline" label="Hours exceptions" />
-            <Text style={styles.cardBody}>Add holiday hours or temporary closures.</Text>
-            <TextInput
-              style={styles.input}
-              value={exceptionDate}
-              onChangeText={setExceptionDate}
-              placeholder="Date (YYYY-MM-DD)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <View style={styles.rowBetween}>
-              <Text style={styles.metaText}>Closed</Text>
-              <Switch
-                value={exceptionClosed}
-                onValueChange={setExceptionClosed}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.surface}
-              />
-            </View>
-            {!exceptionClosed ? (
-              <>
-                <TextInput
-                  style={styles.input}
-                  value={exceptionOpen}
-                  onChangeText={setExceptionOpen}
-                  placeholder="Open time (e.g., 10:00)"
-                  placeholderTextColor={colors.placeholder}
-                />
-                <TextInput
-                  style={styles.input}
-                  value={exceptionClose}
-                  onChangeText={setExceptionClose}
-                  placeholder="Close time (e.g., 18:00)"
-                  placeholderTextColor={colors.placeholder}
-                />
-              </>
-            ) : null}
-            <TextInput
-              style={styles.input}
-              value={exceptionNote}
-              onChangeText={setExceptionNote}
-              placeholder="Note (optional)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <Pressable style={styles.primaryButton} onPress={() => void handleAddException()}>
-              <Text style={styles.primaryButtonText}>Add exception</Text>
-            </Pressable>
-            {activeExceptions.length === 0 ? (
-              <Text style={styles.metaText}>No exceptions yet.</Text>
-            ) : (
-              activeExceptions.map((entry) => (
-                <View key={entry.id} style={styles.listRow}>
-                  <View style={styles.listRowInfo}>
-                    <Text style={styles.cardTitle}>{entry.date}</Text>
-                    <Text style={styles.metaText}>
-                      {entry.isClosed
-                        ? 'Closed'
-                        : entry.openTime && entry.closeTime
-                          ? `${entry.openTime} - ${entry.closeTime}`
-                          : 'Adjusted hours'}
-                    </Text>
-                  </View>
-                  {entry.note ? <Text style={styles.metaText}>{entry.note}</Text> : null}
-                </View>
-              ))
-            )}
-          </View>
-        ) : null}
-        {activeBusiness ? (
-          <View style={styles.card}>
-            <SectionTitle icon="ticket-outline" label="Coupons" />
-            <Text style={styles.cardBody}>Create loyalty or promo codes for customers.</Text>
-            <TextInput
-              style={styles.input}
-              value={couponCode}
-              onChangeText={setCouponCode}
-              placeholder="Code (e.g., BLIP10)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <TextInput
-              style={styles.input}
-              value={couponDetails}
-              onChangeText={setCouponDetails}
-              placeholder="Details (e.g., 10% off)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <View style={styles.rowBetween}>
-              <Text style={styles.metaText}>Active</Text>
-              <Switch
-                value={couponActive}
-                onValueChange={setCouponActive}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.surface}
-              />
-            </View>
-            <Pressable style={styles.primaryButton} onPress={() => void handleAddCoupon()}>
-              <Text style={styles.primaryButtonText}>Add coupon</Text>
-            </Pressable>
-            {activeCoupons.length === 0 ? (
-              <Text style={styles.metaText}>No coupons yet.</Text>
-            ) : (
-              activeCoupons.map((coupon) => (
-                <View key={coupon.id} style={styles.listRow}>
-                  <View style={styles.listRowInfo}>
-                    <Text style={styles.cardTitle}>{coupon.code}</Text>
-                    <Text style={styles.metaText}>{coupon.details}</Text>
-                  </View>
-                  <Text style={styles.metaText}>{coupon.active ? 'Active' : 'Inactive'}</Text>
-                </View>
-              ))
-            )}
-          </View>
-        ) : null}
         {ownedBusinesses.length === 0 ? (
           <View style={styles.card}>
             <Text style={styles.metaText}>No businesses linked to this account.</Text>
@@ -6302,16 +4899,6 @@ const useStyles = () => {
           borderWidth: 1,
           borderColor: colors.border,
         },
-        iconButtonSm: {
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: colors.border,
-        },
         locationPill: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -6743,50 +5330,6 @@ const useStyles = () => {
           flex: 1,
           gap: 4,
         },
-        chatMediaImage: {
-          width: 180,
-          height: 120,
-          borderRadius: 12,
-          marginTop: 6,
-        },
-        mediaRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginTop: 10,
-        },
-        mediaPreview: {
-          width: 140,
-          height: 84,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        mediaPreviewSmall: {
-          width: 84,
-          height: 84,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        mediaImage: {
-          width: '100%',
-          height: '100%',
-        },
-        mediaPlaceholder: {
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 4,
-        },
         reviewComposer: {
           marginTop: 12,
           gap: 10,
@@ -6809,20 +5352,6 @@ const useStyles = () => {
           gap: 6,
         },
         reviewHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        },
-        sectionDivider: {
-          height: 1,
-          backgroundColor: colors.border,
-          marginVertical: 12,
-        },
-        exceptionList: {
-          marginTop: 8,
-          gap: 4,
-        },
-        exceptionRow: {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -6959,19 +5488,10 @@ const useStyles = () => {
           alignItems: 'center',
           gap: 6,
         },
-        feedMediaImage: {
-          marginTop: 10,
-          width: '100%',
-          height: 180,
-          borderRadius: 14,
-        },
         postActions: {
           flexDirection: 'row',
           flexWrap: 'wrap',
           gap: 10,
-        },
-        postMediaPreview: {
-          gap: 8,
         },
         postActionButton: {
           flexDirection: 'row',
@@ -7103,15 +5623,6 @@ const useStyles = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
         },
-        receiptCard: {
-          marginTop: 12,
-          padding: 12,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-          gap: 6,
-        },
         adminStatRow: {
           flexDirection: 'row',
           gap: 10,
@@ -7174,20 +5685,13 @@ const useStyles = () => {
         },
         primaryButton: {
           flex: 1,
-          borderRadius: 22,
+          borderRadius: 14,
           backgroundColor: colors.primary,
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          minHeight: 46,
-          justifyContent: 'center',
+          paddingVertical: 10,
           alignItems: 'center',
         },
-        primaryButtonFull: {
-          flex: 0,
-          alignSelf: 'stretch',
-        },
         primaryButtonText: {
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: '700',
           color: colors.primaryText,
         },
@@ -7203,48 +5707,6 @@ const useStyles = () => {
         secondaryButtonText: {
           fontSize: 14,
           fontWeight: '600',
-          color: colors.text,
-        },
-        authBody: {
-          flex: 1,
-          paddingHorizontal: 16,
-          paddingBottom: 12,
-          justifyContent: 'space-between',
-          gap: 12,
-        },
-        authSubhead: {
-          fontSize: 12,
-          color: colors.textMuted,
-        },
-        authHint: {
-          fontSize: 13,
-          fontWeight: '600',
-          color: colors.text,
-        },
-        authFooterLinks: {
-          paddingHorizontal: 8,
-          flexDirection: 'row',
-          justifyContent: 'flex-end',
-          gap: 16,
-        },
-        linkText: {
-          fontSize: 12,
-          fontWeight: '600',
-          color: colors.textMuted,
-        },
-        storyRow: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: 8,
-        },
-        storyPill: {
-          paddingHorizontal: 10,
-          paddingVertical: 6,
-          borderRadius: 16,
-          backgroundColor: colors.surfaceMuted,
-        },
-        storyPillText: {
-          fontSize: 12,
           color: colors.text,
         },
       }),

@@ -21,6 +21,17 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - AI safety: use Moderation API for text + media checks (edge function).
 - Push notifications: native FCM/APNs via edge function + device tokens.
 
+## Implementation snapshot (2026-01-29)
+- Implemented: map-first Home with clustering + spiderfy + recenter; search overlay with scope; Feed + Create Post.
+- Implemented: Room chat with distance gating; Business profile (menu/offers/Q&A); Reviews storage + UI.
+- Implemented: Orders cart flow + `order_items`; Messages (business list + direct threads + direct chat).
+- Implemented: Profile identity switch + reputation/trust labels + device ID display; billing placeholder.
+- Implemented: AI safety checks for posts + room/business/direct messages.
+- Implemented: Push plumbing (device tokens + test push), but delivery requires FCM/APNS keys.
+- Admin: Business Admin Portal + Blip Admin Portal in-app screens.
+- Implemented: UI placeholders for Stories (Feed) + Voice rooms (Messages).
+- Not implemented yet: magic link/OTP, Google OAuth, payments, stories/highlights/pinned, voice rooms.
+
 ## Scope Tags
 - MVP: required for the first release
 - V1: next iteration after MVP

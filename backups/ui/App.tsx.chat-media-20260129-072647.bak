@@ -180,8 +180,6 @@ type PostEntry = {
   authorHandle: string;
   body: string;
   createdAt: string;
-  mediaUrl?: string | null;
-  mediaType?: string | null;
 };
 
 type OrderEntry = {
@@ -231,25 +229,6 @@ type BusinessReviewEntry = {
   author: string;
   rating: number;
   body: string;
-  createdAt: string;
-};
-
-type BusinessHoursException = {
-  id: string;
-  businessId: string;
-  date: string;
-  isClosed: boolean;
-  openTime: string | null;
-  closeTime: string | null;
-  note: string | null;
-};
-
-type BusinessCouponEntry = {
-  id: string;
-  businessId: string;
-  code: string;
-  details: string;
-  active: boolean;
   createdAt: string;
 };
 
@@ -1817,9 +1796,7 @@ const HomeScreen = () => {
         <View style={styles.mapShell}>
           {Platform.OS === 'web' ? (
             <View style={styles.webPlaceholder}>
-              <Text style={styles.mapLabel}>
-                Web support parity is pending. Map is mobile-only for now.
-              </Text>
+              <Text style={styles.mapLabel}>Map is mobile-only for now.</Text>
             </View>
           ) : (
             <MapView
@@ -2142,12 +2119,10 @@ const FeedScreen = ({ route }: FeedProps) => {
   const [posts, setPosts] = useState<PostEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [storiesNotice, setStoriesNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'trending' | 'forYou' | 'newest'>('trending');
   const [searchValue, setSearchValue] = useState(route.params?.search ?? '');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const tags = ['food', 'events', 'jobs', 'deals', 'study'];
-  const storyLabels = ['Food finds', 'Events', 'Deals', 'Study'];
 
   const loadPosts = async () => {
     if (!supabase) {
@@ -2161,7 +2136,7 @@ const FeedScreen = ({ route }: FeedProps) => {
     setNotice(null);
     const { data, error } = await supabase
       .from('posts')
-      .select('id, author_handle, body, created_at, media_type, media_url')
+      .select('id, author_handle, body, created_at')
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) {
@@ -2175,8 +2150,6 @@ const FeedScreen = ({ route }: FeedProps) => {
         authorHandle: row.author_handle ?? 'blip',
         body: row.body ?? '',
         createdAt: row.created_at ?? '',
-        mediaUrl: row.media_url ?? null,
-        mediaType: row.media_type ?? null,
       }))
     );
     setLoading(false);
@@ -2258,26 +2231,6 @@ const FeedScreen = ({ route }: FeedProps) => {
                 </Pressable>
               ))}
             </View>
-            <View style={styles.card}>
-              <SectionTitle icon="sparkles-outline" label="Stories (coming soon)" />
-              <Text style={styles.cardBody}>
-                Quick local highlights from rooms and businesses.
-              </Text>
-              <View style={styles.storyRow}>
-                {storyLabels.map((label) => (
-                  <View key={label} style={styles.storyPill}>
-                    <Text style={styles.storyPillText}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-              {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null}
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => setStoriesNotice('Stories are coming soon.')}
-              >
-                <Text style={styles.secondaryButtonText}>Get notified</Text>
-              </Pressable>
-            </View>
             <View style={styles.searchInputWrap}>
               <Ionicons name="search" size={18} color={colors.textMuted} />
               <TextInput
@@ -2332,9 +2285,6 @@ const FeedScreen = ({ route }: FeedProps) => {
               </View>
             </View>
             <Text style={styles.cardBody}>{item.body}</Text>
-            {item.mediaUrl ? (
-              <Image source={{ uri: item.mediaUrl }} style={styles.feedMediaImage} />
-            ) : null}
             <View style={styles.postContext}>
               <Ionicons name="location-outline" size={14} color={colors.textMuted} />
               <Text style={styles.metaText}>Room / Business context</Text>
@@ -2384,30 +2334,10 @@ const CreateScreen = () => {
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [mediaUploading, setMediaUploading] = useState(false);
-  const [mediaNotice, setMediaNotice] = useState<string | null>(null);
 
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'create' }, userId);
   }, [userId]);
-
-  const handleAttachPostMedia = async () => {
-    if (!userId) {
-      setMediaNotice('Sign in to attach media.');
-      return;
-    }
-    setMediaUploading(true);
-    setMediaNotice(null);
-    const upload = await pickAndUploadImage('post-media', `posts/${userId}`);
-    if (!upload.url) {
-      setMediaNotice(upload.error === 'permission' ? 'Photo permission denied.' : 'Upload canceled.');
-      setMediaUploading(false);
-      return;
-    }
-    setMediaUrl(upload.url);
-    setMediaUploading(false);
-  };
 
   const handleSubmit = async () => {
     if (!supabase) {
@@ -2425,7 +2355,6 @@ const CreateScreen = () => {
     const moderation = await runModerationCheck({
       content_type: 'post',
       text: body.trim(),
-      image_url: mediaUrl ?? undefined,
     });
     if (!moderation.allowed) {
       setNotice('Post blocked by safety checks.');
@@ -2438,16 +2367,13 @@ const CreateScreen = () => {
       user_id: userId,
       author_handle: profile?.handle ?? 'blip',
       body: body.trim(),
-      media_type: mediaUrl ? 'image' : null,
-      media_url: mediaUrl,
     });
     if (error) {
       setNotice('Unable to create post.');
     } else {
       setBody('');
-      setMediaUrl(null);
       setNotice(safetyWarning ? 'Posted (safety check unavailable).' : 'Posted!');
-      void trackAnalyticsEvent('post_create', { length: body.trim().length, media: Boolean(mediaUrl) }, userId);
+      void trackAnalyticsEvent('post_create', { length: body.trim().length }, userId);
     }
     setSubmitting(false);
   };
@@ -2468,21 +2394,6 @@ const CreateScreen = () => {
           placeholderTextColor={colors.placeholder}
           multiline
         />
-        {mediaNotice ? <Text style={styles.metaText}>{mediaNotice}</Text> : null}
-        {mediaUrl ? (
-          <View style={styles.postMediaPreview}>
-            <Image source={{ uri: mediaUrl }} style={styles.feedMediaImage} />
-            <Pressable style={styles.secondaryButton} onPress={() => setMediaUrl(null)}>
-              <Text style={styles.secondaryButtonText}>Remove media</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable style={styles.secondaryButton} onPress={() => void handleAttachPostMedia()}>
-            <Text style={styles.secondaryButtonText}>
-              {mediaUploading ? 'Uploading...' : 'Attach image'}
-            </Text>
-          </Pressable>
-        )}
         {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
         <Pressable style={styles.primaryButton} onPress={() => void handleSubmit()} disabled={submitting}>
           <Text style={styles.primaryButtonText}>{submitting ? 'Posting...' : 'Post'}</Text>
@@ -2502,7 +2413,6 @@ const MessagesScreen = () => {
   const { colors } = useTheme();
   const [messagesTab, setMessagesTab] = useState<'business' | 'direct'>('business');
   const [searchValue, setSearchValue] = useState('');
-  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const [directThreads, setDirectThreads] = useState<
     { id: string; handle: string; lastMessage: string; time: string }[]
   >([]);
@@ -2657,19 +2567,6 @@ const MessagesScreen = () => {
               onChangeText={setSearchValue}
             />
           </View>
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="mic-outline" label="Voice rooms (coming soon)" />
-          <Text style={styles.cardBody}>
-            Drop-in audio rooms for your neighborhood and favorite spots.
-          </Text>
-          {voiceNotice ? <Text style={styles.metaText}>{voiceNotice}</Text> : null}
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => setVoiceNotice('Voice rooms are coming soon.')}
-          >
-            <Text style={styles.secondaryButtonText}>Notify me</Text>
-          </Pressable>
         </View>
         {messagesTab === 'business' ? (
           <View style={styles.card}>
@@ -2957,12 +2854,6 @@ const OrdersScreen = () => {
   const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
   const [cartItems, setCartItems] = useState<CartItemEntry[]>([]);
-  const [lastReceipt, setLastReceipt] = useState<{
-    orderId: string;
-    businessName: string;
-    items: CartItemEntry[];
-    totalCents: number;
-  } | null>(null);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
     businessList[0]?.id ?? null
   );
@@ -3191,38 +3082,9 @@ const OrdersScreen = () => {
         }))
       );
       setOrderNotes('');
-      setLastReceipt({
-        orderId,
-        businessName: selectedBusinessId
-          ? businessIndex.get(selectedBusinessId) ?? 'Business'
-          : 'Business',
-        items: cartItems,
-        totalCents: cartTotalCents,
-      });
       setCartItems([]);
       setNotice('Order requested.');
       void trackAnalyticsEvent('order_place', { business_id: selectedBusinessId }, userId);
-      if (selectedBusinessId) {
-        const { data: ownerRow } = await supabase
-          .from('businesses')
-          .select('owner_id')
-          .eq('id', selectedBusinessId)
-          .maybeSingle();
-        const ownerId = ownerRow?.owner_id ?? null;
-        const recipients = [userId, ownerId].filter(
-          (entry): entry is string => typeof entry === 'string' && entry.length > 0
-        );
-        if (recipients.length > 0) {
-          await supabase.functions.invoke('push-send', {
-            body: {
-              user_ids: recipients,
-              title: 'BLIP',
-              body: 'New order received.',
-              data: { type: 'order', order_id: orderId },
-            },
-          });
-        }
-      }
       void refreshOrders();
     }
   };
@@ -3320,32 +3182,6 @@ const OrdersScreen = () => {
             <Pressable style={styles.primaryButton} onPress={() => void handleCreateOrder()}>
               <Text style={styles.primaryButtonText}>Submit pickup order</Text>
             </Pressable>
-            {lastReceipt ? (
-              <View style={styles.receiptCard}>
-                <Text style={styles.cardTitle}>Receipt</Text>
-                <Text style={styles.metaText}>Order #{lastReceipt.orderId.slice(0, 6)}</Text>
-                <Text style={styles.metaText}>{lastReceipt.businessName}</Text>
-                {lastReceipt.items.map((item) => (
-                  <View key={item.id} style={styles.rowBetween}>
-                    <Text style={styles.metaText}>{item.name}</Text>
-                    <Text style={styles.metaText}>
-                      x{item.quantity} • Rs{' '}
-                      {item.priceCents ? ((item.priceCents * item.quantity) / 100).toFixed(0) : '0'}
-                    </Text>
-                  </View>
-                ))}
-                <View style={styles.rowBetween}>
-                  <Text style={styles.cardTitle}>Total</Text>
-                  <Text style={styles.cardTitle}>Rs {(lastReceipt.totalCents / 100).toFixed(0)}</Text>
-                </View>
-              </View>
-            ) : null}
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => setNotice('Email/SMS receipt setup pending. Coming soon.')}
-            >
-              <Text style={styles.secondaryButtonText}>Email/SMS receipt</Text>
-            </Pressable>
           </View>
         }
         renderItem={({ item }) => (
@@ -3373,10 +3209,6 @@ const OrdersScreen = () => {
 
 const BillingScreen = () => {
   const styles = useStyles();
-  const [notice, setNotice] = useState<string | null>(null);
-  const handlePending = (label: string) => {
-    setNotice(`${label} setup pending. Coming soon.`);
-  };
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -3387,20 +3219,6 @@ const BillingScreen = () => {
             Payments, subscriptions, and invoices are not enabled yet.
           </Text>
           <Text style={styles.metaText}>This will unlock before rollout.</Text>
-          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Payments')}>
-            <Text style={styles.secondaryButtonText}>Connect payments provider</Text>
-          </Pressable>
-          <View style={styles.sectionDivider} />
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Paid tiers')}>
-            <Text style={styles.secondaryButtonText}>Paid tiers (users)</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Invite-only access')}>
-            <Text style={styles.secondaryButtonText}>Invite-only access</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Paid invites')}>
-            <Text style={styles.secondaryButtonText}>Paid invites</Text>
-          </Pressable>
         </View>
       </ScrollView>
       <BottomNav />
@@ -3650,151 +3468,60 @@ const ProfileScreen = () => {
 const AuthScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { signIn, signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [authMode, setAuthMode] = useState<'personal' | 'business' | 'fleet'>('personal');
+  const [isSignUp, setIsSignUp] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const authHint =
-    authMode === 'business'
-      ? 'Business sign-in opens the Business Admin Portal.'
-      : authMode === 'fleet'
-        ? 'Fleet access is not live yet.'
-        : 'Personal sign-in takes you to the map.';
 
-  const handleLogin = async () => {
+  const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
       setNotice('Email and password are required.');
       return;
     }
-    if (authMode === 'fleet') {
-      setNotice('Fleet login setup pending. Coming soon.');
-      return;
-    }
     setSubmitting(true);
     setNotice(null);
-    const ok = await signIn(email.trim(), password);
+    const ok = isSignUp ? await signUp(email.trim(), password) : await signIn(email.trim(), password);
     if (!ok) {
       setNotice('Unable to authenticate. Check your credentials.');
     } else {
-      setNotice('Signed in.');
-      if (authMode === 'business') {
-        navigation.navigate('BusinessAdmin');
-      } else {
-        navigation.navigate('Home');
-      }
+      setNotice(isSignUp ? 'Account created.' : 'Signed in.');
     }
     setSubmitting(false);
-  };
-
-  const handleSignup = async () => {
-    if (!email.trim() || !password.trim()) {
-      setNotice('Email and password are required.');
-      return;
-    }
-    if (authMode === 'fleet') {
-      setNotice('Fleet signup setup pending. Coming soon.');
-      return;
-    }
-    setSubmitting(true);
-    setNotice(null);
-    const ok = await signUp(email.trim(), password);
-    if (!ok) {
-      setNotice('Unable to create account.');
-    } else {
-      setNotice('Account created.');
-      if (authMode === 'business') {
-        navigation.navigate('BusinessAdmin');
-      } else {
-        navigation.navigate('Home');
-      }
-    }
-    setSubmitting(false);
-  };
-
-  const handlePending = (label: string) => {
-    setNotice(`${label} setup pending. Coming soon.`);
   };
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
-      <View style={styles.authBody}>
-        <View style={styles.card}>
-          <SectionTitle icon="key-outline" label="Sign in" />
-          <Text style={styles.authSubhead}>Choose your access type</Text>
-          <View style={styles.tabRow}>
-            {[
-              { key: 'personal', label: 'Personal' },
-              { key: 'business', label: 'Business' },
-              { key: 'fleet', label: 'Fleet' },
-            ].map((item) => (
-              <Pressable
-                key={item.key}
-                style={[styles.tabPill, authMode === item.key && styles.tabPillActive]}
-                onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
-              >
-                <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.authHint}>{authHint}</Text>
-          <Text style={styles.authSubhead}>
-            Email + password for demo access. Magic link and Google OAuth are coming soon.
+      <View style={styles.card}>
+        <SectionTitle icon="key-outline" label={isSignUp ? 'Create account' : 'Sign in'} />
+        <TextInput
+          style={styles.input}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email"
+          placeholderTextColor={colors.placeholder}
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Password"
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry
+        />
+        {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+        <Pressable style={styles.primaryButton} onPress={handleSubmit} disabled={submitting}>
+          <Text style={styles.primaryButtonText}>
+            {submitting ? 'Please wait...' : isSignUp ? 'Create account' : 'Sign in'}
           </Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            placeholderTextColor={colors.placeholder}
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            placeholderTextColor={colors.placeholder}
-            secureTextEntry
-          />
-          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleLogin}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>{submitting ? 'Please wait...' : 'Sign in'}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleSignup}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>Sign up</Text>
-          </Pressable>
-          <View style={styles.sectionDivider} />
-          <Text style={styles.authSubhead}>Other sign-in options</Text>
-          <View style={styles.filterRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Magic link / OTP')}>
-              <Text style={styles.secondaryButtonText}>Magic link / OTP</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Google OAuth')}>
-              <Text style={styles.secondaryButtonText}>Google OAuth</Text>
-            </Pressable>
-          </View>
-        </View>
-        <View style={styles.authFooterLinks}>
-          <Pressable onPress={() => navigation.navigate('AdminPortal')}>
-            <Text style={styles.linkText}>Admin</Text>
-          </Pressable>
-          <Pressable onPress={() => navigation.navigate('Demo')}>
-            <Text style={styles.linkText}>Demo</Text>
-          </Pressable>
-        </View>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => setIsSignUp((prev) => !prev)}>
+          <Text style={styles.secondaryButtonText}>
+            {isSignUp ? 'Have an account? Sign in' : 'New here? Create an account'}
+          </Text>
+        </Pressable>
       </View>
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -3826,10 +3553,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
   const [menuLoading, setMenuLoading] = useState(false);
   const [offers, setOffers] = useState<BusinessOfferEntry[]>([]);
   const [offersLoading, setOffersLoading] = useState(false);
-  const [coupons, setCoupons] = useState<BusinessCouponEntry[]>([]);
-  const [couponsLoading, setCouponsLoading] = useState(false);
-  const [exceptions, setExceptions] = useState<BusinessHoursException[]>([]);
-  const [exceptionsLoading, setExceptionsLoading] = useState(false);
   const [reviews, setReviews] = useState<BusinessReviewEntry[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
@@ -3937,34 +3660,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
       }
       setMenuLoading(false);
     };
-    const loadExceptions = async () => {
-      setExceptionsLoading(true);
-      const { data, error } = await supabase
-        .from('business_hours_exceptions')
-        .select('id, business_id, date, is_closed, open_time, close_time, note')
-        .eq('business_id', business.id)
-        .order('date', { ascending: true })
-        .limit(10);
-      if (!isMounted) {
-        return;
-      }
-      if (!error && Array.isArray(data)) {
-        setExceptions(
-          data.map((row) => ({
-            id: String(row.id ?? ''),
-            businessId: String(row.business_id ?? ''),
-            date: row.date ?? '',
-            isClosed: Boolean(row.is_closed),
-            openTime: row.open_time ?? null,
-            closeTime: row.close_time ?? null,
-            note: row.note ?? null,
-          }))
-        );
-      } else {
-        setExceptions([]);
-      }
-      setExceptionsLoading(false);
-    };
     const loadOffers = async () => {
       setOffersLoading(true);
       const { data, error } = await supabase
@@ -3989,37 +3684,8 @@ const BusinessScreen = ({ route }: BusinessProps) => {
       }
       setOffersLoading(false);
     };
-    const loadCoupons = async () => {
-      setCouponsLoading(true);
-      const { data, error } = await supabase
-        .from('business_coupons')
-        .select('id, business_id, code, details, active, created_at')
-        .eq('business_id', business.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      if (!isMounted) {
-        return;
-      }
-      if (!error && Array.isArray(data)) {
-        setCoupons(
-          data.map((row) => ({
-            id: String(row.id ?? ''),
-            businessId: String(row.business_id ?? ''),
-            code: row.code ?? '',
-            details: row.details ?? '',
-            active: row.active !== false,
-            createdAt: row.created_at ?? '',
-          }))
-        );
-      } else {
-        setCoupons([]);
-      }
-      setCouponsLoading(false);
-    };
     void loadMenu();
-    void loadExceptions();
     void loadOffers();
-    void loadCoupons();
     return () => {
       isMounted = false;
     };
@@ -4190,24 +3856,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
               ))}
             </View>
             <Text style={styles.metaText}>{business.hours ?? 'Hours not set'}</Text>
-            {exceptionsLoading ? (
-              <Text style={styles.metaText}>Loading hour exceptions...</Text>
-            ) : exceptions.length > 0 ? (
-              <View style={styles.exceptionList}>
-                {exceptions.slice(0, 2).map((entry) => (
-                  <View key={entry.id} style={styles.exceptionRow}>
-                    <Text style={styles.metaText}>{entry.date}</Text>
-                    <Text style={styles.metaText}>
-                      {entry.isClosed
-                        ? 'Closed'
-                        : entry.openTime && entry.closeTime
-                          ? `${entry.openTime} - ${entry.closeTime}`
-                          : 'Adjusted hours'}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
           </View>
         </View>
         <View style={styles.tabRow}>
@@ -4395,22 +4043,6 @@ const BusinessScreen = ({ route }: BusinessProps) => {
                     <Text style={styles.metaText}>{offer.details}</Text>
                   </View>
                   <Text style={styles.metaText}>{offer.createdAt}</Text>
-                </View>
-              ))
-            )}
-            <View style={styles.sectionDivider} />
-            <SectionTitle icon="ticket-outline" label="Coupons" />
-            {couponsLoading ? <Text style={styles.metaText}>Loading coupons...</Text> : null}
-            {coupons.length === 0 ? (
-              <Text style={styles.metaText}>No coupons yet.</Text>
-            ) : (
-              coupons.map((coupon) => (
-                <View key={coupon.id} style={styles.listRow}>
-                  <View style={styles.listRowInfo}>
-                    <Text style={styles.cardTitle}>{coupon.code}</Text>
-                    <Text style={styles.metaText}>{coupon.details}</Text>
-                  </View>
-                  <Text style={styles.metaText}>{coupon.active ? 'Active' : 'Inactive'}</Text>
                 </View>
               ))
             )}
@@ -4819,29 +4451,11 @@ const BusinessAdminScreen = () => {
   const [offers, setOffers] = useState<BusinessOfferEntry[]>([]);
   const [orders, setOrders] = useState<OrderEntry[]>([]);
   const [auditLog, setAuditLog] = useState<BusinessAuditEntry[]>([]);
-  const [exceptions, setExceptions] = useState<BusinessHoursException[]>([]);
-  const [coupons, setCoupons] = useState<BusinessCouponEntry[]>([]);
-  const [couponCode, setCouponCode] = useState('');
-  const [couponDetails, setCouponDetails] = useState('');
-  const [couponActive, setCouponActive] = useState(true);
-  const [exceptionDate, setExceptionDate] = useState('');
-  const [exceptionOpen, setExceptionOpen] = useState('');
-  const [exceptionClose, setExceptionClose] = useState('');
-  const [exceptionNote, setExceptionNote] = useState('');
-  const [exceptionClosed, setExceptionClosed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const activeBusiness =
     ownedBusinesses.find((entry) => entry.id === selectedBusinessId) ?? ownedBusinesses[0] ?? null;
-  const activeExceptions = useMemo(
-    () => exceptions.filter((entry) => entry.businessId === activeBusiness?.id),
-    [activeBusiness?.id, exceptions]
-  );
-  const activeCoupons = useMemo(
-    () => coupons.filter((entry) => entry.businessId === activeBusiness?.id),
-    [activeBusiness?.id, coupons]
-  );
 
   useEffect(() => {
     let isMounted = true;
@@ -4885,7 +4499,7 @@ const BusinessAdminScreen = () => {
         return;
       }
 
-      const [staffRes, menuRes, offersRes, ordersRes, auditRes, exceptionsRes, couponsRes] = await Promise.all([
+      const [staffRes, menuRes, offersRes, ordersRes, auditRes] = await Promise.all([
         supabase
           .from('business_staff')
           .select('id, business_id, user_id, role, permissions, created_at')
@@ -4910,32 +4524,12 @@ const BusinessAdminScreen = () => {
           .in('business_id', businessIds)
           .order('created_at', { ascending: false })
           .limit(20),
-        supabase
-          .from('business_hours_exceptions')
-          .select('id, business_id, date, is_closed, open_time, close_time, note')
-          .in('business_id', businessIds)
-          .order('date', { ascending: true })
-          .limit(20),
-        supabase
-          .from('business_coupons')
-          .select('id, business_id, code, details, active, created_at')
-          .in('business_id', businessIds)
-          .order('created_at', { ascending: false })
-          .limit(20),
       ]);
 
       if (!isMounted) {
         return;
       }
-      if (
-        staffRes.error ||
-        menuRes.error ||
-        offersRes.error ||
-        ordersRes.error ||
-        auditRes.error ||
-        exceptionsRes.error ||
-        couponsRes.error
-      ) {
+      if (staffRes.error || menuRes.error || offersRes.error || ordersRes.error || auditRes.error) {
         setNotice('Some business admin data failed to load.');
       }
 
@@ -4985,27 +4579,6 @@ const BusinessAdminScreen = () => {
           action: row.action ?? 'update',
           entityType: row.entity_type ?? null,
           entityId: row.entity_id ?? null,
-          createdAt: row.created_at ?? '',
-        }))
-      );
-      setExceptions(
-        (exceptionsRes.data ?? []).map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          date: row.date ?? '',
-          isClosed: Boolean(row.is_closed),
-          openTime: row.open_time ?? null,
-          closeTime: row.close_time ?? null,
-          note: row.note ?? null,
-        }))
-      );
-      setCoupons(
-        (couponsRes.data ?? []).map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          code: row.code ?? '',
-          details: row.details ?? '',
-          active: row.active !== false,
           createdAt: row.created_at ?? '',
         }))
       );
@@ -5104,97 +4677,6 @@ const BusinessAdminScreen = () => {
     }
   };
 
-  const handleAddException = async () => {
-    if (!supabase || !activeBusiness) {
-      setNotice('Select a business first.');
-      return;
-    }
-    if (!exceptionDate.trim()) {
-      setNotice('Enter a date (YYYY-MM-DD).');
-      return;
-    }
-    const { error } = await supabase.from('business_hours_exceptions').insert({
-      business_id: activeBusiness.id,
-      date: exceptionDate.trim(),
-      is_closed: exceptionClosed,
-      open_time: exceptionOpen.trim() ? exceptionOpen.trim() : null,
-      close_time: exceptionClose.trim() ? exceptionClose.trim() : null,
-      note: exceptionNote.trim() ? exceptionNote.trim() : null,
-    });
-    if (error) {
-      setNotice('Unable to add hours exception.');
-      return;
-    }
-    const { data } = await supabase
-      .from('business_hours_exceptions')
-      .select('id, business_id, date, is_closed, open_time, close_time, note')
-      .eq('business_id', activeBusiness.id)
-      .order('date', { ascending: true })
-      .limit(20);
-    if (Array.isArray(data)) {
-      setExceptions(
-        data.map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          date: row.date ?? '',
-          isClosed: Boolean(row.is_closed),
-          openTime: row.open_time ?? null,
-          closeTime: row.close_time ?? null,
-          note: row.note ?? null,
-        }))
-      );
-    }
-    setExceptionDate('');
-    setExceptionOpen('');
-    setExceptionClose('');
-    setExceptionNote('');
-    setExceptionClosed(false);
-    setNotice('Hours exception added.');
-  };
-
-  const handleAddCoupon = async () => {
-    if (!supabase || !activeBusiness) {
-      setNotice('Select a business first.');
-      return;
-    }
-    if (!couponCode.trim()) {
-      setNotice('Enter a coupon code.');
-      return;
-    }
-    const { error } = await supabase.from('business_coupons').insert({
-      business_id: activeBusiness.id,
-      code: couponCode.trim().toUpperCase(),
-      details: couponDetails.trim() ? couponDetails.trim() : 'Discount available',
-      active: couponActive,
-    });
-    if (error) {
-      setNotice('Unable to add coupon.');
-      return;
-    }
-    const { data } = await supabase
-      .from('business_coupons')
-      .select('id, business_id, code, details, active, created_at')
-      .eq('business_id', activeBusiness.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    if (Array.isArray(data)) {
-      setCoupons(
-        data.map((row) => ({
-          id: String(row.id ?? ''),
-          businessId: String(row.business_id ?? ''),
-          code: row.code ?? '',
-          details: row.details ?? '',
-          active: row.active !== false,
-          createdAt: row.created_at ?? '',
-        }))
-      );
-    }
-    setCouponCode('');
-    setCouponDetails('');
-    setCouponActive(true);
-    setNotice('Coupon added.');
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -5278,120 +4760,6 @@ const BusinessAdminScreen = () => {
                 </Text>
               </Pressable>
             </View>
-          </View>
-        ) : null}
-        {activeBusiness ? (
-          <View style={styles.card}>
-            <SectionTitle icon="time-outline" label="Hours exceptions" />
-            <Text style={styles.cardBody}>Add holiday hours or temporary closures.</Text>
-            <TextInput
-              style={styles.input}
-              value={exceptionDate}
-              onChangeText={setExceptionDate}
-              placeholder="Date (YYYY-MM-DD)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <View style={styles.rowBetween}>
-              <Text style={styles.metaText}>Closed</Text>
-              <Switch
-                value={exceptionClosed}
-                onValueChange={setExceptionClosed}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.surface}
-              />
-            </View>
-            {!exceptionClosed ? (
-              <>
-                <TextInput
-                  style={styles.input}
-                  value={exceptionOpen}
-                  onChangeText={setExceptionOpen}
-                  placeholder="Open time (e.g., 10:00)"
-                  placeholderTextColor={colors.placeholder}
-                />
-                <TextInput
-                  style={styles.input}
-                  value={exceptionClose}
-                  onChangeText={setExceptionClose}
-                  placeholder="Close time (e.g., 18:00)"
-                  placeholderTextColor={colors.placeholder}
-                />
-              </>
-            ) : null}
-            <TextInput
-              style={styles.input}
-              value={exceptionNote}
-              onChangeText={setExceptionNote}
-              placeholder="Note (optional)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <Pressable style={styles.primaryButton} onPress={() => void handleAddException()}>
-              <Text style={styles.primaryButtonText}>Add exception</Text>
-            </Pressable>
-            {activeExceptions.length === 0 ? (
-              <Text style={styles.metaText}>No exceptions yet.</Text>
-            ) : (
-              activeExceptions.map((entry) => (
-                <View key={entry.id} style={styles.listRow}>
-                  <View style={styles.listRowInfo}>
-                    <Text style={styles.cardTitle}>{entry.date}</Text>
-                    <Text style={styles.metaText}>
-                      {entry.isClosed
-                        ? 'Closed'
-                        : entry.openTime && entry.closeTime
-                          ? `${entry.openTime} - ${entry.closeTime}`
-                          : 'Adjusted hours'}
-                    </Text>
-                  </View>
-                  {entry.note ? <Text style={styles.metaText}>{entry.note}</Text> : null}
-                </View>
-              ))
-            )}
-          </View>
-        ) : null}
-        {activeBusiness ? (
-          <View style={styles.card}>
-            <SectionTitle icon="ticket-outline" label="Coupons" />
-            <Text style={styles.cardBody}>Create loyalty or promo codes for customers.</Text>
-            <TextInput
-              style={styles.input}
-              value={couponCode}
-              onChangeText={setCouponCode}
-              placeholder="Code (e.g., BLIP10)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <TextInput
-              style={styles.input}
-              value={couponDetails}
-              onChangeText={setCouponDetails}
-              placeholder="Details (e.g., 10% off)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <View style={styles.rowBetween}>
-              <Text style={styles.metaText}>Active</Text>
-              <Switch
-                value={couponActive}
-                onValueChange={setCouponActive}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.surface}
-              />
-            </View>
-            <Pressable style={styles.primaryButton} onPress={() => void handleAddCoupon()}>
-              <Text style={styles.primaryButtonText}>Add coupon</Text>
-            </Pressable>
-            {activeCoupons.length === 0 ? (
-              <Text style={styles.metaText}>No coupons yet.</Text>
-            ) : (
-              activeCoupons.map((coupon) => (
-                <View key={coupon.id} style={styles.listRow}>
-                  <View style={styles.listRowInfo}>
-                    <Text style={styles.cardTitle}>{coupon.code}</Text>
-                    <Text style={styles.metaText}>{coupon.details}</Text>
-                  </View>
-                  <Text style={styles.metaText}>{coupon.active ? 'Active' : 'Inactive'}</Text>
-                </View>
-              ))
-            )}
           </View>
         ) : null}
         {ownedBusinesses.length === 0 ? (
@@ -6813,20 +6181,6 @@ const useStyles = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
         },
-        sectionDivider: {
-          height: 1,
-          backgroundColor: colors.border,
-          marginVertical: 12,
-        },
-        exceptionList: {
-          marginTop: 8,
-          gap: 4,
-        },
-        exceptionRow: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        },
         messageRow: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -6959,19 +6313,10 @@ const useStyles = () => {
           alignItems: 'center',
           gap: 6,
         },
-        feedMediaImage: {
-          marginTop: 10,
-          width: '100%',
-          height: 180,
-          borderRadius: 14,
-        },
         postActions: {
           flexDirection: 'row',
           flexWrap: 'wrap',
           gap: 10,
-        },
-        postMediaPreview: {
-          gap: 8,
         },
         postActionButton: {
           flexDirection: 'row',
@@ -7103,15 +6448,6 @@ const useStyles = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
         },
-        receiptCard: {
-          marginTop: 12,
-          padding: 12,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-          gap: 6,
-        },
         adminStatRow: {
           flexDirection: 'row',
           gap: 10,
@@ -7174,20 +6510,13 @@ const useStyles = () => {
         },
         primaryButton: {
           flex: 1,
-          borderRadius: 22,
+          borderRadius: 14,
           backgroundColor: colors.primary,
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          minHeight: 46,
-          justifyContent: 'center',
+          paddingVertical: 10,
           alignItems: 'center',
         },
-        primaryButtonFull: {
-          flex: 0,
-          alignSelf: 'stretch',
-        },
         primaryButtonText: {
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: '700',
           color: colors.primaryText,
         },
@@ -7203,48 +6532,6 @@ const useStyles = () => {
         secondaryButtonText: {
           fontSize: 14,
           fontWeight: '600',
-          color: colors.text,
-        },
-        authBody: {
-          flex: 1,
-          paddingHorizontal: 16,
-          paddingBottom: 12,
-          justifyContent: 'space-between',
-          gap: 12,
-        },
-        authSubhead: {
-          fontSize: 12,
-          color: colors.textMuted,
-        },
-        authHint: {
-          fontSize: 13,
-          fontWeight: '600',
-          color: colors.text,
-        },
-        authFooterLinks: {
-          paddingHorizontal: 8,
-          flexDirection: 'row',
-          justifyContent: 'flex-end',
-          gap: 16,
-        },
-        linkText: {
-          fontSize: 12,
-          fontWeight: '600',
-          color: colors.textMuted,
-        },
-        storyRow: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: 8,
-        },
-        storyPill: {
-          paddingHorizontal: 10,
-          paddingVertical: 6,
-          borderRadius: 16,
-          backgroundColor: colors.surfaceMuted,
-        },
-        storyPillText: {
-          fontSize: 12,
           color: colors.text,
         },
       }),

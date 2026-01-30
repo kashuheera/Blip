@@ -1817,9 +1817,7 @@ const HomeScreen = () => {
         <View style={styles.mapShell}>
           {Platform.OS === 'web' ? (
             <View style={styles.webPlaceholder}>
-              <Text style={styles.mapLabel}>
-                Web support parity is pending. Map is mobile-only for now.
-              </Text>
+              <Text style={styles.mapLabel}>Map is mobile-only for now.</Text>
             </View>
           ) : (
             <MapView
@@ -2142,12 +2140,10 @@ const FeedScreen = ({ route }: FeedProps) => {
   const [posts, setPosts] = useState<PostEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [storiesNotice, setStoriesNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'trending' | 'forYou' | 'newest'>('trending');
   const [searchValue, setSearchValue] = useState(route.params?.search ?? '');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const tags = ['food', 'events', 'jobs', 'deals', 'study'];
-  const storyLabels = ['Food finds', 'Events', 'Deals', 'Study'];
 
   const loadPosts = async () => {
     if (!supabase) {
@@ -2257,26 +2253,6 @@ const FeedScreen = ({ route }: FeedProps) => {
                   </Text>
                 </Pressable>
               ))}
-            </View>
-            <View style={styles.card}>
-              <SectionTitle icon="sparkles-outline" label="Stories (coming soon)" />
-              <Text style={styles.cardBody}>
-                Quick local highlights from rooms and businesses.
-              </Text>
-              <View style={styles.storyRow}>
-                {storyLabels.map((label) => (
-                  <View key={label} style={styles.storyPill}>
-                    <Text style={styles.storyPillText}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-              {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null}
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => setStoriesNotice('Stories are coming soon.')}
-              >
-                <Text style={styles.secondaryButtonText}>Get notified</Text>
-              </Pressable>
             </View>
             <View style={styles.searchInputWrap}>
               <Ionicons name="search" size={18} color={colors.textMuted} />
@@ -2502,7 +2478,6 @@ const MessagesScreen = () => {
   const { colors } = useTheme();
   const [messagesTab, setMessagesTab] = useState<'business' | 'direct'>('business');
   const [searchValue, setSearchValue] = useState('');
-  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const [directThreads, setDirectThreads] = useState<
     { id: string; handle: string; lastMessage: string; time: string }[]
   >([]);
@@ -2657,19 +2632,6 @@ const MessagesScreen = () => {
               onChangeText={setSearchValue}
             />
           </View>
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="mic-outline" label="Voice rooms (coming soon)" />
-          <Text style={styles.cardBody}>
-            Drop-in audio rooms for your neighborhood and favorite spots.
-          </Text>
-          {voiceNotice ? <Text style={styles.metaText}>{voiceNotice}</Text> : null}
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => setVoiceNotice('Voice rooms are coming soon.')}
-          >
-            <Text style={styles.secondaryButtonText}>Notify me</Text>
-          </Pressable>
         </View>
         {messagesTab === 'business' ? (
           <View style={styles.card}>
@@ -3657,12 +3619,6 @@ const AuthScreen = () => {
   const [authMode, setAuthMode] = useState<'personal' | 'business' | 'fleet'>('personal');
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const authHint =
-    authMode === 'business'
-      ? 'Business sign-in opens the Business Admin Portal.'
-      : authMode === 'fleet'
-        ? 'Fleet access is not live yet.'
-        : 'Personal sign-in takes you to the map.';
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -3720,81 +3676,64 @@ const AuthScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
-      <View style={styles.authBody}>
-        <View style={styles.card}>
-          <SectionTitle icon="key-outline" label="Sign in" />
-          <Text style={styles.authSubhead}>Choose your access type</Text>
-          <View style={styles.tabRow}>
-            {[
-              { key: 'personal', label: 'Personal' },
-              { key: 'business', label: 'Business' },
-              { key: 'fleet', label: 'Fleet' },
-            ].map((item) => (
-              <Pressable
-                key={item.key}
-                style={[styles.tabPill, authMode === item.key && styles.tabPillActive]}
-                onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
-              >
-                <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.authHint}>{authHint}</Text>
-          <Text style={styles.authSubhead}>
-            Email + password for demo access. Magic link and Google OAuth are coming soon.
-          </Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            placeholderTextColor={colors.placeholder}
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            placeholderTextColor={colors.placeholder}
-            secureTextEntry
-          />
-          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleLogin}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>{submitting ? 'Please wait...' : 'Sign in'}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleSignup}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>Sign up</Text>
-          </Pressable>
-          <View style={styles.sectionDivider} />
-          <Text style={styles.authSubhead}>Other sign-in options</Text>
-          <View style={styles.filterRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Magic link / OTP')}>
-              <Text style={styles.secondaryButtonText}>Magic link / OTP</Text>
+      <View style={styles.card}>
+        <SectionTitle icon="key-outline" label="Sign in" />
+        <View style={styles.tabRow}>
+          {[
+            { key: 'personal', label: 'Personal' },
+            { key: 'business', label: 'Business' },
+            { key: 'fleet', label: 'Fleet' },
+          ].map((item) => (
+            <Pressable
+              key={item.key}
+              style={[styles.tabPill, authMode === item.key && styles.tabPillActive]}
+              onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
+            >
+              <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
+                {item.label}
+              </Text>
             </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Google OAuth')}>
-              <Text style={styles.secondaryButtonText}>Google OAuth</Text>
-            </Pressable>
-          </View>
+          ))}
         </View>
-        <View style={styles.authFooterLinks}>
-          <Pressable onPress={() => navigation.navigate('AdminPortal')}>
-            <Text style={styles.linkText}>Admin</Text>
+        <TextInput
+          style={styles.input}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email"
+          placeholderTextColor={colors.placeholder}
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Password"
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry
+        />
+        {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+        <Pressable style={styles.primaryButton} onPress={handleLogin} disabled={submitting}>
+          <Text style={styles.primaryButtonText}>{submitting ? 'Please wait...' : 'Sign in'}</Text>
+        </Pressable>
+        <Pressable style={styles.primaryButton} onPress={handleSignup} disabled={submitting}>
+          <Text style={styles.primaryButtonText}>Sign up</Text>
+        </Pressable>
+        <View style={styles.filterRow}>
+          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Magic link / OTP')}>
+            <Text style={styles.secondaryButtonText}>Magic link / OTP</Text>
           </Pressable>
-          <Pressable onPress={() => navigation.navigate('Demo')}>
-            <Text style={styles.linkText}>Demo</Text>
+          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Google OAuth')}>
+            <Text style={styles.secondaryButtonText}>Google OAuth</Text>
           </Pressable>
         </View>
+      </View>
+      <View style={styles.authFooterLinks}>
+        <Pressable onPress={() => navigation.navigate('AdminPortal')}>
+          <Text style={styles.linkText}>Admin</Text>
+        </Pressable>
+        <Pressable onPress={() => navigation.navigate('Demo')}>
+          <Text style={styles.linkText}>Demo</Text>
+        </Pressable>
       </View>
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -7174,17 +7113,12 @@ const useStyles = () => {
         },
         primaryButton: {
           flex: 1,
-          borderRadius: 22,
+          borderRadius: 18,
           backgroundColor: colors.primary,
           paddingVertical: 12,
-          paddingHorizontal: 16,
-          minHeight: 46,
+          minHeight: 48,
           justifyContent: 'center',
           alignItems: 'center',
-        },
-        primaryButtonFull: {
-          flex: 0,
-          alignSelf: 'stretch',
         },
         primaryButtonText: {
           fontSize: 15,
@@ -7205,24 +7139,9 @@ const useStyles = () => {
           fontWeight: '600',
           color: colors.text,
         },
-        authBody: {
-          flex: 1,
-          paddingHorizontal: 16,
-          paddingBottom: 12,
-          justifyContent: 'space-between',
-          gap: 12,
-        },
-        authSubhead: {
-          fontSize: 12,
-          color: colors.textMuted,
-        },
-        authHint: {
-          fontSize: 13,
-          fontWeight: '600',
-          color: colors.text,
-        },
         authFooterLinks: {
-          paddingHorizontal: 8,
+          marginTop: 16,
+          paddingHorizontal: 20,
           flexDirection: 'row',
           justifyContent: 'flex-end',
           gap: 16,
@@ -7231,21 +7150,6 @@ const useStyles = () => {
           fontSize: 12,
           fontWeight: '600',
           color: colors.textMuted,
-        },
-        storyRow: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: 8,
-        },
-        storyPill: {
-          paddingHorizontal: 10,
-          paddingVertical: 6,
-          borderRadius: 16,
-          backgroundColor: colors.surfaceMuted,
-        },
-        storyPillText: {
-          fontSize: 12,
-          color: colors.text,
         },
       }),
     [colors]

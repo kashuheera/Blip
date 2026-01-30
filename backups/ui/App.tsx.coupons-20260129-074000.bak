@@ -1817,9 +1817,7 @@ const HomeScreen = () => {
         <View style={styles.mapShell}>
           {Platform.OS === 'web' ? (
             <View style={styles.webPlaceholder}>
-              <Text style={styles.mapLabel}>
-                Web support parity is pending. Map is mobile-only for now.
-              </Text>
+              <Text style={styles.mapLabel}>Map is mobile-only for now.</Text>
             </View>
           ) : (
             <MapView
@@ -2142,12 +2140,10 @@ const FeedScreen = ({ route }: FeedProps) => {
   const [posts, setPosts] = useState<PostEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [storiesNotice, setStoriesNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'trending' | 'forYou' | 'newest'>('trending');
   const [searchValue, setSearchValue] = useState(route.params?.search ?? '');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const tags = ['food', 'events', 'jobs', 'deals', 'study'];
-  const storyLabels = ['Food finds', 'Events', 'Deals', 'Study'];
 
   const loadPosts = async () => {
     if (!supabase) {
@@ -2257,26 +2253,6 @@ const FeedScreen = ({ route }: FeedProps) => {
                   </Text>
                 </Pressable>
               ))}
-            </View>
-            <View style={styles.card}>
-              <SectionTitle icon="sparkles-outline" label="Stories (coming soon)" />
-              <Text style={styles.cardBody}>
-                Quick local highlights from rooms and businesses.
-              </Text>
-              <View style={styles.storyRow}>
-                {storyLabels.map((label) => (
-                  <View key={label} style={styles.storyPill}>
-                    <Text style={styles.storyPillText}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-              {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null}
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => setStoriesNotice('Stories are coming soon.')}
-              >
-                <Text style={styles.secondaryButtonText}>Get notified</Text>
-              </Pressable>
             </View>
             <View style={styles.searchInputWrap}>
               <Ionicons name="search" size={18} color={colors.textMuted} />
@@ -2502,7 +2478,6 @@ const MessagesScreen = () => {
   const { colors } = useTheme();
   const [messagesTab, setMessagesTab] = useState<'business' | 'direct'>('business');
   const [searchValue, setSearchValue] = useState('');
-  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const [directThreads, setDirectThreads] = useState<
     { id: string; handle: string; lastMessage: string; time: string }[]
   >([]);
@@ -2657,19 +2632,6 @@ const MessagesScreen = () => {
               onChangeText={setSearchValue}
             />
           </View>
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="mic-outline" label="Voice rooms (coming soon)" />
-          <Text style={styles.cardBody}>
-            Drop-in audio rooms for your neighborhood and favorite spots.
-          </Text>
-          {voiceNotice ? <Text style={styles.metaText}>{voiceNotice}</Text> : null}
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => setVoiceNotice('Voice rooms are coming soon.')}
-          >
-            <Text style={styles.secondaryButtonText}>Notify me</Text>
-          </Pressable>
         </View>
         {messagesTab === 'business' ? (
           <View style={styles.card}>
@@ -2957,12 +2919,6 @@ const OrdersScreen = () => {
   const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
   const [cartItems, setCartItems] = useState<CartItemEntry[]>([]);
-  const [lastReceipt, setLastReceipt] = useState<{
-    orderId: string;
-    businessName: string;
-    items: CartItemEntry[];
-    totalCents: number;
-  } | null>(null);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
     businessList[0]?.id ?? null
   );
@@ -3191,38 +3147,9 @@ const OrdersScreen = () => {
         }))
       );
       setOrderNotes('');
-      setLastReceipt({
-        orderId,
-        businessName: selectedBusinessId
-          ? businessIndex.get(selectedBusinessId) ?? 'Business'
-          : 'Business',
-        items: cartItems,
-        totalCents: cartTotalCents,
-      });
       setCartItems([]);
       setNotice('Order requested.');
       void trackAnalyticsEvent('order_place', { business_id: selectedBusinessId }, userId);
-      if (selectedBusinessId) {
-        const { data: ownerRow } = await supabase
-          .from('businesses')
-          .select('owner_id')
-          .eq('id', selectedBusinessId)
-          .maybeSingle();
-        const ownerId = ownerRow?.owner_id ?? null;
-        const recipients = [userId, ownerId].filter(
-          (entry): entry is string => typeof entry === 'string' && entry.length > 0
-        );
-        if (recipients.length > 0) {
-          await supabase.functions.invoke('push-send', {
-            body: {
-              user_ids: recipients,
-              title: 'BLIP',
-              body: 'New order received.',
-              data: { type: 'order', order_id: orderId },
-            },
-          });
-        }
-      }
       void refreshOrders();
     }
   };
@@ -3320,32 +3247,6 @@ const OrdersScreen = () => {
             <Pressable style={styles.primaryButton} onPress={() => void handleCreateOrder()}>
               <Text style={styles.primaryButtonText}>Submit pickup order</Text>
             </Pressable>
-            {lastReceipt ? (
-              <View style={styles.receiptCard}>
-                <Text style={styles.cardTitle}>Receipt</Text>
-                <Text style={styles.metaText}>Order #{lastReceipt.orderId.slice(0, 6)}</Text>
-                <Text style={styles.metaText}>{lastReceipt.businessName}</Text>
-                {lastReceipt.items.map((item) => (
-                  <View key={item.id} style={styles.rowBetween}>
-                    <Text style={styles.metaText}>{item.name}</Text>
-                    <Text style={styles.metaText}>
-                      x{item.quantity} • Rs{' '}
-                      {item.priceCents ? ((item.priceCents * item.quantity) / 100).toFixed(0) : '0'}
-                    </Text>
-                  </View>
-                ))}
-                <View style={styles.rowBetween}>
-                  <Text style={styles.cardTitle}>Total</Text>
-                  <Text style={styles.cardTitle}>Rs {(lastReceipt.totalCents / 100).toFixed(0)}</Text>
-                </View>
-              </View>
-            ) : null}
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => setNotice('Email/SMS receipt setup pending. Coming soon.')}
-            >
-              <Text style={styles.secondaryButtonText}>Email/SMS receipt</Text>
-            </Pressable>
           </View>
         }
         renderItem={({ item }) => (
@@ -3373,10 +3274,6 @@ const OrdersScreen = () => {
 
 const BillingScreen = () => {
   const styles = useStyles();
-  const [notice, setNotice] = useState<string | null>(null);
-  const handlePending = (label: string) => {
-    setNotice(`${label} setup pending. Coming soon.`);
-  };
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -3387,20 +3284,6 @@ const BillingScreen = () => {
             Payments, subscriptions, and invoices are not enabled yet.
           </Text>
           <Text style={styles.metaText}>This will unlock before rollout.</Text>
-          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Payments')}>
-            <Text style={styles.secondaryButtonText}>Connect payments provider</Text>
-          </Pressable>
-          <View style={styles.sectionDivider} />
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Paid tiers')}>
-            <Text style={styles.secondaryButtonText}>Paid tiers (users)</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Invite-only access')}>
-            <Text style={styles.secondaryButtonText}>Invite-only access</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Paid invites')}>
-            <Text style={styles.secondaryButtonText}>Paid invites</Text>
-          </Pressable>
         </View>
       </ScrollView>
       <BottomNav />
@@ -3650,151 +3533,60 @@ const ProfileScreen = () => {
 const AuthScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { signIn, signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [authMode, setAuthMode] = useState<'personal' | 'business' | 'fleet'>('personal');
+  const [isSignUp, setIsSignUp] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const authHint =
-    authMode === 'business'
-      ? 'Business sign-in opens the Business Admin Portal.'
-      : authMode === 'fleet'
-        ? 'Fleet access is not live yet.'
-        : 'Personal sign-in takes you to the map.';
 
-  const handleLogin = async () => {
+  const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
       setNotice('Email and password are required.');
       return;
     }
-    if (authMode === 'fleet') {
-      setNotice('Fleet login setup pending. Coming soon.');
-      return;
-    }
     setSubmitting(true);
     setNotice(null);
-    const ok = await signIn(email.trim(), password);
+    const ok = isSignUp ? await signUp(email.trim(), password) : await signIn(email.trim(), password);
     if (!ok) {
       setNotice('Unable to authenticate. Check your credentials.');
     } else {
-      setNotice('Signed in.');
-      if (authMode === 'business') {
-        navigation.navigate('BusinessAdmin');
-      } else {
-        navigation.navigate('Home');
-      }
+      setNotice(isSignUp ? 'Account created.' : 'Signed in.');
     }
     setSubmitting(false);
-  };
-
-  const handleSignup = async () => {
-    if (!email.trim() || !password.trim()) {
-      setNotice('Email and password are required.');
-      return;
-    }
-    if (authMode === 'fleet') {
-      setNotice('Fleet signup setup pending. Coming soon.');
-      return;
-    }
-    setSubmitting(true);
-    setNotice(null);
-    const ok = await signUp(email.trim(), password);
-    if (!ok) {
-      setNotice('Unable to create account.');
-    } else {
-      setNotice('Account created.');
-      if (authMode === 'business') {
-        navigation.navigate('BusinessAdmin');
-      } else {
-        navigation.navigate('Home');
-      }
-    }
-    setSubmitting(false);
-  };
-
-  const handlePending = (label: string) => {
-    setNotice(`${label} setup pending. Coming soon.`);
   };
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
-      <View style={styles.authBody}>
-        <View style={styles.card}>
-          <SectionTitle icon="key-outline" label="Sign in" />
-          <Text style={styles.authSubhead}>Choose your access type</Text>
-          <View style={styles.tabRow}>
-            {[
-              { key: 'personal', label: 'Personal' },
-              { key: 'business', label: 'Business' },
-              { key: 'fleet', label: 'Fleet' },
-            ].map((item) => (
-              <Pressable
-                key={item.key}
-                style={[styles.tabPill, authMode === item.key && styles.tabPillActive]}
-                onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
-              >
-                <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.authHint}>{authHint}</Text>
-          <Text style={styles.authSubhead}>
-            Email + password for demo access. Magic link and Google OAuth are coming soon.
+      <View style={styles.card}>
+        <SectionTitle icon="key-outline" label={isSignUp ? 'Create account' : 'Sign in'} />
+        <TextInput
+          style={styles.input}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email"
+          placeholderTextColor={colors.placeholder}
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Password"
+          placeholderTextColor={colors.placeholder}
+          secureTextEntry
+        />
+        {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+        <Pressable style={styles.primaryButton} onPress={handleSubmit} disabled={submitting}>
+          <Text style={styles.primaryButtonText}>
+            {submitting ? 'Please wait...' : isSignUp ? 'Create account' : 'Sign in'}
           </Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            placeholderTextColor={colors.placeholder}
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            placeholderTextColor={colors.placeholder}
-            secureTextEntry
-          />
-          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleLogin}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>{submitting ? 'Please wait...' : 'Sign in'}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleSignup}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>Sign up</Text>
-          </Pressable>
-          <View style={styles.sectionDivider} />
-          <Text style={styles.authSubhead}>Other sign-in options</Text>
-          <View style={styles.filterRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Magic link / OTP')}>
-              <Text style={styles.secondaryButtonText}>Magic link / OTP</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Google OAuth')}>
-              <Text style={styles.secondaryButtonText}>Google OAuth</Text>
-            </Pressable>
-          </View>
-        </View>
-        <View style={styles.authFooterLinks}>
-          <Pressable onPress={() => navigation.navigate('AdminPortal')}>
-            <Text style={styles.linkText}>Admin</Text>
-          </Pressable>
-          <Pressable onPress={() => navigation.navigate('Demo')}>
-            <Text style={styles.linkText}>Demo</Text>
-          </Pressable>
-        </View>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => setIsSignUp((prev) => !prev)}>
+          <Text style={styles.secondaryButtonText}>
+            {isSignUp ? 'Have an account? Sign in' : 'New here? Create an account'}
+          </Text>
+        </Pressable>
       </View>
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -7103,15 +6895,6 @@ const useStyles = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
         },
-        receiptCard: {
-          marginTop: 12,
-          padding: 12,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
-          gap: 6,
-        },
         adminStatRow: {
           flexDirection: 'row',
           gap: 10,
@@ -7174,20 +6957,13 @@ const useStyles = () => {
         },
         primaryButton: {
           flex: 1,
-          borderRadius: 22,
+          borderRadius: 14,
           backgroundColor: colors.primary,
-          paddingVertical: 12,
-          paddingHorizontal: 16,
-          minHeight: 46,
-          justifyContent: 'center',
+          paddingVertical: 10,
           alignItems: 'center',
         },
-        primaryButtonFull: {
-          flex: 0,
-          alignSelf: 'stretch',
-        },
         primaryButtonText: {
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: '700',
           color: colors.primaryText,
         },
@@ -7203,48 +6979,6 @@ const useStyles = () => {
         secondaryButtonText: {
           fontSize: 14,
           fontWeight: '600',
-          color: colors.text,
-        },
-        authBody: {
-          flex: 1,
-          paddingHorizontal: 16,
-          paddingBottom: 12,
-          justifyContent: 'space-between',
-          gap: 12,
-        },
-        authSubhead: {
-          fontSize: 12,
-          color: colors.textMuted,
-        },
-        authHint: {
-          fontSize: 13,
-          fontWeight: '600',
-          color: colors.text,
-        },
-        authFooterLinks: {
-          paddingHorizontal: 8,
-          flexDirection: 'row',
-          justifyContent: 'flex-end',
-          gap: 16,
-        },
-        linkText: {
-          fontSize: 12,
-          fontWeight: '600',
-          color: colors.textMuted,
-        },
-        storyRow: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: 8,
-        },
-        storyPill: {
-          paddingHorizontal: 10,
-          paddingVertical: 6,
-          borderRadius: 16,
-          backgroundColor: colors.surfaceMuted,
-        },
-        storyPillText: {
-          fontSize: 12,
           color: colors.text,
         },
       }),
