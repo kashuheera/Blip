@@ -20,7 +20,9 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Map search overlay with scope (rooms/businesses/posts) and text match.
 - Feed screen (tabs + search + tags) + create post.
 - Stories placeholder card in Feed (UI only).
-- Feed actions updated: share button + user profile drilldown + distance badge (UI).
+- Feed actions updated: like + share + reply (business-only) + user profile drilldown + distance badge (coarse location).
+- Post engagement: likes (personal) + replies/comments (business-only).
+- Orders: pickup + delivery options + KYC-required user details (name/phone/address).
 - Auth screen with Personal/Business/Fleet tabs + pending buttons for Magic link/OTP + Google OAuth.
 - Room chat with realtime updates + distance gating.
 - Business profile (menu, offers, Q&A chat) + chat join gating.
@@ -37,6 +39,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders).
 - Blip Admin Portal (feature flags, verification queue, moderation ops).
 - Side panel navigation drawer (hamburger menu).
+- Account types enforced (personal vs business; business accounts blocked from user screens).
 
 ### Known broken, disabled, or deferred
 - Magic link / email OTP auth: deferred. Must-have before rollout with proper domain redirects/deep links (mobile cannot follow `127.0.0.1` links).
@@ -44,6 +47,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Payments/billing: not implemented (billing screen is placeholder only).
 - Stories + voice rooms: UI placeholders only (no functional media/voice backend).
 - Business admin access requires a business account (owner/staff). Personal-only accounts are blocked from admin controls.
+- KYC verification: CNIC/ID upload + verification badge not implemented yet (UI placeholder only).
 - Push notifications delivery: requires FCM/APNS keys + redeploy `push-send`.
 - Web support: location is disabled on web (mobile-first).
 - Advanced search filters: open now/verified/tags are wired for businesses/rooms.
@@ -97,6 +101,7 @@ From `c:\Blip\app`:
 - Post media fields: `supabase/migrations/20260129104500_add_post_media.sql`
 - Post media storage bucket: `supabase/migrations/20260129104600_add_post_media_storage.sql`
 - Business coupons: `supabase/migrations/20260129105000_add_business_coupons.sql`
+- Account types + KYC + delivery + post location: `supabase/migrations/20260131093000_account_type_kyc_delivery_posts.sql`
 - Business verification workflow: `supabase/migrations/20260120091000_add_business_verification_workflow.sql`
 - Analytics events: `supabase/migrations/20260120093000_add_analytics_events.sql`
 - Safety + push + reputation + room roles: `supabase/migrations/20260122090000_add_safety_push_reputation.sql`
@@ -108,6 +113,7 @@ From `c:\Blip\app`:
 
 ### Core tables (and what they power)
 - `profiles`: user profile + moderation flags + XP/level/chat-points state + `avatar_url`, `interests`.
+- `user_private`: KYC details (name/phone/address/CNIC) visible to the user and only to businesses for their orders.
 - `handle_history`: stores previously-used handles to enforce “no reuse for 3 months”.
 - `businesses`: business profiles (owner-managed), location + city, description + hero image, categories/amenities, verification status/notes.
 - `business_verification_requests`: owner-submitted verification requests with admin review status.

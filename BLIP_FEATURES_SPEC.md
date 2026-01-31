@@ -17,7 +17,10 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - Access: open signup; no invite-only or waitlist in MVP.
 - Tiers: not included for now.
 - Ordering: included (no payments in MVP; pickup only in app; delivery handled by businesses outside BLIP).
-- Accounts: personal and business logins are separate; personal accounts cannot access business admin.
+- Accounts: personal and business logins are separate; personal accounts cannot access business admin; business accounts cannot access user feeds/rooms/DMs.
+- KYC: users must provide name + phone + address to place orders; CNIC/ID upload + verification badge comes later.
+- Orders: pickup + delivery options; delivery handled by business; businesses can view user contact + address for their orders only.
+- Location privacy: posts store coarse location for distance labels; exact user location is never shown to other users.
 - Safer onboarding: Supabase phone OTP + in-house device ID (lightweight device fingerprint).
 - AI safety: use Moderation API for text + media checks (edge function).
 - Push notifications: native FCM/APNs via edge function + device tokens.
@@ -29,10 +32,12 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - Implemented: Profile identity switch + reputation/trust labels + device ID display; billing placeholder.
 - Implemented: Side panel navigation + user profile drilldown from feed (UI).
 - Implemented: AI safety checks for posts + room/business/direct messages.
+- Implemented: Account type gating (personal vs business) + KYC capture + delivery method selection.
+- Implemented: Post engagement (likes + business-only replies) + coarse distance labels.
 - Implemented: Push plumbing (device tokens + test push), but delivery requires FCM/APNS keys.
 - Admin: Business Admin Portal + Blip Admin Portal in-app screens.
 - Implemented: UI placeholders for Stories (Feed) + Voice rooms (Messages).
-- Not implemented yet: magic link/OTP, Google OAuth, payments, stories/highlights/pinned, voice rooms.
+- Not implemented yet: magic link/OTP, Google OAuth, payments, stories/highlights/pinned, voice rooms, KYC badge/ID upload.
 
 ## Scope Tags
 - MVP: required for the first release

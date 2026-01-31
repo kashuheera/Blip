@@ -49,6 +49,7 @@ Notifications.setNotificationHandler({
 type RootStackParamList = {
   Home: undefined;
   Feed: { search?: string } | undefined;
+  PostReplies: { postId: string; authorHandle: string } | undefined;
   Create: undefined;
   Messages: undefined;
   DirectChat: { threadId: string; title: string } | undefined;
@@ -169,6 +170,8 @@ type BusinessMessage = {
   createdAt: string;
 };
 
+type AccountType = 'personal' | 'business';
+
 type ProfileSummary = {
   handle: string | null;
   isAdmin: boolean;
@@ -176,6 +179,7 @@ type ProfileSummary = {
   u2uLocked: boolean;
   xp: number;
   level: number;
+  accountType: AccountType;
 };
 
 type PostEntry = {
@@ -185,6 +189,8 @@ type PostEntry = {
   createdAt: string;
   mediaUrl?: string | null;
   mediaType?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type OrderEntry = {
@@ -194,6 +200,9 @@ type OrderEntry = {
   status: string;
   notes?: string | null;
   createdAt: string;
+  userId?: string | null;
+  deliveryMethod?: 'pickup' | 'delivery' | null;
+  deliveryAddress?: string | null;
 };
 
 type CartItemEntry = {
@@ -298,8 +307,8 @@ type AuthContextValue = {
   deviceId: string | null;
   profile: ProfileSummary | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<boolean>;
-  signUp: (email: string, password: string) => Promise<boolean>;
+  signIn: (email: string, password: string) => Promise<ProfileSummary | null>;
+  signUp: (email: string, password: string, accountType: AccountType) => Promise<ProfileSummary | null>;
   signOut: () => Promise<void>;
 };
 
@@ -611,28 +620,31 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async (nextUserId: string | null) => {
+  const loadProfile = async (nextUserId: string | null): Promise<ProfileSummary | null> => {
     if (!supabase || !nextUserId) {
       setProfile(null);
-      return;
+      return null;
     }
     const { data, error } = await supabase
       .from('profiles')
-      .select('current_handle, is_admin, shadowbanned, u2u_locked, xp, level')
+      .select('current_handle, is_admin, shadowbanned, u2u_locked, xp, level, account_type')
       .eq('id', nextUserId)
       .maybeSingle();
     if (error) {
       setProfile(null);
-      return;
+      return null;
     }
-    setProfile({
+    const nextProfile: ProfileSummary = {
       handle: data?.current_handle ?? null,
       isAdmin: Boolean(data?.is_admin),
       shadowbanned: Boolean(data?.shadowbanned),
       u2uLocked: Boolean(data?.u2u_locked),
       xp: typeof data?.xp === 'number' ? data.xp : 0,
       level: typeof data?.level === 'number' ? data.level : 1,
-    });
+      accountType: data?.account_type === 'business' ? 'business' : 'personal',
+    };
+    setProfile(nextProfile);
+    return nextProfile;
   };
 
   useEffect(() => {
@@ -719,38 +731,44 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (nextEmail: string, password: string) => {
     if (!supabase) {
-      return false;
+      return null;
     }
     const { error, data } = await supabase.auth.signInWithPassword({
       email: nextEmail,
       password,
     });
     if (error) {
-      return false;
+      return null;
     }
     setUserId(data.user?.id ?? null);
     setEmail(data.user?.email ?? null);
-    void loadProfile(data.user?.id ?? null);
+    const nextProfile = await loadProfile(data.user?.id ?? null);
     void trackAnalyticsEvent('auth_sign_in', { method: 'password' }, data.user?.id ?? null);
-    return true;
+    return nextProfile;
   };
 
-  const signUp = async (nextEmail: string, password: string) => {
+  const signUp = async (nextEmail: string, password: string, accountType: AccountType) => {
     if (!supabase) {
-      return false;
+      return null;
     }
     const { error, data } = await supabase.auth.signUp({
       email: nextEmail,
       password,
     });
     if (error) {
-      return false;
+      return null;
     }
     setUserId(data.user?.id ?? null);
     setEmail(data.user?.email ?? null);
-    void loadProfile(data.user?.id ?? null);
+    if (data.user?.id) {
+      await supabase
+        .from('profiles')
+        .update({ account_type: accountType })
+        .eq('id', data.user.id);
+    }
+    const nextProfile = await loadProfile(data.user?.id ?? null);
     void trackAnalyticsEvent('auth_sign_up', { method: 'password' }, data.user?.id ?? null);
-    return true;
+    return nextProfile;
   };
 
   const signOut = async () => {
@@ -835,10 +853,12 @@ const AppHeader = () => {
                 <Ionicons name="receipt-outline" size={18} color={colors.text} />
                 <Text style={styles.sideSheetItemText}>Orders</Text>
               </Pressable>
-              <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('BusinessAdmin')}>
-                <Ionicons name="storefront-outline" size={18} color={colors.text} />
-                <Text style={styles.sideSheetItemText}>Business admin</Text>
-              </Pressable>
+              {profile?.accountType === 'business' ? (
+                <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('BusinessAdmin')}>
+                  <Ionicons name="storefront-outline" size={18} color={colors.text} />
+                  <Text style={styles.sideSheetItemText}>Business admin</Text>
+                </Pressable>
+              ) : null}
               {profile?.isAdmin ? (
                 <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('AdminPortal')}>
                   <Ionicons name="shield-checkmark-outline" size={18} color={colors.text} />
@@ -874,6 +894,27 @@ const SectionTitle = ({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; l
     <View style={styles.sectionTitleRow}>
       <Ionicons name={icon} size={16} color={colors.text} />
       <Text style={styles.sectionTitleText}>{label}</Text>
+    </View>
+  );
+};
+
+const BusinessAccountLockout = ({
+  message,
+  onPress,
+  actionLabel = 'Open Business Admin',
+}: {
+  message: string;
+  onPress: () => void;
+  actionLabel?: string;
+}) => {
+  const styles = useStyles();
+  return (
+    <View style={styles.card}>
+      <SectionTitle icon="lock-closed-outline" label="Business access only" />
+      <Text style={styles.cardBody}>{message}</Text>
+      <Pressable style={styles.secondaryButton} onPress={onPress}>
+        <Text style={styles.secondaryButtonText}>{actionLabel}</Text>
+      </Pressable>
     </View>
   );
 };
@@ -945,23 +986,67 @@ const BottomNav = () => {
   );
 };
 
-const hashString = (value: string) => {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash);
+const distanceInMeters = (
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number }
+) => {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(h));
 };
 
-const estimateDistanceLabel = (seed: string) => {
-  const minMeters = 120;
-  const maxMeters = 3200;
-  const span = maxMeters - minMeters;
-  const meters = minMeters + (hashString(seed) % span);
+const formatDistanceLabel = (meters: number) => {
+  if (!Number.isFinite(meters)) {
+    return 'Nearby';
+  }
   if (meters < 1000) {
-    return `~${meters} m away`;
+    return `~${Math.round(meters)} m away`;
   }
   return `~${(meters / 1000).toFixed(1)} km away`;
+};
+
+const getPostDistanceLabel = (
+  post: PostEntry,
+  currentLocation: { latitude: number; longitude: number } | null
+) => {
+  if (
+    !currentLocation ||
+    typeof post.latitude !== 'number' ||
+    typeof post.longitude !== 'number'
+  ) {
+    return 'Nearby';
+  }
+  const meters = distanceInMeters(currentLocation, {
+    latitude: post.latitude,
+    longitude: post.longitude,
+  });
+  return formatDistanceLabel(meters);
+};
+
+const getFuzzedLocation = async () => {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      return null;
+    }
+    const result = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Low,
+    });
+    const round = (value: number) => Math.round(value * 1000) / 1000;
+    return {
+      latitude: round(result.coords.latitude),
+      longitude: round(result.coords.longitude),
+    };
+  } catch {
+    return null;
+  }
 };
 
 const pinColor = (pin: MapPin) => {
@@ -1324,6 +1409,7 @@ const HomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { businesses: businessList, setBusinesses } = useBusinesses();
   const { profile, userId } = useAuth();
+  const isBusinessAccount = profile?.accountType === 'business';
   const initialRegion = useMemo<Region>(
     () => ({
       latitude: 31.4498226,
@@ -1355,6 +1441,22 @@ const HomeScreen = () => {
   const showUsers = true;
   const [userPins, setUserPins] = useState<MapPin[]>(demoUserPins);
   const [rooms, setRooms] = useState<Room[]>(demoRooms);
+
+  if (isBusinessAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppHeader />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <BusinessAccountLockout
+            message="Business accounts only access business tools. Switch to a personal account to use the map."
+            onPress={() => navigation.navigate('BusinessAdmin')}
+          />
+        </ScrollView>
+        <BottomNav />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
 
   const filteredBusinesses = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -2226,14 +2328,19 @@ const FeedScreen = ({ route }: FeedProps) => {
   const styles = useStyles();
   const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { userId } = useAuth();
+  const { userId, profile } = useAuth();
+  const isBusinessAccount = profile?.accountType === 'business';
   const [posts, setPosts] = useState<PostEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [storiesNotice, setStoriesNotice] = useState<string | null>(null);
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState<'trending' | 'forYou' | 'newest'>('trending');
   const [searchValue, setSearchValue] = useState(route.params?.search ?? '');
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const tags = ['food', 'events', 'jobs', 'deals', 'study'];
   const storyLabels = ['Food finds', 'Events', 'Deals', 'Study'];
 
@@ -2249,7 +2356,7 @@ const FeedScreen = ({ route }: FeedProps) => {
     setNotice(null);
     const { data, error } = await supabase
       .from('posts')
-      .select('id, author_handle, body, created_at, media_type, media_url')
+      .select('id, author_handle, body, created_at, media_type, media_url, latitude, longitude')
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) {
@@ -2265,8 +2372,49 @@ const FeedScreen = ({ route }: FeedProps) => {
         createdAt: row.created_at ?? '',
         mediaUrl: row.media_url ?? null,
         mediaType: row.media_type ?? null,
+        latitude: typeof row.latitude === 'number' ? row.latitude : null,
+        longitude: typeof row.longitude === 'number' ? row.longitude : null,
       }))
     );
+    const postIds = (data ?? [])
+      .map((row) => String(row.id ?? ''))
+      .filter((id) => id.length > 0);
+    if (postIds.length > 0) {
+      const [reactionsRes, commentsRes] = await Promise.all([
+        supabase
+          .from('post_reactions')
+          .select('post_id, user_id, reaction')
+          .in('post_id', postIds),
+        supabase.from('post_comments').select('post_id').in('post_id', postIds),
+      ]);
+      const nextReactionCounts: Record<string, number> = {};
+      const nextLiked: Record<string, boolean> = {};
+      (reactionsRes.data ?? []).forEach((row) => {
+        const postId = row.post_id ? String(row.post_id) : '';
+        if (!postId) {
+          return;
+        }
+        nextReactionCounts[postId] = (nextReactionCounts[postId] ?? 0) + 1;
+        if (userId && row.user_id === userId && row.reaction === 'like') {
+          nextLiked[postId] = true;
+        }
+      });
+      const nextCommentCounts: Record<string, number> = {};
+      (commentsRes.data ?? []).forEach((row) => {
+        const postId = row.post_id ? String(row.post_id) : '';
+        if (!postId) {
+          return;
+        }
+        nextCommentCounts[postId] = (nextCommentCounts[postId] ?? 0) + 1;
+      });
+      setReactionCounts(nextReactionCounts);
+      setLikedPosts(nextLiked);
+      setCommentCounts(nextCommentCounts);
+    } else {
+      setReactionCounts({});
+      setLikedPosts({});
+      setCommentCounts({});
+    }
     setLoading(false);
   };
 
@@ -2297,6 +2445,35 @@ const FeedScreen = ({ route }: FeedProps) => {
   }, [userId]);
 
   useEffect(() => {
+    let isMounted = true;
+    const loadLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          return;
+        }
+        const result = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Low,
+        });
+        if (isMounted) {
+          setCurrentLocation({
+            latitude: result.coords.latitude,
+            longitude: result.coords.longitude,
+          });
+        }
+      } catch {
+        if (isMounted) {
+          setCurrentLocation(null);
+        }
+      }
+    };
+    void loadLocation();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (route.params?.search !== undefined) {
       setSearchValue(route.params.search ?? '');
     }
@@ -2315,9 +2492,21 @@ const FeedScreen = ({ route }: FeedProps) => {
     });
   }, [activeTag, posts, searchValue]);
 
-  const handlePostAction = (label: string) => {
-    setNotice(`${label} is coming soon.`);
-  };
+  if (isBusinessAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppHeader />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <BusinessAccountLockout
+            message="Business accounts cannot access the public feed. Use Business Admin to manage your listings and chats."
+            onPress={() => navigation.navigate('BusinessAdmin')}
+          />
+        </ScrollView>
+        <BottomNav />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
 
   const handleShare = async (post: PostEntry) => {
     try {
@@ -2328,6 +2517,36 @@ const FeedScreen = ({ route }: FeedProps) => {
     }
   };
 
+  const handleLike = async (postId: string) => {
+    if (!supabase || !userId) {
+      setNotice('Sign in to like posts.');
+      return;
+    }
+    if (profile?.accountType === 'business') {
+      setNotice('Business accounts cannot like posts.');
+      return;
+    }
+    const alreadyLiked = Boolean(likedPosts[postId]);
+    if (alreadyLiked) {
+      await supabase.from('post_reactions').delete().eq('post_id', postId).eq('user_id', userId);
+    } else {
+      await supabase.from('post_reactions').insert({
+        post_id: postId,
+        user_id: userId,
+        reaction: 'like',
+      });
+    }
+    setLikedPosts((prev) => ({ ...prev, [postId]: !alreadyLiked }));
+    setReactionCounts((prev) => ({
+      ...prev,
+      [postId]: Math.max(0, (prev[postId] ?? 0) + (alreadyLiked ? -1 : 1)),
+    }));
+  };
+
+  const handleReply = (post: PostEntry) => {
+    navigation.navigate('PostReplies', { postId: post.id, authorHandle: post.authorHandle });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -2335,89 +2554,7 @@ const FeedScreen = ({ route }: FeedProps) => {
         contentContainerStyle={styles.listContent}
         data={filteredPosts}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          <View style={styles.feedHeader}>
-            <View style={styles.feedTabs}>
-              {[
-                { key: 'trending', label: 'Trending' },
-                { key: 'forYou', label: 'For You' },
-                { key: 'newest', label: 'Newest' },
-              ].map((tab) => (
-                <Pressable
-                  key={tab.key}
-                  style={[styles.tabPill, activeTab === tab.key && styles.tabPillActive]}
-                  onPress={() => setActiveTab(tab.key as 'trending' | 'forYou' | 'newest')}
-                >
-                  <Text
-                    style={[
-                      styles.tabPillText,
-                      activeTab === tab.key && styles.tabPillTextActive,
-                    ]}
-                  >
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={styles.card}>
-              <SectionTitle icon="sparkles-outline" label="Stories (coming soon)" />
-              <Text style={styles.cardBody}>
-                Quick local highlights from rooms and businesses.
-              </Text>
-              <View style={styles.storyRow}>
-                {storyLabels.map((label) => (
-                  <View key={label} style={styles.storyPill}>
-                    <Text style={styles.storyPillText}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-              {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null}
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => setStoriesNotice('Stories are coming soon.')}
-              >
-                <Text style={styles.secondaryButtonText}>Get notified</Text>
-              </Pressable>
-            </View>
-            <View style={styles.searchInputWrap}>
-              <Ionicons name="search" size={18} color={colors.textMuted} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search local posts"
-                placeholderTextColor={colors.placeholder}
-                value={searchValue}
-                onChangeText={setSearchValue}
-              />
-            </View>
-            <View style={styles.filterRow}>
-              {tags.map((tag) => (
-                <Pressable
-                  key={tag}
-                  style={[
-                    styles.filterChip,
-                    activeTag === tag && styles.filterChipActive,
-                  ]}
-                  onPress={() => setActiveTag((prev) => (prev === tag ? null : tag))}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      activeTag === tag && styles.filterChipTextActive,
-                    ]}
-                  >
-                    #{tag}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={styles.card}>
-              <SectionTitle icon="newspaper-outline" label="Local feed" />
-              <Text style={styles.cardBody}>Posts from nearby users and businesses.</Text>
-              {loading ? <Text style={styles.metaText}>Loading posts...</Text> : null}
-              {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-            </View>
-          </View>
-        }
+        ListHeaderComponent={orderHeader}
         renderItem={({ item }) => (
           <View style={styles.postCard}>
             <Pressable
@@ -2432,7 +2569,7 @@ const FeedScreen = ({ route }: FeedProps) => {
                 <Text style={styles.metaText}>Level 3 | XP 120</Text>
               </View>
               <View style={styles.postBadge}>
-                <Text style={styles.postBadgeText}>{estimateDistanceLabel(item.id)}</Text>
+                <Text style={styles.postBadgeText}>{getPostDistanceLabel(item, currentLocation)}</Text>
               </View>
             </Pressable>
             <Text style={styles.cardBody}>{item.body}</Text>
@@ -2444,17 +2581,25 @@ const FeedScreen = ({ route }: FeedProps) => {
               <Text style={styles.metaText}>Room / Business context</Text>
             </View>
             <View style={styles.postActions}>
-              <Pressable style={styles.postActionButton} onPress={() => handlePostAction('Likes')}>
-                <Ionicons name="heart-outline" size={16} color={colors.text} />
-                <Text style={styles.postActionText}>Like</Text>
+              <Pressable style={styles.postActionButton} onPress={() => void handleLike(item.id)}>
+                <Ionicons
+                  name={likedPosts[item.id] ? 'heart' : 'heart-outline'}
+                  size={16}
+                  color={likedPosts[item.id] ? colors.primary : colors.text}
+                />
+                <Text style={styles.postActionText}>
+                  Like{reactionCounts[item.id] ? ` ${reactionCounts[item.id]}` : ''}
+                </Text>
               </Pressable>
               <Pressable style={styles.postActionButton} onPress={() => handleShare(item)}>
                 <Ionicons name="share-social-outline" size={16} color={colors.text} />
                 <Text style={styles.postActionText}>Share</Text>
               </Pressable>
-              <Pressable style={styles.postActionButton} onPress={() => handlePostAction('Replies')}>
+              <Pressable style={styles.postActionButton} onPress={() => handleReply(item)}>
                 <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.text} />
-                <Text style={styles.postActionText}>Reply</Text>
+                <Text style={styles.postActionText}>
+                  Reply{commentCounts[item.id] ? ` ${commentCounts[item.id]}` : ''}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -2477,10 +2622,191 @@ const FeedScreen = ({ route }: FeedProps) => {
   );
 };
 
+type PostRepliesProps = NativeStackScreenProps<RootStackParamList, 'PostReplies'>;
+
+const PostRepliesScreen = ({ route }: PostRepliesProps) => {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const { userId, profile, loading: authLoading } = useAuth();
+  const postId = route.params?.postId ?? '';
+  const authorHandle = route.params?.authorHandle ?? 'post';
+  const [comments, setComments] = useState<
+    { id: string; body: string; author: string; createdAt: string }[]
+  >([]);
+  const [draft, setDraft] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
+  const [replyAs, setReplyAs] = useState<string | null>(null);
+  const isBusinessAccount = profile?.accountType === 'business';
+
+  useEffect(() => {
+    void trackAnalyticsEvent('screen_view', { screen: 'post_replies', post_id: postId }, userId);
+  }, [postId, userId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadComments = async () => {
+      if (!supabase || !postId) {
+        setComments([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('post_comments')
+        .select('id, body, author_handle, created_at')
+        .eq('post_id', postId)
+        .order('created_at', { ascending: true })
+        .limit(50);
+      if (!isMounted) {
+        return;
+      }
+      setComments(
+        (data ?? []).map((row) => ({
+          id: String(row.id ?? ''),
+          body: row.body ?? '',
+          author: row.author_handle ?? 'Business',
+          createdAt: row.created_at ?? '',
+        }))
+      );
+    };
+    void loadComments();
+    return () => {
+      isMounted = false;
+    };
+  }, [postId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadReplyAs = async () => {
+      if (!supabase || !userId || !isBusinessAccount) {
+        return;
+      }
+      const { data: ownedRows } = await supabase
+        .from('businesses')
+        .select('id, name')
+        .eq('owner_id', userId)
+        .limit(1);
+      let name = ownedRows?.[0]?.name ?? null;
+      if (!name) {
+        const { data: staffRows } = await supabase
+          .from('business_staff')
+          .select('business_id')
+          .eq('user_id', userId)
+          .limit(1);
+        const staffId = staffRows?.[0]?.business_id ?? null;
+        if (staffId) {
+          const { data: staffBiz } = await supabase
+            .from('businesses')
+            .select('name')
+            .eq('id', staffId)
+            .maybeSingle();
+          name = staffBiz?.name ?? null;
+        }
+      }
+      if (!isMounted) {
+        return;
+      }
+      setReplyAs(name);
+    };
+    void loadReplyAs();
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, isBusinessAccount]);
+
+  const handleSubmitReply = async () => {
+    if (!supabase || !userId || !isBusinessAccount) {
+      setNotice('Replies are available for business accounts only.');
+      return;
+    }
+    if (!draft.trim()) {
+      setNotice('Write a reply first.');
+      return;
+    }
+    const author = replyAs ?? profile?.handle ?? 'Business';
+    const { error } = await supabase.from('post_comments').insert({
+      post_id: postId,
+      user_id: userId,
+      author_handle: author,
+      body: draft.trim(),
+    });
+    if (error) {
+      setNotice('Unable to post reply.');
+      return;
+    }
+    setDraft('');
+    setNotice('Reply posted.');
+    const { data } = await supabase
+      .from('post_comments')
+      .select('id, body, author_handle, created_at')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    setComments(
+      (data ?? []).map((row) => ({
+        id: String(row.id ?? ''),
+        body: row.body ?? '',
+        author: row.author_handle ?? 'Business',
+        createdAt: row.created_at ?? '',
+      }))
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <AppHeader />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.card}>
+          <SectionTitle icon="chatbubble-ellipses-outline" label={`Replies to @${authorHandle}`} />
+          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+          {comments.length === 0 ? (
+            <Text style={styles.metaText}>No replies yet.</Text>
+          ) : (
+            comments.map((comment) => (
+              <View key={comment.id} style={styles.reviewRow}>
+                <View style={styles.reviewHeader}>
+                  <Text style={styles.cardTitle}>{comment.author}</Text>
+                  <Text style={styles.metaText}>{comment.createdAt}</Text>
+                </View>
+                <Text style={styles.cardBody}>{comment.body}</Text>
+              </View>
+            ))
+          )}
+        </View>
+        <View style={styles.card}>
+          <SectionTitle icon="create-outline" label="Reply" />
+          {isBusinessAccount ? (
+            <>
+              <Text style={styles.metaText}>
+                Posting as {replyAs ?? 'Business'}.
+              </Text>
+              <TextInput
+                style={[styles.input, styles.multilineInput]}
+                value={draft}
+                onChangeText={setDraft}
+                placeholder="Write a business reply..."
+                placeholderTextColor={colors.placeholder}
+                multiline
+              />
+              <Pressable style={styles.primaryButton} onPress={() => void handleSubmitReply()}>
+                <Text style={styles.primaryButtonText}>Post reply</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.metaText}>Replies are available for businesses only.</Text>
+          )}
+        </View>
+      </ScrollView>
+      <BottomNav />
+      <StatusBar style="auto" />
+    </SafeAreaView>
+  );
+};
+
 const CreateScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { userId, profile } = useAuth();
+  const isBusinessAccount = profile?.accountType === 'business';
   const [body, setBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -2491,6 +2817,23 @@ const CreateScreen = () => {
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'create' }, userId);
   }, [userId]);
+
+  if (isBusinessAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppHeader />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <BusinessAccountLockout
+            message="Business accounts cannot create personal posts. Use your business profile to share updates."
+            onPress={() => navigation.navigate('BusinessAdmin')}
+            actionLabel="Open Business Admin"
+          />
+        </ScrollView>
+        <BottomNav />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
 
   const handleAttachPostMedia = async () => {
     if (!userId) {
@@ -2532,6 +2875,7 @@ const CreateScreen = () => {
       return;
     }
     const safetyWarning = moderation.status !== 'ok';
+    const location = await getFuzzedLocation();
     setSubmitting(true);
     setNotice(null);
     const { error } = await supabase.from('posts').insert({
@@ -2540,6 +2884,8 @@ const CreateScreen = () => {
       body: body.trim(),
       media_type: mediaUrl ? 'image' : null,
       media_url: mediaUrl,
+      latitude: location?.latitude ?? null,
+      longitude: location?.longitude ?? null,
     });
     if (error) {
       setNotice('Unable to create post.');
@@ -2598,7 +2944,7 @@ const MessagesScreen = () => {
   const styles = useStyles();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { businesses: businessList } = useBusinesses();
-  const { userId, loading } = useAuth();
+  const { userId, loading, profile } = useAuth();
   const { colors } = useTheme();
   const [messagesTab, setMessagesTab] = useState<'business' | 'direct'>('business');
   const [searchValue, setSearchValue] = useState('');
@@ -2715,6 +3061,22 @@ const MessagesScreen = () => {
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'messages' }, userId);
   }, [userId]);
+  const isBusinessAccount = profile?.accountType === 'business';
+  if (isBusinessAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppHeader />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <BusinessAccountLockout
+            message="Business accounts cannot access personal messaging. Manage customer chats in your business profile."
+            onPress={() => navigation.navigate('BusinessAdmin')}
+          />
+        </ScrollView>
+        <BottomNav />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -2853,7 +3215,8 @@ type DirectChatProps = NativeStackScreenProps<RootStackParamList, 'DirectChat'>;
 const DirectChatScreen = ({ route }: DirectChatProps) => {
   const styles = useStyles();
   const { colors } = useTheme();
-  const { userId } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { userId, profile } = useAuth();
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
@@ -2864,6 +3227,22 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'direct_chat' }, userId);
   }, [userId]);
+  const isBusinessAccount = profile?.accountType === 'business';
+  if (isBusinessAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppHeader />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <BusinessAccountLockout
+            message="Business accounts cannot access direct user chats. Use business chats instead."
+            onPress={() => navigation.navigate('BusinessAdmin')}
+          />
+        </ScrollView>
+        <BottomNav />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
   const formatTime = (value?: string | null) => {
     if (!value) {
       return '';
@@ -3048,7 +3427,7 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
 const OrdersScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
-  const { userId } = useAuth();
+  const { userId, profile } = useAuth();
   const { businesses: businessList } = useBusinesses();
   const [orders, setOrders] = useState<OrderEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -3057,6 +3436,16 @@ const OrdersScreen = () => {
   const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
   const [cartItems, setCartItems] = useState<CartItemEntry[]>([]);
+  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [userPrivate, setUserPrivate] = useState<{
+    fullName: string;
+    phone: string;
+    address: string;
+    cnic: string;
+    status: string;
+  } | null>(null);
+  const [userPrivateById, setUserPrivateById] = useState<Record<string, { name: string; phone: string; address: string }>>({});
   const [lastReceipt, setLastReceipt] = useState<{
     orderId: string;
     businessName: string;
@@ -3066,10 +3455,45 @@ const OrdersScreen = () => {
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
     businessList[0]?.id ?? null
   );
+  const isBusinessAccount = profile?.accountType === 'business';
 
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'orders' }, userId);
   }, [userId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadPrivate = async () => {
+      if (!supabase || !userId || isBusinessAccount) {
+        return;
+      }
+      const { data } = await supabase
+        .from('user_private')
+        .select('full_name, phone, address, cnic, kyc_status')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!isMounted) {
+        return;
+      }
+      if (data) {
+        const nextPrivate = {
+          fullName: data.full_name ?? '',
+          phone: data.phone ?? '',
+          address: data.address ?? '',
+          cnic: data.cnic ?? '',
+          status: data.kyc_status ?? 'pending',
+        };
+        setUserPrivate(nextPrivate);
+        if (nextPrivate.address && !deliveryAddress) {
+          setDeliveryAddress(nextPrivate.address);
+        }
+      }
+    };
+    void loadPrivate();
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, isBusinessAccount, deliveryAddress]);
 
   const businessIndex = useMemo(() => {
     const map = new Map<string, string>();
@@ -3088,7 +3512,7 @@ const OrdersScreen = () => {
   useEffect(() => {
     let isMounted = true;
     const loadMenu = async () => {
-      if (!supabase || !selectedBusinessId) {
+      if (!supabase || !selectedBusinessId || isBusinessAccount) {
         setMenuItems([]);
         return;
       }
@@ -3164,67 +3588,142 @@ const OrdersScreen = () => {
     }
     setLoading(true);
     setNotice(null);
-    const nameLookup = new Map(businessIndex);
-    const { data: ownedBusinesses, error: ownedError } = await supabase
-      .from('businesses')
-      .select('id, name')
-      .eq('owner_id', userId);
-    if (ownedError) {
-      setNotice('Unable to load businesses.');
-    }
-    ownedBusinesses?.forEach((row) => {
-      if (row.id && row.name) {
-        nameLookup.set(String(row.id), row.name);
+    if (isBusinessAccount) {
+      const nameLookup = new Map<string, string>();
+      const { data: ownedBusinesses, error: ownedError } = await supabase
+        .from('businesses')
+        .select('id, name')
+        .eq('owner_id', userId);
+      if (ownedError) {
+        setNotice('Unable to load businesses.');
       }
-    });
+      const { data: staffRows } = await supabase
+        .from('business_staff')
+        .select('business_id')
+        .eq('user_id', userId);
+      const staffIds = (staffRows ?? [])
+        .map((row) => String(row.business_id ?? ''))
+        .filter((id) => id.length > 0);
+      const staffBusinessesRes = staffIds.length
+        ? await supabase.from('businesses').select('id, name').in('id', staffIds)
+        : { data: [] as any[] };
+
+      const combinedBusinesses = [...(ownedBusinesses ?? []), ...(staffBusinessesRes.data ?? [])];
+      const businessIds = Array.from(
+        new Set(
+          combinedBusinesses
+            .map((row) => {
+              if (row.id && row.name) {
+                nameLookup.set(String(row.id), row.name);
+              }
+              return row.id ? String(row.id) : '';
+            })
+            .filter((id) => id.length > 0)
+        )
+      );
+
+      if (businessIds.length === 0) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      const businessOrdersRes = await supabase
+        .from('orders')
+        .select('id, business_id, user_id, status, notes, created_at, delivery_method, delivery_address')
+        .in('business_id', businessIds)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (businessOrdersRes.error) {
+        setNotice('Unable to load orders.');
+        setLoading(false);
+        return;
+      }
+
+      const orderRows = businessOrdersRes.data ?? [];
+      const userIds = Array.from(
+        new Set(
+          orderRows
+            .map((row) => (row.user_id ? String(row.user_id) : ''))
+            .filter((id) => id.length > 0)
+        )
+      );
+      if (userIds.length > 0) {
+        const { data: privateRows } = await supabase
+          .from('user_private')
+          .select('user_id, full_name, phone, address')
+          .in('user_id', userIds);
+        const nextMap: Record<string, { name: string; phone: string; address: string }> = {};
+        (privateRows ?? []).forEach((row) => {
+          const id = row.user_id ? String(row.user_id) : '';
+          if (id) {
+            nextMap[id] = {
+              name: row.full_name ?? 'Customer',
+              phone: row.phone ?? 'N/A',
+              address: row.address ?? 'Address missing',
+            };
+          }
+        });
+        setUserPrivateById(nextMap);
+      } else {
+        setUserPrivateById({});
+      }
+
+      setOrders(
+        orderRows.map((row) => {
+          const businessId = row.business_id ? String(row.business_id) : null;
+          return {
+            id: String(row.id ?? ''),
+            businessId,
+            userId: row.user_id ? String(row.user_id) : null,
+            businessName: businessId ? nameLookup.get(businessId) ?? 'Business' : 'Business',
+            status: row.status ?? 'requested',
+            notes: row.notes ?? null,
+            createdAt: row.created_at ?? '',
+            deliveryMethod:
+              row.delivery_method === 'delivery' || row.delivery_method === 'pickup'
+                ? row.delivery_method
+                : 'pickup',
+            deliveryAddress: row.delivery_address ?? null,
+          };
+        })
+      );
+      setLoading(false);
+      return;
+    }
 
     const userOrdersRes = await supabase
       .from('orders')
-      .select('id, business_id, status, notes, created_at')
+      .select('id, business_id, status, notes, created_at, delivery_method, delivery_address')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50);
 
-    const ownedIds = (ownedBusinesses ?? [])
-      .map((row) => String(row.id ?? ''))
-      .filter((id) => id.length > 0);
-
-    const businessOrdersRes = ownedIds.length
-      ? await supabase
-          .from('orders')
-          .select('id, business_id, status, notes, created_at')
-          .in('business_id', ownedIds)
-          .order('created_at', { ascending: false })
-          .limit(50)
-      : { data: [], error: null };
-
-    if (userOrdersRes.error || businessOrdersRes.error) {
+    if (userOrdersRes.error) {
       setNotice('Unable to load orders.');
       setLoading(false);
       return;
     }
 
-    const combined = new Map<string, OrderEntry>();
-    const ingest = (rows: any[]) => {
-      rows.forEach((row) => {
-        const id = String(row.id ?? '');
-        if (!id || combined.has(id)) {
-          return;
-        }
+    setOrders(
+      (userOrdersRes.data ?? []).map((row) => {
         const businessId = row.business_id ? String(row.business_id) : null;
-        combined.set(id, {
-          id,
+        return {
+          id: String(row.id ?? ''),
           businessId,
-          businessName: businessId ? nameLookup.get(businessId) ?? 'Business' : 'Business',
+          businessName: businessId ? businessIndex.get(businessId) ?? 'Business' : 'Business',
           status: row.status ?? 'requested',
           notes: row.notes ?? null,
           createdAt: row.created_at ?? '',
-        });
-      });
-    };
-    ingest(userOrdersRes.data ?? []);
-    ingest(businessOrdersRes.data ?? []);
-    setOrders(Array.from(combined.values()));
+          deliveryMethod:
+            row.delivery_method === 'delivery' || row.delivery_method === 'pickup'
+              ? row.delivery_method
+              : 'pickup',
+          deliveryAddress: row.delivery_address ?? null,
+        };
+      })
+    );
     setLoading(false);
   };
 
@@ -3255,8 +3754,16 @@ const OrdersScreen = () => {
       setNotice('Supabase not configured.');
       return;
     }
+    if (isBusinessAccount) {
+      setNotice('Business accounts cannot place orders.');
+      return;
+    }
     if (!userId) {
       setNotice('Sign in to place orders.');
+      return;
+    }
+    if (!userPrivate || !userPrivate.fullName || !userPrivate.phone || !userPrivate.address) {
+      setNotice('Complete your KYC details (name, phone, address) to place orders.');
       return;
     }
     if (!selectedBusinessId) {
@@ -3267,6 +3774,10 @@ const OrdersScreen = () => {
       setNotice('Add at least one item.');
       return;
     }
+    if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
+      setNotice('Add a delivery address.');
+      return;
+    }
     setNotice(null);
     const { data, error } = await supabase
       .from('orders')
@@ -3275,6 +3786,8 @@ const OrdersScreen = () => {
         user_id: userId,
         status: 'requested',
         notes: orderNotes.trim() ? orderNotes.trim() : null,
+        delivery_method: deliveryMethod,
+        delivery_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
       })
       .select('id')
       .maybeSingle();
@@ -3327,6 +3840,172 @@ const OrdersScreen = () => {
     }
   };
 
+  const orderHeader = isBusinessAccount ? (
+    <View style={styles.card}>
+      <SectionTitle icon="briefcase-outline" label="Business orders" />
+      <Text style={styles.cardBody}>Manage pickup and delivery requests from customers.</Text>
+      {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+      {!userId ? <Text style={styles.metaText}>Sign in with a business account.</Text> : null}
+    </View>
+  ) : (
+    <View style={styles.card}>
+      <SectionTitle icon="receipt-outline" label="Order flow" />
+      <Text style={styles.cardBody}>Pickup or delivery handled by the business.</Text>
+      {!userId ? <Text style={styles.metaText}>Sign in to place an order.</Text> : null}
+      {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+      {!userPrivate || !userPrivate.fullName || !userPrivate.phone || !userPrivate.address ? (
+        <Text style={styles.metaText}>Complete your KYC details (name, phone, address).</Text>
+      ) : (
+        <Text style={styles.metaText}>KYC status: {userPrivate.status}</Text>
+      )}
+      <View style={styles.stepRow}>
+        <View style={styles.stepBadge}>
+          <Text style={styles.stepBadgeText}>1</Text>
+        </View>
+        <Text style={styles.metaText}>Select business</Text>
+      </View>
+      <View style={styles.filterRow}>
+        {businessList.map((business) => (
+          <Pressable
+            key={business.id}
+            style={[
+              styles.filterChip,
+              selectedBusinessId === business.id && styles.filterChipActive,
+            ]}
+            onPress={() => setSelectedBusinessId(business.id)}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                selectedBusinessId === business.id && styles.filterChipTextActive,
+              ]}
+            >
+              {business.name}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <View style={styles.stepRow}>
+        <View style={styles.stepBadge}>
+          <Text style={styles.stepBadgeText}>2</Text>
+        </View>
+        <Text style={styles.metaText}>Choose pickup or delivery</Text>
+      </View>
+      <View style={styles.filterRow}>
+        {(['pickup', 'delivery'] as const).map((method) => (
+          <Pressable
+            key={method}
+            style={[
+              styles.filterChip,
+              deliveryMethod === method && styles.filterChipActive,
+            ]}
+            onPress={() => setDeliveryMethod(method)}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                deliveryMethod === method && styles.filterChipTextActive,
+              ]}
+            >
+              {method === 'pickup' ? 'Pickup' : 'Delivery'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {deliveryMethod === 'delivery' ? (
+        <TextInput
+          style={styles.input}
+          value={deliveryAddress}
+          onChangeText={setDeliveryAddress}
+          placeholder="Delivery address"
+          placeholderTextColor={colors.placeholder}
+        />
+      ) : null}
+      <View style={styles.stepRow}>
+        <View style={styles.stepBadge}>
+          <Text style={styles.stepBadgeText}>3</Text>
+        </View>
+        <Text style={styles.metaText}>Add items (menu tab)</Text>
+      </View>
+      {menuLoading ? <Text style={styles.metaText}>Loading menu...</Text> : null}
+      {menuItems.length === 0 ? (
+        <Text style={styles.metaText}>No menu items yet.</Text>
+      ) : (
+        menuItems.map((item) => {
+          const inCart = cartItems.find((entry) => entry.id === item.id);
+          return (
+            <View key={item.id} style={styles.cartRow}>
+              <View style={styles.listRowInfo}>
+                <Text style={styles.cardTitle}>{item.name}</Text>
+                <Text style={styles.metaText}>
+                  {item.priceCents ? `Rs ${(item.priceCents / 100).toFixed(0)}` : 'Price TBD'}
+                </Text>
+              </View>
+              <View style={styles.cartControls}>
+                <Pressable style={styles.cartButton} onPress={() => updateCart(item, -1)}>
+                  <Ionicons name="remove" size={16} color={colors.text} />
+                </Pressable>
+                <Text style={styles.cardTitle}>{inCart?.quantity ?? 0}</Text>
+                <Pressable style={styles.cartButton} onPress={() => updateCart(item, 1)}>
+                  <Ionicons name="add" size={16} color={colors.text} />
+                </Pressable>
+              </View>
+            </View>
+          );
+        })
+      )}
+      <View style={styles.stepRow}>
+        <View style={styles.stepBadge}>
+          <Text style={styles.stepBadgeText}>4</Text>
+        </View>
+        <Text style={styles.metaText}>Add order notes</Text>
+      </View>
+      <View style={styles.cartSummary}>
+        <Text style={styles.cardTitle}>Cart total</Text>
+        <Text style={styles.cardTitle}>Rs {(cartTotalCents / 100).toFixed(0)}</Text>
+      </View>
+      <TextInput
+        style={styles.input}
+        value={orderNotes}
+        onChangeText={setOrderNotes}
+        placeholder="Order notes (optional)"
+        placeholderTextColor={colors.placeholder}
+      />
+      <Pressable style={styles.primaryButton} onPress={() => void handleCreateOrder()}>
+        <Text style={styles.primaryButtonText}>Submit order</Text>
+      </Pressable>
+      {lastReceipt ? (
+        <View style={styles.receiptCard}>
+          <Text style={styles.cardTitle}>Receipt</Text>
+          <Text style={styles.metaText}>Order #{lastReceipt.orderId.slice(0, 6)}</Text>
+          <Text style={styles.metaText}>{lastReceipt.businessName}</Text>
+          <Text style={styles.metaText}>
+            Method: {deliveryMethod === 'delivery' ? 'Delivery' : 'Pickup'}
+          </Text>
+          {lastReceipt.items.map((item) => (
+            <View key={item.id} style={styles.rowBetween}>
+              <Text style={styles.metaText}>{item.name}</Text>
+              <Text style={styles.metaText}>
+                x{item.quantity} • Rs{' '}
+                {item.priceCents ? ((item.priceCents * item.quantity) / 100).toFixed(0) : '0'}
+              </Text>
+            </View>
+          ))}
+          <View style={styles.rowBetween}>
+            <Text style={styles.cardTitle}>Total</Text>
+            <Text style={styles.cardTitle}>Rs {(lastReceipt.totalCents / 100).toFixed(0)}</Text>
+          </View>
+        </View>
+      ) : null}
+      <Pressable
+        style={styles.secondaryButton}
+        onPress={() => setNotice('Email/SMS receipt setup pending. Coming soon.')}
+      >
+        <Text style={styles.secondaryButtonText}>Email/SMS receipt</Text>
+      </Pressable>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -3334,127 +4013,38 @@ const OrdersScreen = () => {
         contentContainerStyle={styles.listContent}
         data={orders}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          <View style={styles.card}>
-            <SectionTitle icon="receipt-outline" label="Order flow" />
-            <Text style={styles.cardBody}>Pickup-only. Delivery handled outside BLIP.</Text>
-            {!userId ? <Text style={styles.metaText}>Sign in to place an order.</Text> : null}
-            {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-            <View style={styles.stepRow}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>1</Text>
-              </View>
-              <Text style={styles.metaText}>Select business</Text>
-            </View>
-            <View style={styles.filterRow}>
-              {businessList.map((business) => (
-                <Pressable
-                  key={business.id}
-                  style={[
-                    styles.filterChip,
-                    selectedBusinessId === business.id && styles.filterChipActive,
-                  ]}
-                  onPress={() => setSelectedBusinessId(business.id)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      selectedBusinessId === business.id && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {business.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={styles.stepRow}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>2</Text>
-              </View>
-              <Text style={styles.metaText}>Add items (menu tab)</Text>
-            </View>
-            {menuLoading ? <Text style={styles.metaText}>Loading menu...</Text> : null}
-            {menuItems.length === 0 ? (
-              <Text style={styles.metaText}>No menu items yet.</Text>
-            ) : (
-              menuItems.map((item) => {
-                const inCart = cartItems.find((entry) => entry.id === item.id);
-                return (
-                  <View key={item.id} style={styles.cartRow}>
-                    <View style={styles.listRowInfo}>
-                      <Text style={styles.cardTitle}>{item.name}</Text>
-                      <Text style={styles.metaText}>
-                        {item.priceCents ? `Rs ${(item.priceCents / 100).toFixed(0)}` : 'Price TBD'}
-                      </Text>
-                    </View>
-                    <View style={styles.cartControls}>
-                      <Pressable style={styles.cartButton} onPress={() => updateCart(item, -1)}>
-                        <Ionicons name="remove" size={16} color={colors.text} />
-                      </Pressable>
-                      <Text style={styles.cardTitle}>{inCart?.quantity ?? 0}</Text>
-                      <Pressable style={styles.cartButton} onPress={() => updateCart(item, 1)}>
-                        <Ionicons name="add" size={16} color={colors.text} />
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-            <View style={styles.stepRow}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>3</Text>
-              </View>
-              <Text style={styles.metaText}>Add pickup notes</Text>
-            </View>
-            <View style={styles.cartSummary}>
-              <Text style={styles.cardTitle}>Cart total</Text>
-              <Text style={styles.cardTitle}>Rs {(cartTotalCents / 100).toFixed(0)}</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={orderNotes}
-              onChangeText={setOrderNotes}
-              placeholder="Order notes (optional)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <Pressable style={styles.primaryButton} onPress={() => void handleCreateOrder()}>
-              <Text style={styles.primaryButtonText}>Submit pickup order</Text>
-            </Pressable>
-            {lastReceipt ? (
-              <View style={styles.receiptCard}>
-                <Text style={styles.cardTitle}>Receipt</Text>
-                <Text style={styles.metaText}>Order #{lastReceipt.orderId.slice(0, 6)}</Text>
-                <Text style={styles.metaText}>{lastReceipt.businessName}</Text>
-                {lastReceipt.items.map((item) => (
-                  <View key={item.id} style={styles.rowBetween}>
-                    <Text style={styles.metaText}>{item.name}</Text>
-                    <Text style={styles.metaText}>
-                      x{item.quantity} • Rs{' '}
-                      {item.priceCents ? ((item.priceCents * item.quantity) / 100).toFixed(0) : '0'}
-                    </Text>
-                  </View>
-                ))}
-                <View style={styles.rowBetween}>
-                  <Text style={styles.cardTitle}>Total</Text>
-                  <Text style={styles.cardTitle}>Rs {(lastReceipt.totalCents / 100).toFixed(0)}</Text>
-                </View>
-              </View>
-            ) : null}
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => setNotice('Email/SMS receipt setup pending. Coming soon.')}
-            >
-              <Text style={styles.secondaryButtonText}>Email/SMS receipt</Text>
-            </Pressable>
-          </View>
-        }
+        ListHeaderComponent={orderHeader}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.rowBetween}>
               <Text style={styles.cardTitle}>{item.businessName}</Text>
               <Text style={styles.badge}>{item.status}</Text>
             </View>
+            {item.deliveryMethod ? (
+              <View style={styles.metaRow}>
+                <Ionicons name="bicycle-outline" size={14} color={colors.textMuted} />
+                <Text style={styles.metaText}>
+                  {item.deliveryMethod === 'delivery' ? 'Delivery' : 'Pickup'}
+                </Text>
+              </View>
+            ) : null}
             {item.notes ? <Text style={styles.metaText}>{item.notes}</Text> : null}
+            {isBusinessAccount && item.userId ? (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Customer</Text>
+                <Text style={styles.metaText}>
+                  {userPrivateById[item.userId]?.name ?? 'Customer'}
+                </Text>
+                <Text style={styles.metaText}>
+                  {userPrivateById[item.userId]?.phone ?? 'Phone pending'}
+                </Text>
+                <Text style={styles.metaText}>
+                  {item.deliveryAddress ??
+                    userPrivateById[item.userId]?.address ??
+                    'Address pending'}
+                </Text>
+              </View>
+            ) : null}
             <View style={styles.metaRow}>
               <Ionicons name="time-outline" size={14} color={colors.textMuted} />
               <Text style={styles.metaText}>{item.createdAt || 'Recently'}</Text>
@@ -3520,7 +4110,15 @@ const ProfileScreen = () => {
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [pushStatus, setPushStatus] = useState<string | null>(null);
   const [pushNotice, setPushNotice] = useState<string | null>(null);
+  const [kycName, setKycName] = useState('');
+  const [kycPhone, setKycPhone] = useState('');
+  const [kycAddress, setKycAddress] = useState('');
+  const [kycCnic, setKycCnic] = useState('');
+  const [kycStatus, setKycStatus] = useState('pending');
+  const [kycNotice, setKycNotice] = useState<string | null>(null);
+  const [kycLoading, setKycLoading] = useState(false);
   const activeBusiness = businessList[0];
+  const isBusinessAccount = profile?.accountType === 'business';
   const reputationScore = useMemo(() => {
     const xp = profile?.xp ?? 0;
     const level = profile?.level ?? 1;
@@ -3546,6 +4144,66 @@ const ProfileScreen = () => {
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'profile' }, userId);
   }, [userId]);
+
+  useEffect(() => {
+    if (profile?.accountType === 'business') {
+      setIdentity('business');
+    } else if (profile?.accountType === 'personal') {
+      setIdentity('personal');
+    }
+  }, [profile?.accountType]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadKyc = async () => {
+      if (!supabase || !userId || isBusinessAccount) {
+        return;
+      }
+      const { data } = await supabase
+        .from('user_private')
+        .select('full_name, phone, address, cnic, kyc_status')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!isMounted || !data) {
+        return;
+      }
+      setKycName(data.full_name ?? '');
+      setKycPhone(data.phone ?? '');
+      setKycAddress(data.address ?? '');
+      setKycCnic(data.cnic ?? '');
+      setKycStatus(data.kyc_status ?? 'pending');
+    };
+    void loadKyc();
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, isBusinessAccount]);
+
+  const saveKyc = async () => {
+    if (!supabase || !userId) {
+      return;
+    }
+    setKycLoading(true);
+    setKycNotice(null);
+    const { error } = await supabase.from('user_private').upsert(
+      {
+        user_id: userId,
+        full_name: kycName.trim(),
+        phone: kycPhone.trim(),
+        address: kycAddress.trim(),
+        cnic: kycCnic.trim() ? kycCnic.trim() : null,
+        kyc_status: 'pending',
+      },
+      { onConflict: 'user_id' }
+    );
+    if (error) {
+      setKycNotice('Unable to save verification details.');
+    } else {
+      setKycNotice('Verification details saved. Pending review.');
+      setKycStatus('pending');
+    }
+    setKycLoading(false);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -3610,24 +4268,15 @@ const ProfileScreen = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
           <SectionTitle icon="person-circle-outline" label="Active identity" />
-          <View style={styles.tabRow}>
-            <Pressable
-              style={[styles.tabPill, identity === 'personal' && styles.tabPillActive]}
-              onPress={() => setIdentity('personal')}
-            >
-              <Text style={[styles.tabPillText, identity === 'personal' && styles.tabPillTextActive]}>
-                Personal
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.tabPill, identity === 'business' && styles.tabPillActive]}
-              onPress={() => setIdentity('business')}
-            >
-              <Text style={[styles.tabPillText, identity === 'business' && styles.tabPillTextActive]}>
-                Business
-              </Text>
-            </Pressable>
-          </View>
+          {isBusinessAccount ? (
+            <Text style={styles.metaText}>Business account (personal features disabled).</Text>
+          ) : (
+            <View style={styles.tabRow}>
+              <Pressable style={[styles.tabPill, styles.tabPillActive]}>
+                <Text style={[styles.tabPillText, styles.tabPillTextActive]}>Personal</Text>
+              </Pressable>
+            </View>
+          )}
           {loading ? (
             <Text style={styles.metaText}>Loading...</Text>
           ) : userId ? (
@@ -3692,6 +4341,56 @@ const ProfileScreen = () => {
             <Text style={styles.metaText}>{deviceId ?? 'Pending'}</Text>
           </View>
         </View>
+        {!isBusinessAccount ? (
+          <View style={styles.card}>
+            <SectionTitle icon="id-card-outline" label="KYC verification" />
+            <Text style={styles.cardBody}>
+              Required to place orders. Businesses only see your verified details.
+            </Text>
+            <Text style={styles.metaText}>Status: {kycStatus}</Text>
+            {kycNotice ? <Text style={styles.metaText}>{kycNotice}</Text> : null}
+            <TextInput
+              style={styles.input}
+              value={kycName}
+              onChangeText={setKycName}
+              placeholder="Full name"
+              placeholderTextColor={colors.placeholder}
+            />
+            <TextInput
+              style={styles.input}
+              value={kycPhone}
+              onChangeText={setKycPhone}
+              placeholder="Phone"
+              placeholderTextColor={colors.placeholder}
+              keyboardType="phone-pad"
+            />
+            <TextInput
+              style={styles.input}
+              value={kycAddress}
+              onChangeText={setKycAddress}
+              placeholder="Address"
+              placeholderTextColor={colors.placeholder}
+            />
+            <TextInput
+              style={styles.input}
+              value={kycCnic}
+              onChangeText={setKycCnic}
+              placeholder="CNIC / ID (optional)"
+              placeholderTextColor={colors.placeholder}
+            />
+            <Pressable style={styles.primaryButton} onPress={() => void saveKyc()} disabled={kycLoading}>
+              <Text style={styles.primaryButtonText}>
+                {kycLoading ? 'Saving...' : 'Save verification'}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => setKycNotice('ID upload coming soon.')}
+            >
+              <Text style={styles.secondaryButtonText}>Upload ID (coming soon)</Text>
+            </Pressable>
+          </View>
+        ) : null}
         <View style={styles.card}>
           <SectionTitle icon="card-outline" label="Billing" />
           <Text style={styles.cardBody}>Subscriptions and payments are coming soon.</Text>
@@ -3842,7 +4541,7 @@ const AuthScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signOut } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authMode, setAuthMode] = useState<'personal' | 'business' | 'fleet'>('personal');
@@ -3866,10 +4565,23 @@ const AuthScreen = () => {
     }
     setSubmitting(true);
     setNotice(null);
-    const ok = await signIn(email.trim(), password);
-    if (!ok) {
+    const nextProfile = await signIn(email.trim(), password);
+    if (!nextProfile) {
       setNotice('Unable to authenticate. Check your credentials.');
     } else {
+      const isBusiness = nextProfile.accountType === 'business';
+      if (authMode === 'business' && !isBusiness) {
+        setNotice('Business account required. Use personal login for user accounts.');
+        await signOut();
+        setSubmitting(false);
+        return;
+      }
+      if (authMode === 'personal' && isBusiness) {
+        setNotice('Personal access blocked for business accounts. Use Business login.');
+        await signOut();
+        setSubmitting(false);
+        return;
+      }
       setNotice('Signed in.');
       if (authMode === 'business') {
         navigation.navigate('BusinessAdmin');
@@ -3891,8 +4603,8 @@ const AuthScreen = () => {
     }
     setSubmitting(true);
     setNotice(null);
-    const ok = await signUp(email.trim(), password);
-    if (!ok) {
+    const nextProfile = await signUp(email.trim(), password, authMode === 'business' ? 'business' : 'personal');
+    if (!nextProfile) {
       setNotice('Unable to create account.');
     } else {
       setNotice('Account created.');
@@ -4619,7 +5331,9 @@ type RoomProps = NativeStackScreenProps<RootStackParamList, 'Room'>;
 const RoomScreen = ({ route }: RoomProps) => {
   const styles = useStyles();
   const { colors } = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { userId, profile } = useAuth();
+  const isBusinessAccount = profile?.accountType === 'business';
   const [room, setRoom] = useState<Room | null>(null);
   const [messages, setMessages] = useState<
     { id: string; body: string; author: string; createdAt: string; mediaUrl?: string | null; mediaType?: string | null }[]
@@ -4636,6 +5350,22 @@ const RoomScreen = ({ route }: RoomProps) => {
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'room', room_id: roomId }, userId);
   }, [roomId, userId]);
+
+  if (isBusinessAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppHeader />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <BusinessAccountLockout
+            message="Business accounts cannot join public rooms. Manage business chats in your profile."
+            onPress={() => navigation.navigate('BusinessAdmin')}
+          />
+        </ScrollView>
+        <BottomNav />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -5002,7 +5732,7 @@ const BusinessAdminScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { userId } = useAuth();
+  const { userId, profile } = useAuth();
   const { businesses, setBusinesses } = useBusinesses();
   const [ownedBusinesses, setOwnedBusinesses] = useState<OwnedBusinessEntry[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
@@ -5040,6 +5770,16 @@ const BusinessAdminScreen = () => {
     let isMounted = true;
     const loadBusinessAdmin = async () => {
       if (!supabase || !userId) {
+        return;
+      }
+      if (!profile && authLoading) {
+        setLoading(true);
+        return;
+      }
+      if (profile && !profile.isAdmin && profile.accountType !== 'business') {
+        setHasBusinessAccess(false);
+        setLoading(false);
+        setNotice('Business account required.');
         return;
       }
       setLoading(true);
@@ -5459,6 +6199,18 @@ const BusinessAdminScreen = () => {
                 </Pressable>
               ))}
             </View>
+          </View>
+        ) : null}
+        {hasBusinessAccess && activeBusiness ? (
+          <View style={styles.card}>
+            <SectionTitle icon="chatbubbles-outline" label="Business chat" />
+            <Text style={styles.cardBody}>Moderate and reply to customers in your business room.</Text>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => navigation.navigate('Business', { businessId: activeBusiness.id, tab: 'qa' })}
+            >
+              <Text style={styles.secondaryButtonText}>Open chatroom</Text>
+            </Pressable>
           </View>
         ) : null}
         {hasBusinessAccess && activeBusiness ? (
@@ -6395,6 +7147,7 @@ export default function App() {
             <Stack.Navigator screenOptions={{ headerShown: false }}>
               <Stack.Screen name="Home" component={HomeScreen} />
               <Stack.Screen name="Feed" component={FeedScreen} />
+              <Stack.Screen name="PostReplies" component={PostRepliesScreen} />
               <Stack.Screen name="Create" component={CreateScreen} />
               <Stack.Screen name="Messages" component={MessagesScreen} />
               <Stack.Screen name="DirectChat" component={DirectChatScreen} />

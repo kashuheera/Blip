@@ -8,6 +8,7 @@
 - Search filters (open now, verified, tags)
 - Feed screen (tabs, search, tags) + post creation
 - Feed actions (share) + user profile drilldown + distance badge (UI)
+- Post engagement: likes (personal accounts) + replies (business accounts)
 - Room chat (realtime) + distance gating
 - Business profile (hero, menu, offers, Q&A chat)
 - Business chat join gating (blocked for shadowbanned/u2u-locked)
@@ -32,6 +33,8 @@
 - Blip Admin Portal (feature flags, verification queue, moderation ops)
 - Side panel navigation drawer
 - Business admin access gating (business accounts only)
+- Account type enforcement (personal vs business, UI + RLS)
+- KYC capture (name/phone/address) + delivery vs pickup order options
 
 ## In-Progress
 - Push notifications: set FCM/APNS keys + redeploy `push-send`
@@ -42,6 +45,7 @@
 - MUST-HAVE before rollout: payments / billing (explicitly not implemented; subscriptions are placeholders)
 - MUST-HAVE before rollout: web support parity (location disabled on web; mobile-first only)
 - Order notifications + receipts (email/SMS provider pending; push requires keys)
+- KYC verification badge + ID upload (pending)
 - A4 Invite-only tiers / access (disabled; open signup per decision)
 - F1 Paid tiers (users) (disabled; no tiers for now)
 - F3 Paid invites (disabled; no invite system)
