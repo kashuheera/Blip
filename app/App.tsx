@@ -6400,6 +6400,39 @@ const BusinessAdminScreen = () => {
         ) : null}
         {hasBusinessAccess && activeBusiness ? (
           <View style={styles.card}>
+            <SectionTitle icon="mail-open-outline" label="Replies inbox" />
+            <Text style={styles.cardBody}>Recent replies posted by your business.</Text>
+            {replyLoading ? (
+              <View style={styles.skeletonStack}>
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <SkeletonCard key={`reply-preview-${index}`} />
+                ))}
+              </View>
+            ) : replyInbox.length === 0 ? (
+              <Text style={styles.metaText}>No replies yet.</Text>
+            ) : (
+              replyInbox.map((reply) => (
+                <View key={reply.id} style={styles.reviewRow}>
+                  <View style={styles.reviewHeader}>
+                    <Text style={styles.cardTitle}>{reply.postAuthor ?? 'Post'}</Text>
+                    <Text style={styles.metaText}>{reply.createdAt}</Text>
+                  </View>
+                  <Text style={styles.cardBody} numberOfLines={2}>
+                    Reply: {reply.body}
+                  </Text>
+                </View>
+              ))
+            )}
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => navigation.navigate('BusinessReplies')}
+            >
+              <Text style={styles.secondaryButtonText}>Open inbox</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {hasBusinessAccess && activeBusiness ? (
+          <View style={styles.card}>
             <SectionTitle icon="image-outline" label="Media" />
             <Text style={styles.cardBody}>Upload a hero image and logo for your listing.</Text>
             <View style={styles.mediaRow}>
