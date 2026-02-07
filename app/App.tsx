@@ -78,11 +78,17 @@ type ThemeColors = {
   surfaceMuted: string;
   text: string;
   textMuted: string;
+  textSubtle: string;
   border: string;
   borderStrong: string;
-  primary: string;
-  primaryText: string;
+  brand: string;
+  brandText: string;
+  reward: string;
+  rewardText: string;
+  prestige: string;
   danger: string;
+  warning: string;
+  info: string;
   overlay: string;
   placeholder: string;
 };
@@ -387,44 +393,138 @@ const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
 
 const THEME_COLORS: Record<ResolvedThemeMode, ThemeColors> = {
   light: {
-    background: '#F8FAFC',
+    background: '#F7F7FB',
     surface: '#FFFFFF',
-    surfaceMuted: '#EEF2F7',
-    text: '#1F2937',
-    textMuted: '#6B7280',
-    border: '#E2E8F0',
-    borderStrong: '#CBD5E1',
-    primary: '#3B82F6',
-    primaryText: '#FFFFFF',
-    danger: '#F97316',
-    overlay: 'rgba(31, 41, 55, 0.45)',
-    placeholder: '#94A3B8',
+    surfaceMuted: '#F0F0F7',
+    text: '#0E0E14',
+    textMuted: '#4A4A5A',
+    textSubtle: '#7A7A8A',
+    border: '#E6E6EF',
+    borderStrong: '#E6E6EF',
+    brand: '#3F35E8',
+    brandText: '#F7F7FB',
+    reward: '#12C98A',
+    rewardText: '#F7F7FB',
+    prestige: '#B88A2C',
+    danger: '#D92D20',
+    warning: '#B85A1A',
+    info: '#136C86',
+    overlay: 'rgba(14, 14, 20, 0.12)',
+    placeholder: '#7A7A8A',
   },
   dark: {
-    background: '#0F172A',
-    surface: '#111827',
-    surfaceMuted: '#1E293B',
-    text: '#F8FAFC',
-    textMuted: '#94A3B8',
-    border: '#273244',
-    borderStrong: '#334155',
-    primary: '#3B82F6',
-    primaryText: '#FFFFFF',
-    danger: '#FB923C',
-    overlay: 'rgba(0, 0, 0, 0.55)',
-    placeholder: '#64748B',
+    background: '#0B0B10',
+    surface: '#15151D',
+    surfaceMuted: '#1B1B24',
+    text: '#EAEAF0',
+    textMuted: '#A1A1B3',
+    textSubtle: '#6B6B7A',
+    border: '#242430',
+    borderStrong: '#242430',
+    brand: '#4C3EFF',
+    brandText: '#EAEAF0',
+    reward: '#2DFFB3',
+    rewardText: '#0B0B10',
+    prestige: '#C9A24D',
+    danger: '#FF4D4D',
+    warning: '#FFB86B',
+    info: '#7AE2FF',
+    overlay: 'rgba(11, 11, 16, 0.6)',
+    placeholder: '#6B6B7A',
   },
 };
 
-const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#1f1c2b' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#1f1c2b' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#9fa8b8' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2a2e3a' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1b1f2a' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#8a94a6' }] },
-];
+const MAP_STYLES: Record<ResolvedThemeMode, object[]> = {
+  dark: [
+    { elementType: 'geometry', stylers: [{ color: '#0B0B10' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#0B0B10' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#6B6B7A' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1B1B24' }] },
+    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#15151D' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0B0B10' }] },
+    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#6B6B7A' }] },
+  ],
+  light: [
+    { elementType: 'geometry', stylers: [{ color: '#F7F7FB' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#F7F7FB' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#7A7A8A' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#E6E6EF' }] },
+    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#FFFFFF' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#E6F9FF' }] },
+    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#7A7A8A' }] },
+  ],
+};
+
+type CategoryColors = { fg: string; bg: string };
+
+const CATEGORY_COLORS: Record<ResolvedThemeMode, Record<string, CategoryColors>> = {
+  dark: {
+    coffee: { fg: '#BFA8FF', bg: '#221B33' },
+    restaurant: { fg: '#FFB86B', bg: '#2B1F14' },
+    streetFood: { fg: '#FF7A90', bg: '#2B151A' },
+    dessert: { fg: '#FFB3E6', bg: '#2A1624' },
+    grocery: { fg: '#8FF5C7', bg: '#13271F' },
+    beauty: { fg: '#7AE2FF', bg: '#10232B' },
+    health: { fg: '#8DA2FF', bg: '#151B2B' },
+    services: { fg: '#FFD66B', bg: '#2A2414' },
+  },
+  light: {
+    coffee: { fg: '#5A47C8', bg: '#ECE9FF' },
+    restaurant: { fg: '#B85A1A', bg: '#FFF0E3' },
+    streetFood: { fg: '#B83249', bg: '#FFE6EA' },
+    dessert: { fg: '#A8397A', bg: '#FFE8F5' },
+    grocery: { fg: '#0E8A60', bg: '#E6FFF5' },
+    beauty: { fg: '#136C86', bg: '#E6F9FF' },
+    health: { fg: '#2B43B8', bg: '#E9EEFF' },
+    services: { fg: '#8A6A0E', bg: '#FFF6D6' },
+  },
+};
+
+const normalizeCategory = (category?: string | null) => {
+  if (!category) {
+    return null;
+  }
+  const value = category.toLowerCase();
+  if (value.includes('coffee') || value.includes('cafe')) {
+    return 'coffee';
+  }
+  if (value.includes('street')) {
+    return 'streetFood';
+  }
+  if (value.includes('dessert') || value.includes('bakery')) {
+    return 'dessert';
+  }
+  if (value.includes('grocery') || value.includes('market') || value.includes('convenience')) {
+    return 'grocery';
+  }
+  if (value.includes('beauty') || value.includes('salon') || value.includes('spa')) {
+    return 'beauty';
+  }
+  if (value.includes('health') || value.includes('pharmacy')) {
+    return 'health';
+  }
+  if (value.includes('service') || value.includes('laundry') || value.includes('repair')) {
+    return 'services';
+  }
+  if (value.includes('restaurant') || value.includes('food')) {
+    return 'restaurant';
+  }
+  return null;
+};
+
+const getCategoryColors = (
+  category: string | null | undefined,
+  mode: ResolvedThemeMode
+): CategoryColors => {
+  const key = normalizeCategory(category);
+  if (key && CATEGORY_COLORS[mode][key]) {
+    return CATEGORY_COLORS[mode][key];
+  }
+  return {
+    fg: THEME_COLORS[mode].textMuted,
+    bg: THEME_COLORS[mode].surfaceMuted,
+  };
+};
 
 const ThemeContext = React.createContext<ThemeContextValue | null>(null);
 const BusinessContext = React.createContext<BusinessContextValue | null>(null);
@@ -434,9 +534,9 @@ const useTheme = () => {
   const context = React.useContext(ThemeContext);
   return (
     context ?? {
-      mode: 'light',
-      resolvedMode: 'light',
-      colors: THEME_COLORS.light,
+      mode: 'dark',
+      resolvedMode: 'dark',
+      colors: THEME_COLORS.dark,
       setMode: () => {},
       toggle: () => {},
     }
@@ -470,7 +570,7 @@ const useAuth = () => {
 };
 
 const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [mode, setMode] = useState<ThemeMode>('light');
+  const [mode, setMode] = useState<ThemeMode>('dark');
   const resolvedMode: ResolvedThemeMode = mode === 'dark' ? 'dark' : 'light';
   const colors = THEME_COLORS[resolvedMode];
 
@@ -996,6 +1096,20 @@ const BottomNav = () => {
   );
 };
 
+const withOpacity = (value: string, opacity: number) => {
+  if (!value.startsWith('#')) {
+    return value;
+  }
+  const hex = value.replace('#', '');
+  if (hex.length !== 6) {
+    return value;
+  }
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
+
 const distanceInMeters = (
   a: { latitude: number; longitude: number },
   b: { latitude: number; longitude: number }
@@ -1104,14 +1218,12 @@ const loadBusinessReplies = async (userId: string, limit = 20): Promise<Business
   });
 };
 
-const pinColor = (pin: MapPin) => {
-  if (pin.kind === 'user') {
-    return '#F97316';
+const pinColor = (pin: MapPin, mode: ResolvedThemeMode) => {
+  const theme = THEME_COLORS[mode];
+  if (pin.kind === 'user' || pin.kind === 'room') {
+    return theme.brand;
   }
-  if (pin.kind === 'room') {
-    return '#38BDF8';
-  }
-  return pin.category === 'grocery' ? '#34C759' : '#FF9500';
+  return getCategoryColors(pin.category ?? null, mode).fg;
 };
 
 const PulseRing = ({ color, size }: { color: string; size: number }) => {
@@ -2071,14 +2183,14 @@ const HomeScreen = () => {
               style={styles.map}
               region={region}
               onRegionChangeComplete={setRegion}
-              customMapStyle={resolvedMode === 'dark' ? DARK_MAP_STYLE : undefined}
+              customMapStyle={MAP_STYLES[resolvedMode]}
             >
               {currentLocation ? (
                 <Circle
                   center={currentLocation}
                   radius={500}
-                  strokeColor="rgba(132, 89, 183, 0.4)"
-                  fillColor="rgba(132, 89, 183, 0.12)"
+                  strokeColor={withOpacity(colors.brand, 0.4)}
+                  fillColor={withOpacity(colors.brand, 0.12)}
                 />
               ) : null}
               {clusters.map((item) => {
@@ -2099,6 +2211,7 @@ const HomeScreen = () => {
                 if (item.kind === 'business' && item.businessId) {
                   const business = businessById.get(item.businessId);
                   const logoUrl = business?.logoUrl ?? business?.imageUrl ?? null;
+                  const categoryColors = getCategoryColors(item.category ?? null, resolvedMode);
                   return (
                     <Marker
                       key={item.id}
@@ -2110,16 +2223,21 @@ const HomeScreen = () => {
                       }}
                     >
                       <View style={styles.pinWrap}>
-                        <PulseRing color={colors.primary} size={42} />
+                        <PulseRing color={categoryColors.fg} size={42} />
                         {item.saved ? <View style={styles.savedRing} /> : null}
-                        <View style={styles.businessPin}>
+                        <View
+                          style={[
+                            styles.businessPin,
+                            { backgroundColor: categoryColors.bg, borderColor: categoryColors.fg },
+                          ]}
+                        >
                           {logoUrl ? (
                             <Image source={{ uri: logoUrl }} style={styles.businessPinImage} />
                           ) : (
                             <Ionicons
                               name={item.category === 'grocery' ? 'basket-outline' : 'restaurant-outline'}
                               size={16}
-                              color={colors.primaryText}
+                              color={categoryColors.fg}
                             />
                           )}
                         </View>
@@ -2140,10 +2258,10 @@ const HomeScreen = () => {
                       }}
                     >
                       <View style={styles.pinWrap}>
-                        <PulseRing color="#38BDF8" size={38} />
+                        <PulseRing color={colors.brand} size={38} />
                         {item.saved ? <View style={styles.savedRing} /> : null}
                         <View style={styles.roomPin}>
-                          <Ionicons name="chatbubbles-outline" size={16} color={colors.primaryText} />
+                          <Ionicons name="chatbubbles-outline" size={16} color={colors.brandText} />
                         </View>
                       </View>
                     </Marker>
@@ -2163,12 +2281,12 @@ const HomeScreen = () => {
                       }}
                     >
                       <View style={styles.pinWrap}>
-                        <PulseRing color={colors.danger} size={36} />
+                        <PulseRing color={colors.brand} size={36} />
                         <View style={styles.userPin}>
                           {item.avatarUrl ? (
                             <Image source={{ uri: item.avatarUrl }} style={styles.userPinImage} />
                           ) : (
-                            <Ionicons name="person" size={14} color={colors.primaryText} />
+                            <Ionicons name="person" size={14} color={colors.brandText} />
                           )}
                         </View>
                       </View>
@@ -2181,7 +2299,7 @@ const HomeScreen = () => {
                     key={item.id}
                     coordinate={{ latitude: item.latitude, longitude: item.longitude }}
                     title={item.title}
-                    pinColor={pinColor(item)}
+                    pinColor={pinColor(item, resolvedMode)}
                     onPress={() => {
                       if (item.businessId) {
                         setSelectedBusinessId(item.businessId);
@@ -2202,6 +2320,7 @@ const HomeScreen = () => {
                 if (pin.kind === 'business' && pin.businessId) {
                   const business = businessById.get(pin.businessId);
                   const logoUrl = business?.logoUrl ?? business?.imageUrl ?? null;
+                  const categoryColors = getCategoryColors(pin.category ?? null, resolvedMode);
                   return (
                     <Marker
                       key={pin.id}
@@ -2213,16 +2332,21 @@ const HomeScreen = () => {
                       }}
                     >
                       <View style={styles.pinWrap}>
-                        <PulseRing color={colors.primary} size={42} />
+                        <PulseRing color={categoryColors.fg} size={42} />
                         {pin.saved ? <View style={styles.savedRing} /> : null}
-                        <View style={styles.businessPin}>
+                        <View
+                          style={[
+                            styles.businessPin,
+                            { backgroundColor: categoryColors.bg, borderColor: categoryColors.fg },
+                          ]}
+                        >
                           {logoUrl ? (
                             <Image source={{ uri: logoUrl }} style={styles.businessPinImage} />
                           ) : (
                             <Ionicons
                               name={pin.category === 'grocery' ? 'basket-outline' : 'restaurant-outline'}
                               size={16}
-                              color={colors.primaryText}
+                              color={categoryColors.fg}
                             />
                           )}
                         </View>
@@ -2242,10 +2366,10 @@ const HomeScreen = () => {
                       }}
                     >
                       <View style={styles.pinWrap}>
-                        <PulseRing color="#38BDF8" size={38} />
+                        <PulseRing color={colors.brand} size={38} />
                         {pin.saved ? <View style={styles.savedRing} /> : null}
                         <View style={styles.roomPin}>
-                          <Ionicons name="chatbubbles-outline" size={16} color={colors.primaryText} />
+                          <Ionicons name="chatbubbles-outline" size={16} color={colors.brandText} />
                         </View>
                       </View>
                     </Marker>
@@ -2258,12 +2382,12 @@ const HomeScreen = () => {
                     onPress={() => setSpiderfy(null)}
                   >
                     <View style={styles.pinWrap}>
-                      <PulseRing color={colors.danger} size={36} />
+                      <PulseRing color={colors.brand} size={36} />
                       <View style={styles.userPin}>
                         {pin.avatarUrl ? (
                           <Image source={{ uri: pin.avatarUrl }} style={styles.userPinImage} />
                         ) : (
-                          <Ionicons name="person" size={14} color={colors.primaryText} />
+                          <Ionicons name="person" size={14} color={colors.brandText} />
                         )}
                       </View>
                     </View>
@@ -2294,7 +2418,7 @@ const HomeScreen = () => {
                       <Text style={styles.mapBusinessTitle}>{selectedBusiness.name}</Text>
                       <Text style={styles.mapBusinessDescription}>{selectedBusiness.description}</Text>
                       <View style={styles.mapBusinessMetaRow}>
-                        <Ionicons name="star" size={14} color="#F59E0B" />
+                        <Ionicons name="star" size={14} color={colors.prestige} />
                         <Text style={styles.mapBusinessMetaText}>
                           {selectedBusiness.rating.toFixed(1)}
                         </Text>
@@ -2328,7 +2452,7 @@ const HomeScreen = () => {
                 <>
                   <View style={styles.mapBusinessHeader}>
                     <View style={styles.roomPinLarge}>
-                      <Ionicons name="chatbubbles-outline" size={18} color={colors.primaryText} />
+                      <Ionicons name="chatbubbles-outline" size={18} color={colors.brandText} />
                     </View>
                     <View style={styles.mapBusinessInfo}>
                       <Text style={styles.mapBusinessTitle}>{selectedRoom.title}</Text>
@@ -2359,15 +2483,15 @@ const HomeScreen = () => {
         </View>
         <View style={styles.mapFabBar}>
           <Pressable style={styles.fabButton} onPress={() => navigation.navigate('Create')}>
-            <Ionicons name="add-circle-outline" size={20} color={colors.primaryText} />
+            <Ionicons name="add-circle-outline" size={20} color={colors.rewardText} />
             <Text style={styles.fabText}>Create Room</Text>
           </Pressable>
           <Pressable style={styles.fabButton} onPress={() => navigation.navigate('BusinessAdmin')}>
-            <Ionicons name="storefront-outline" size={20} color={colors.primaryText} />
+            <Ionicons name="storefront-outline" size={20} color={colors.rewardText} />
             <Text style={styles.fabText}>Add Business</Text>
           </Pressable>
           <Pressable style={styles.fabButton} onPress={() => navigation.navigate('Feed')}>
-            <Ionicons name="newspaper-outline" size={20} color={colors.primaryText} />
+            <Ionicons name="newspaper-outline" size={20} color={colors.rewardText} />
             <Text style={styles.fabText}>View Feed</Text>
           </Pressable>
         </View>
@@ -2640,7 +2764,7 @@ const FeedScreen = ({ route }: FeedProps) => {
                 <Ionicons
                   name={likedPosts[item.id] ? 'heart' : 'heart-outline'}
                   size={16}
-                  color={likedPosts[item.id] ? colors.primary : colors.text}
+                  color={likedPosts[item.id] ? colors.brand : colors.text}
                 />
                 <Text style={styles.postActionText}>
                   Like{reactionCounts[item.id] ? ` ${reactionCounts[item.id]}` : ''}
@@ -4573,7 +4697,7 @@ const ProfileScreen = () => {
             <Switch
               value={pushEnabled}
               onValueChange={setPushEnabled}
-              trackColor={{ false: colors.border, true: colors.primary }}
+              trackColor={{ false: colors.border, true: colors.brand }}
               thumbColor={colors.surface}
             />
           </View>
@@ -4870,7 +4994,7 @@ type BusinessProps = NativeStackScreenProps<RootStackParamList, 'Business'>;
 
 const BusinessScreen = ({ route }: BusinessProps) => {
   const styles = useStyles();
-  const { colors } = useTheme();
+  const { colors, resolvedMode } = useTheme();
   const { businesses: businessList } = useBusinesses();
   const { userId, profile } = useAuth();
   const [tab, setTab] = useState<'menu' | 'qa' | 'reviews' | 'offers'>(
@@ -4902,6 +5026,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
   const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const [joinedChats, setJoinedChats] = useState<Record<string, boolean>>({});
   const isChatRestricted = Boolean(profile?.shadowbanned || profile?.u2uLocked);
+  const categoryColors = getCategoryColors(business?.category ?? null, resolvedMode);
   const averageRating = useMemo(() => {
     if (reviews.length === 0) {
       return business.rating;
@@ -5245,12 +5370,35 @@ const BusinessScreen = ({ route }: BusinessProps) => {
             </View>
             <Text style={styles.cardBody}>{business.description}</Text>
             <View style={styles.filterRow}>
-              <View style={styles.filterChip}>
-                <Text style={styles.filterChipText}>{business.category}</Text>
+              <View
+                style={[
+                  styles.filterChip,
+                  { backgroundColor: categoryColors.bg, borderColor: categoryColors.bg },
+                ]}
+              >
+                <Text style={[styles.filterChipText, { color: categoryColors.fg }]}>
+                  {business.category}
+                </Text>
               </View>
               {(business.categories ?? []).slice(0, 3).map((entry) => (
-                <View key={entry} style={styles.filterChip}>
-                  <Text style={styles.filterChipText}>{entry}</Text>
+                <View
+                  key={entry}
+                  style={[
+                    styles.filterChip,
+                    {
+                      backgroundColor: getCategoryColors(entry, resolvedMode).bg,
+                      borderColor: getCategoryColors(entry, resolvedMode).bg,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: getCategoryColors(entry, resolvedMode).fg },
+                    ]}
+                  >
+                    {entry}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -5399,7 +5547,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
                       <Ionicons
                         name={rating <= reviewRating ? 'star' : 'star-outline'}
                         size={18}
-                        color={rating <= reviewRating ? colors.primary : colors.textMuted}
+                        color={rating <= reviewRating ? colors.prestige : colors.textMuted}
                       />
                     </Pressable>
                   ))}
@@ -5434,7 +5582,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
                           key={`${review.id}-star-${rating}`}
                           name={rating <= review.rating ? 'star' : 'star-outline'}
                           size={14}
-                          color={rating <= review.rating ? colors.primary : colors.textMuted}
+                          color={rating <= review.rating ? colors.prestige : colors.textMuted}
                         />
                       ))}
                     </View>
@@ -6495,7 +6643,7 @@ const BusinessAdminScreen = () => {
               <Switch
                 value={exceptionClosed}
                 onValueChange={setExceptionClosed}
-                trackColor={{ false: colors.border, true: colors.primary }}
+                trackColor={{ false: colors.border, true: colors.brand }}
                 thumbColor={colors.surface}
               />
             </View>
@@ -6571,7 +6719,7 @@ const BusinessAdminScreen = () => {
               <Switch
                 value={couponActive}
                 onValueChange={setCouponActive}
-                trackColor={{ false: colors.border, true: colors.primary }}
+                trackColor={{ false: colors.border, true: colors.brand }}
                 thumbColor={colors.surface}
               />
             </View>
@@ -6941,7 +7089,7 @@ const AdminPortalScreen = () => {
               <Switch
                 value={flags[flag.key]}
                 onValueChange={(next) => handleToggleFlag(flag.key, next)}
-                trackColor={{ false: colors.border, true: colors.primary }}
+                trackColor={{ false: colors.border, true: colors.brand }}
                 thumbColor={colors.surface}
               />
             </View>
@@ -7447,15 +7595,15 @@ const useStyles = () => {
           paddingVertical: 2,
           paddingHorizontal: 8,
           borderWidth: 1,
-          borderColor: 'rgba(59, 130, 246, 0.35)',
-          backgroundColor: 'rgba(59, 130, 246, 0.12)',
+          borderColor: withOpacity(colors.brand, 0.35),
+          backgroundColor: withOpacity(colors.brand, 0.12),
         },
         betaPillText: {
           fontSize: 10,
           fontWeight: '800',
           textTransform: 'uppercase',
           letterSpacing: 0.8,
-          color: colors.primary,
+          color: colors.brand,
         },
         sectionTitleRow: {
           flexDirection: 'row',
@@ -7536,7 +7684,7 @@ const useStyles = () => {
           borderRadius: 16,
           borderWidth: 1,
           borderColor: colors.border,
-          backgroundColor: colors.surface,
+          backgroundColor: colors.surfaceMuted,
           paddingHorizontal: 12,
           paddingVertical: 10,
         },
@@ -7556,7 +7704,7 @@ const useStyles = () => {
           borderColor: colors.border,
           backgroundColor: colors.surface,
           zIndex: 6,
-          shadowColor: '#000',
+          shadowColor: colors.overlay,
           shadowOpacity: 0.12,
           shadowRadius: 12,
           shadowOffset: { width: 0, height: 8 },
@@ -7603,8 +7751,8 @@ const useStyles = () => {
           backgroundColor: colors.surface,
         },
         filterChipActive: {
-          backgroundColor: colors.primary,
-          borderColor: colors.primary,
+          backgroundColor: colors.brand,
+          borderColor: colors.brand,
         },
         filterChipText: {
           fontSize: 12,
@@ -7612,7 +7760,7 @@ const useStyles = () => {
           color: colors.text,
         },
         filterChipTextActive: {
-          color: colors.primaryText,
+          color: colors.brandText,
         },
         mapShell: {
           flex: 1,
@@ -7630,7 +7778,7 @@ const useStyles = () => {
         },
         mapLabel: {
           fontSize: 16,
-          color: colors.textMuted,
+          color: colors.textSubtle,
           textAlign: 'center',
         },
         webPlaceholder: {
@@ -7651,7 +7799,7 @@ const useStyles = () => {
           backgroundColor: colors.surface,
           borderWidth: 1,
           borderColor: colors.border,
-          shadowColor: '#000',
+          shadowColor: colors.overlay,
           shadowOpacity: 0.12,
           shadowRadius: 10,
           shadowOffset: { width: 0, height: 6 },
@@ -7667,7 +7815,7 @@ const useStyles = () => {
           backgroundColor: colors.surface,
           padding: 12,
           gap: 10,
-          shadowColor: '#000',
+          shadowColor: colors.overlay,
           shadowOpacity: 0.08,
           shadowRadius: 12,
           shadowOffset: { width: 0, height: 6 },
@@ -7683,7 +7831,7 @@ const useStyles = () => {
           backgroundColor: colors.surface,
           padding: 12,
           gap: 10,
-          shadowColor: '#000',
+          shadowColor: colors.overlay,
           shadowOpacity: 0.12,
           shadowRadius: 14,
           shadowOffset: { width: 0, height: 8 },
@@ -7713,7 +7861,7 @@ const useStyles = () => {
         },
         mapBusinessPlaceholderText: {
           fontSize: 12,
-          color: colors.textMuted,
+          color: colors.textSubtle,
         },
         mapBusinessInfo: {
           flex: 1,
@@ -7761,37 +7909,37 @@ const useStyles = () => {
           borderRadius: 999,
           paddingVertical: 10,
           paddingHorizontal: 12,
-          backgroundColor: colors.primary,
+          backgroundColor: colors.reward,
           borderWidth: 1,
-          borderColor: colors.primary,
+          borderColor: colors.reward,
         },
         fabText: {
           fontSize: 12,
           fontWeight: '700',
-          color: colors.primaryText,
+          color: colors.rewardText,
         },
         clusterMarker: {
           width: 34,
           height: 34,
           borderRadius: 17,
-          backgroundColor: colors.primary,
+          backgroundColor: colors.brand,
           alignItems: 'center',
           justifyContent: 'center',
           borderWidth: 2,
-          borderColor: '#FFFFFF',
+          borderColor: colors.background,
         },
         clusterMarkerText: {
           fontSize: 12,
           fontWeight: '700',
-          color: colors.primaryText,
+          color: colors.brandText,
         },
         businessPin: {
           width: 30,
           height: 30,
           borderRadius: 8,
-          backgroundColor: colors.primary,
+          backgroundColor: colors.surfaceMuted,
           borderWidth: 2,
-          borderColor: '#FFFFFF',
+          borderColor: colors.border,
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
@@ -7800,9 +7948,9 @@ const useStyles = () => {
           width: 30,
           height: 30,
           borderRadius: 15,
-          backgroundColor: '#38BDF8',
+          backgroundColor: colors.brand,
           borderWidth: 2,
-          borderColor: '#FFFFFF',
+          borderColor: colors.background,
           alignItems: 'center',
           justifyContent: 'center',
         },
@@ -7810,9 +7958,9 @@ const useStyles = () => {
           width: 48,
           height: 48,
           borderRadius: 24,
-          backgroundColor: '#38BDF8',
+          backgroundColor: colors.brand,
           borderWidth: 2,
-          borderColor: '#FFFFFF',
+          borderColor: colors.background,
           alignItems: 'center',
           justifyContent: 'center',
         },
@@ -7826,7 +7974,7 @@ const useStyles = () => {
           height: 38,
           borderRadius: 19,
           borderWidth: 2,
-          borderColor: '#F97316',
+          borderColor: colors.prestige,
         },
         businessPinImage: {
           width: '100%',
@@ -7837,9 +7985,9 @@ const useStyles = () => {
           width: 26,
           height: 26,
           borderRadius: 13,
-          backgroundColor: colors.danger,
+          backgroundColor: colors.brand,
           borderWidth: 2,
-          borderColor: '#FFFFFF',
+          borderColor: colors.background,
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
@@ -7863,8 +8011,8 @@ const useStyles = () => {
           backgroundColor: colors.surface,
         },
         tabPillActive: {
-          backgroundColor: colors.primary,
-          borderColor: colors.primary,
+          backgroundColor: colors.brand,
+          borderColor: colors.brand,
         },
         tabPillText: {
           fontSize: 12,
@@ -7872,7 +8020,7 @@ const useStyles = () => {
           color: colors.text,
         },
         tabPillTextActive: {
-          color: colors.primaryText,
+          color: colors.brandText,
         },
         feedHeader: {
           gap: 12,
@@ -7903,7 +8051,7 @@ const useStyles = () => {
         tabLabel: {
           fontSize: 12,
           fontWeight: '600',
-          color: colors.textMuted,
+          color: colors.textSubtle,
         },
         listContent: {
           padding: 16,
@@ -8052,7 +8200,7 @@ const useStyles = () => {
           borderRadius: 16,
         },
         messageBubbleMine: {
-          backgroundColor: colors.primary,
+          backgroundColor: colors.brand,
         },
         messageBubbleOther: {
           backgroundColor: colors.surfaceMuted,
@@ -8062,7 +8210,7 @@ const useStyles = () => {
           color: colors.text,
         },
         messageTextMine: {
-          color: colors.primaryText,
+          color: colors.brandText,
         },
         messageTimestamp: {
           fontSize: 11,
@@ -8243,7 +8391,7 @@ const useStyles = () => {
         badge: {
           fontSize: 12,
           fontWeight: '600',
-          color: colors.primary,
+          color: colors.info,
           backgroundColor: colors.surfaceMuted,
           paddingHorizontal: 8,
           paddingVertical: 4,
@@ -8359,7 +8507,7 @@ const useStyles = () => {
           borderRadius: 12,
           borderWidth: 1,
           borderColor: colors.border,
-          backgroundColor: colors.surface,
+          backgroundColor: colors.surfaceMuted,
           paddingHorizontal: 12,
           paddingVertical: 10,
           fontSize: 14,
@@ -8377,7 +8525,7 @@ const useStyles = () => {
         primaryButton: {
           flex: 1,
           borderRadius: 22,
-          backgroundColor: colors.primary,
+          backgroundColor: colors.reward,
           paddingVertical: 12,
           paddingHorizontal: 16,
           minHeight: 46,
@@ -8391,7 +8539,7 @@ const useStyles = () => {
         primaryButtonText: {
           fontSize: 15,
           fontWeight: '700',
-          color: colors.primaryText,
+          color: colors.rewardText,
         },
         secondaryButton: {
           flex: 1,

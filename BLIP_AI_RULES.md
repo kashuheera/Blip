@@ -10,6 +10,7 @@
 - Prefer small, reviewable diffs.
 - Don't rename files or move folders unless asked.
 - If unsure about existing architecture, ask by inspecting current code first.
+- Before any change, create a local backup copy of every file that will be edited.
 
 ## Coding style
 - TypeScript strict-friendly

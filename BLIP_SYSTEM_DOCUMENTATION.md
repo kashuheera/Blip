@@ -41,6 +41,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Blip Admin Portal (feature flags, verification queue, moderation ops).
 - Side panel navigation drawer (hamburger menu).
 - Account types enforced (personal vs business; business accounts blocked from user screens).
+- UI color system applied (brand/reward/categories + map styling).
 
 ### Known broken, disabled, or deferred
 - Magic link / email OTP auth: deferred. Must-have before rollout with proper domain redirects/deep links (mobile cannot follow `127.0.0.1` links).

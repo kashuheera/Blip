@@ -31,6 +31,7 @@
 - Voice rooms placeholder (UI only, coming soon)
 - Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders)
 - Business replies inbox (business-only, recent post replies + thread jump)
+- UI color system applied (brand/reward/categories + map styling)
 - Blip Admin Portal (feature flags, verification queue, moderation ops)
 - Side panel navigation drawer
 - Business admin access gating (business accounts only)
