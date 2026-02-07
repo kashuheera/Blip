@@ -5894,7 +5894,7 @@ const BusinessAdminScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { userId, profile } = useAuth();
+  const { userId, profile, loading: authLoading } = useAuth();
   const { businesses, setBusinesses } = useBusinesses();
   const [ownedBusinesses, setOwnedBusinesses] = useState<OwnedBusinessEntry[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
@@ -5905,6 +5905,8 @@ const BusinessAdminScreen = () => {
   const [auditLog, setAuditLog] = useState<BusinessAuditEntry[]>([]);
   const [exceptions, setExceptions] = useState<BusinessHoursException[]>([]);
   const [coupons, setCoupons] = useState<BusinessCouponEntry[]>([]);
+  const [replyInbox, setReplyInbox] = useState<BusinessReplyItem[]>([]);
+  const [replyLoading, setReplyLoading] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponDetails, setCouponDetails] = useState('');
   const [couponActive, setCouponActive] = useState(true);
@@ -7310,6 +7312,7 @@ export default function App() {
               <Stack.Screen name="Home" component={HomeScreen} />
               <Stack.Screen name="Feed" component={FeedScreen} />
               <Stack.Screen name="PostReplies" component={PostRepliesScreen} />
+              <Stack.Screen name="BusinessReplies" component={BusinessRepliesScreen} />
               <Stack.Screen name="Create" component={CreateScreen} />
               <Stack.Screen name="Messages" component={MessagesScreen} />
               <Stack.Screen name="DirectChat" component={DirectChatScreen} />
