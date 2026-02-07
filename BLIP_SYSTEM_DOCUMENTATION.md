@@ -37,6 +37,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Onboarding flow (privacy + interests).
 - Help/support + bug reporting.
 - Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders).
+- Business replies inbox (business-only view of recent post replies + thread jump).
 - Blip Admin Portal (feature flags, verification queue, moderation ops).
 - Side panel navigation drawer (hamburger menu).
 - Account types enforced (personal vs business; business accounts blocked from user screens).

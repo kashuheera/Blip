@@ -559,6 +559,7 @@ BLIP is a map-first, location-based, pseudonymous social layer + local business 
   - Offers/announcements: create/schedule, rate-limited publishing
   - Orders: pickup-first queue, status updates, order notes, refunds/chargebacks placeholder (no payments in MVP)
   - Messaging: business room moderation, canned replies, escalation to support
+  - Replies inbox: recent business replies + jump to post thread
   - Analytics: views, clicks, messages, orders by day, retention
   - Audit log: who changed what/when (owner/staff) (implemented)
 - Rules:
