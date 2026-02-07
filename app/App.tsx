@@ -50,6 +50,7 @@ type RootStackParamList = {
   Home: undefined;
   Feed: { search?: string } | undefined;
   PostReplies: { postId: string; authorHandle: string } | undefined;
+  BusinessReplies: undefined;
   Create: undefined;
   Messages: undefined;
   DirectChat: { threadId: string; title: string } | undefined;
@@ -279,6 +280,15 @@ type OwnedBusinessEntry = {
   name: string;
   imageUrl: string | null;
   logoUrl: string | null;
+};
+
+type BusinessReplyItem = {
+  id: string;
+  postId: string;
+  body: string;
+  createdAt: string;
+  postAuthor?: string | null;
+  postBody?: string | null;
 };
 
 type BugReportEntry = {
