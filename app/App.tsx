@@ -6138,6 +6138,27 @@ const BusinessAdminScreen = () => {
     };
   }, [userId]);
 
+  useEffect(() => {
+    let isMounted = true;
+    const loadInbox = async () => {
+      if (!userId || profile?.accountType !== 'business') {
+        setReplyInbox([]);
+        return;
+      }
+      setReplyLoading(true);
+      const inbox = await loadBusinessReplies(userId, 5);
+      if (!isMounted) {
+        return;
+      }
+      setReplyInbox(inbox);
+      setReplyLoading(false);
+    };
+    void loadInbox();
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, profile?.accountType]);
+
   const handlePickImage = async (kind: 'hero' | 'logo') => {
     if (!supabase || !activeBusiness) {
       setNotice('Select a business first.');
