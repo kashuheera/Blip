@@ -1059,6 +1059,51 @@ const getFuzzedLocation = async () => {
   }
 };
 
+const loadBusinessReplies = async (userId: string, limit = 20): Promise<BusinessReplyItem[]> => {
+  if (!supabase || !userId) {
+    return [];
+  }
+  const { data: replyRows } = await supabase
+    .from('post_comments')
+    .select('id, post_id, body, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  const rows = replyRows ?? [];
+  const postIds = Array.from(
+    new Set(rows.map((row) => String(row.post_id ?? '')).filter((id) => id.length > 0))
+  );
+  const postMap = new Map<string, { author: string; body: string }>();
+  if (postIds.length > 0) {
+    const { data: postRows } = await supabase
+      .from('posts')
+      .select('id, author_handle, body')
+      .in('id', postIds);
+    (postRows ?? []).forEach((row) => {
+      const id = String(row.id ?? '');
+      if (!id) {
+        return;
+      }
+      postMap.set(id, {
+        author: row.author_handle ?? 'User',
+        body: row.body ?? '',
+      });
+    });
+  }
+  return rows.map((row) => {
+    const postId = String(row.post_id ?? '');
+    const postData = postMap.get(postId);
+    return {
+      id: String(row.id ?? ''),
+      postId,
+      body: row.body ?? '',
+      createdAt: row.created_at ?? '',
+      postAuthor: postData?.author ?? null,
+      postBody: postData?.body ?? null,
+    };
+  });
+};
+
 const pinColor = (pin: MapPin) => {
   if (pin.kind === 'user') {
     return '#F97316';
@@ -2802,6 +2847,113 @@ const PostRepliesScreen = ({ route }: PostRepliesProps) => {
             </>
           ) : (
             <Text style={styles.metaText}>Replies are available for businesses only.</Text>
+          )}
+        </View>
+      </ScrollView>
+      <BottomNav />
+      <StatusBar style="auto" />
+    </SafeAreaView>
+  );
+};
+
+const BusinessRepliesScreen = () => {
+  const styles = useStyles();
+  const { userId, profile } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [replies, setReplies] = useState<BusinessReplyItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const isBusinessAccount = profile?.accountType === 'business';
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadReplies = async () => {
+      if (!isBusinessAccount || !userId) {
+        setReplies([]);
+        return;
+      }
+      setLoading(true);
+      const inbox = await loadBusinessReplies(userId, 30);
+      if (!isMounted) {
+        return;
+      }
+      setReplies(inbox);
+      setLoading(false);
+    };
+    void loadReplies();
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, isBusinessAccount]);
+
+  useEffect(() => {
+    if (!isBusinessAccount) {
+      setNotice('Business account required.');
+    } else {
+      setNotice(null);
+    }
+  }, [isBusinessAccount]);
+
+  if (!isBusinessAccount) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <AppHeader />
+        <View style={styles.card}>
+          <SectionTitle icon="lock-closed-outline" label="Business access required" />
+          <Text style={styles.metaText}>
+            Sign in with a business account to view your replies inbox.
+          </Text>
+          <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Auth')}>
+            <Text style={styles.secondaryButtonText}>Go to sign in</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <AppHeader />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.card}>
+          <SectionTitle icon="mail-open-outline" label="Replies inbox" />
+          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+          {loading ? (
+            <View style={styles.skeletonStack}>
+              {Array.from({ length: 3 }).map((_, index) => (
+                <SkeletonCard key={`reply-skel-${index}`} />
+              ))}
+            </View>
+          ) : replies.length === 0 ? (
+            <Text style={styles.metaText}>No replies yet.</Text>
+          ) : (
+            replies.map((reply) => (
+              <View key={reply.id} style={styles.reviewRow}>
+                <View style={styles.reviewHeader}>
+                  <Text style={styles.cardTitle}>{reply.postAuthor ?? 'Post'}</Text>
+                  <Text style={styles.metaText}>{reply.createdAt}</Text>
+                </View>
+                {reply.postBody ? (
+                  <Text style={styles.cardBody} numberOfLines={2}>
+                    Post: {reply.postBody}
+                  </Text>
+                ) : null}
+                <Text style={styles.cardBody} numberOfLines={2}>
+                  Reply: {reply.body}
+                </Text>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() =>
+                    navigation.navigate('PostReplies', {
+                      postId: reply.postId,
+                      authorHandle: reply.postAuthor ?? 'post',
+                    })
+                  }
+                >
+                  <Text style={styles.secondaryButtonText}>Open thread</Text>
+                </Pressable>
+              </View>
+            ))
           )}
         </View>
       </ScrollView>
