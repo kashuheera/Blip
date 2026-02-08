@@ -39,10 +39,11 @@
 - Account type enforcement (personal vs business, UI + RLS)
 - KYC capture (name/phone/address) + delivery vs pickup order options
 - KYC status badge UI (profile)
-- KYC document upload placeholders (UI only)
+- KYC document uploads + verification requests + admin review
 
 ## In-Progress
 - Push notifications: set FCM/APNS keys + redeploy `push-send`
+- Apply KYC verification migration (db push failed: Supabase tenant/user not found)
 
 ## Pending
 - MUST-HAVE before rollout: magic link + email OTP deep-link auth (explicitly deferred)
@@ -50,7 +51,6 @@
 - MUST-HAVE before rollout: payments / billing (provider planned: Safepay; subscriptions are placeholders)
 - MUST-HAVE before rollout: web support parity (location disabled on web; mobile-first only)
 - Order notifications + receipts (provider chosen: SendGrid email + SMS4Connect SMS for Pakistan coverage; integration pending)
-- KYC ID upload + verification workflow (backend pending)
 - A4 Invite-only tiers / access (disabled; open signup per decision)
 - F1 Paid tiers (users) (disabled; no tiers for now)
 - F3 Paid invites (disabled; no invite system)

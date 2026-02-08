@@ -4,6 +4,7 @@ import {
   Animated,
   FlatList,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -342,6 +343,19 @@ type VerificationRequest = {
   status: string;
   notes?: string | null;
   createdAt?: string | null;
+};
+
+type KycVerificationRequest = {
+  id: string;
+  userId: string;
+  status: string;
+  notes?: string | null;
+  createdAt?: string | null;
+  fullName?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  frontPath?: string | null;
+  backPath?: string | null;
 };
 
 type ReportEntry = {
@@ -4424,6 +4438,11 @@ const ProfileScreen = () => {
   const [kycStatus, setKycStatus] = useState('pending');
   const [kycNotice, setKycNotice] = useState<string | null>(null);
   const [kycLoading, setKycLoading] = useState(false);
+  const [kycFrontPath, setKycFrontPath] = useState<string | null>(null);
+  const [kycBackPath, setKycBackPath] = useState<string | null>(null);
+  const [kycRequestStatus, setKycRequestStatus] = useState<string | null>(null);
+  const [kycUploading, setKycUploading] = useState(false);
+  const [kycRequesting, setKycRequesting] = useState(false);
   const activeBusiness = businessList[0];
   const isBusinessAccount = profile?.accountType === 'business';
   const reputationScore = useMemo(() => {
@@ -4448,9 +4467,23 @@ const ProfileScreen = () => {
     return 'New';
   }, [profile?.level, profile?.shadowbanned, profile?.u2uLocked]);
   const kycLabel =
-    kycStatus === 'verified' ? 'Verified' : kycStatus === 'rejected' ? 'Rejected' : 'Pending';
+    kycStatus === 'verified'
+      ? 'Verified'
+      : kycStatus === 'rejected'
+        ? 'Rejected'
+        : kycStatus === 'submitted'
+          ? 'Submitted'
+          : 'Pending';
   const kycTone =
-    kycStatus === 'verified' ? colors.reward : kycStatus === 'rejected' ? colors.danger : colors.warning;
+    kycStatus === 'verified'
+      ? colors.reward
+      : kycStatus === 'rejected'
+        ? colors.danger
+        : kycStatus === 'submitted'
+          ? colors.info
+          : colors.warning;
+  const kycRequestLocked =
+    kycRequesting || kycRequestStatus === 'pending' || kycStatus === 'submitted' || kycStatus === 'verified';
   const handleKycPending = (label: string) => {
     setKycNotice(`${label} setup pending. Coming soon.`);
   };
@@ -4475,7 +4508,7 @@ const ProfileScreen = () => {
       }
       const { data } = await supabase
         .from('user_private')
-        .select('full_name, phone, address, cnic, kyc_status')
+        .select('full_name, phone, address, cnic, kyc_status, id_doc_front_path, id_doc_back_path')
         .eq('user_id', userId)
         .maybeSingle();
       if (!isMounted || !data) {
@@ -4486,6 +4519,19 @@ const ProfileScreen = () => {
       setKycAddress(data.address ?? '');
       setKycCnic(data.cnic ?? '');
       setKycStatus(data.kyc_status ?? 'pending');
+      setKycFrontPath(data.id_doc_front_path ?? null);
+      setKycBackPath(data.id_doc_back_path ?? null);
+      const { data: requestRow } = await supabase
+        .from('kyc_verification_requests')
+        .select('id, status')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!isMounted) {
+        return;
+      }
+      setKycRequestStatus(requestRow?.status ?? null);
     };
     void loadKyc();
     return () => {
@@ -4495,6 +4541,7 @@ const ProfileScreen = () => {
 
   const saveKyc = async () => {
     if (!supabase || !userId) {
+      setKycNotice('Supabase not configured.');
       return;
     }
     setKycLoading(true);
@@ -4517,6 +4564,104 @@ const ProfileScreen = () => {
       setKycStatus('pending');
     }
     setKycLoading(false);
+  };
+
+  const handleUploadKycDoc = async (kind: 'front' | 'back') => {
+    if (!supabase || !userId) {
+      setKycNotice('Supabase not configured.');
+      return;
+    }
+    setKycUploading(true);
+    setKycNotice(null);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== 'granted') {
+      setKycNotice('Permission to access photos is required.');
+      setKycUploading(false);
+      return;
+    }
+    const picker = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.85,
+    });
+    if (picker.canceled || !picker.assets?.length) {
+      setKycUploading(false);
+      return;
+    }
+    const asset = picker.assets[0];
+    if (!asset.uri) {
+      setKycUploading(false);
+      return;
+    }
+    try {
+      const extension = asset.uri.split('.').pop() ?? 'jpg';
+      const filePath = `users/${userId}/${kind}-${Date.now()}.${extension}`;
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      const upload = await supabase.storage.from('kyc-docs').upload(filePath, blob, {
+        upsert: true,
+        contentType: asset.type ?? 'image/jpeg',
+      });
+      if (upload.error) {
+        setKycNotice('Upload failed.');
+        setKycUploading(false);
+        return;
+      }
+      const updates =
+        kind === 'front'
+          ? { id_doc_front_path: filePath }
+          : { id_doc_back_path: filePath };
+      const { error } = await supabase
+        .from('user_private')
+        .upsert({ user_id: userId, ...updates }, { onConflict: 'user_id' });
+      if (error) {
+        setKycNotice('Unable to save document.');
+        setKycUploading(false);
+        return;
+      }
+      if (kind === 'front') {
+        setKycFrontPath(filePath);
+      } else {
+        setKycBackPath(filePath);
+      }
+      setKycNotice('Document uploaded.');
+    } catch {
+      setKycNotice('Upload failed.');
+    } finally {
+      setKycUploading(false);
+    }
+  };
+
+  const handleRequestKyc = async () => {
+    if (!supabase || !userId) {
+      setKycNotice('Supabase not configured.');
+      return;
+    }
+    if (!kycFrontPath || !kycBackPath) {
+      setKycNotice('Upload both sides of your ID first.');
+      return;
+    }
+    if (kycRequestStatus === 'pending') {
+      setKycNotice('Verification request already submitted.');
+      return;
+    }
+    setKycRequesting(true);
+    const { error } = await supabase.from('kyc_verification_requests').insert({
+      user_id: userId,
+    });
+    if (error) {
+      setKycNotice('Unable to submit verification request.');
+      setKycRequesting(false);
+      return;
+    }
+    await supabase
+      .from('user_private')
+      .upsert({ user_id: userId, kyc_status: 'submitted' }, { onConflict: 'user_id' });
+    setKycStatus('submitted');
+    setKycRequestStatus('pending');
+    setKycNotice('Verification request submitted.');
+    setKycRequesting(false);
   };
 
   useEffect(() => {
@@ -4704,23 +4849,44 @@ const ProfileScreen = () => {
             </Pressable>
             <View style={styles.sectionDivider} />
             <Text style={styles.metaText}>Document upload (CNIC/ID)</Text>
+            <View style={styles.rowBetween}>
+              <Text style={styles.metaText}>ID front</Text>
+              <Text style={styles.metaText}>{kycFrontPath ? 'Uploaded' : 'Missing'}</Text>
+            </View>
             <Pressable
               style={styles.secondaryButton}
-              onPress={() => handleKycPending('Upload ID front')}
+              onPress={() => void handleUploadKycDoc('front')}
+              disabled={kycUploading}
             >
-              <Text style={styles.secondaryButtonText}>Upload ID front (pending)</Text>
+              <Text style={styles.secondaryButtonText}>
+                {kycUploading ? 'Uploading...' : kycFrontPath ? 'Replace front' : 'Upload front'}
+              </Text>
+            </Pressable>
+            <View style={styles.rowBetween}>
+              <Text style={styles.metaText}>ID back</Text>
+              <Text style={styles.metaText}>{kycBackPath ? 'Uploaded' : 'Missing'}</Text>
+            </View>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => void handleUploadKycDoc('back')}
+              disabled={kycUploading}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {kycUploading ? 'Uploading...' : kycBackPath ? 'Replace back' : 'Upload back'}
+              </Text>
             </Pressable>
             <Pressable
-              style={styles.secondaryButton}
-              onPress={() => handleKycPending('Upload ID back')}
+              style={styles.primaryButton}
+              onPress={() => void handleRequestKyc()}
+              disabled={kycRequestLocked}
             >
-              <Text style={styles.secondaryButtonText}>Upload ID back (pending)</Text>
-            </Pressable>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => handleKycPending('Verification request')}
-            >
-              <Text style={styles.secondaryButtonText}>Request verification (pending)</Text>
+              <Text style={styles.primaryButtonText}>
+                {kycRequesting
+                  ? 'Submitting...'
+                  : kycRequestLocked
+                    ? 'Request submitted'
+                    : 'Request verification'}
+              </Text>
             </Pressable>
           </View>
         ) : null}
@@ -6896,6 +7062,7 @@ const AdminPortalScreen = () => {
   const [reportsCount, setReportsCount] = useState(0);
   const [appealsCount, setAppealsCount] = useState(0);
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
+  const [kycRequests, setKycRequests] = useState<KycVerificationRequest[]>([]);
   const [bugReports, setBugReports] = useState<BugReportEntry[]>([]);
   const [flaggedUsers, setFlaggedUsers] = useState<UserFlagEntry[]>([]);
   const [recentOrders, setRecentOrders] = useState<OrderEntry[]>([]);
@@ -6916,6 +7083,7 @@ const AdminPortalScreen = () => {
         reportsRes,
         appealsRes,
         verificationRes,
+        kycRes,
         flagsRes,
         bugRes,
         flaggedRes,
@@ -6933,6 +7101,11 @@ const AdminPortalScreen = () => {
         supabase
           .from('business_verification_requests')
           .select('id, owner_id, status, notes, created_at, businesses(name)')
+          .order('created_at', { ascending: false })
+          .limit(10),
+        supabase
+          .from('kyc_verification_requests')
+          .select('id, user_id, status, notes, created_at')
           .order('created_at', { ascending: false })
           .limit(10),
         supabase.from('feature_flags').select('key, enabled'),
@@ -6966,6 +7139,7 @@ const AdminPortalScreen = () => {
         reportsRes.error ||
         appealsRes.error ||
         verificationRes.error ||
+        kycRes.error ||
         flagsRes.error ||
         bugRes.error ||
         flaggedRes.error ||
@@ -6988,6 +7162,59 @@ const AdminPortalScreen = () => {
           createdAt: row.created_at ?? null,
         })) ?? [];
       setVerificationRequests(nextRequests);
+
+      const kycUserIds =
+        kycRes.data
+          ?.map((row) => (row.user_id ? String(row.user_id) : ''))
+          .filter((id) => id.length > 0) ?? [];
+      const { data: kycPrivate } =
+        kycUserIds.length > 0
+          ? await supabase
+              .from('user_private')
+              .select('user_id, full_name, phone, address, id_doc_front_path, id_doc_back_path')
+              .in('user_id', kycUserIds)
+          : { data: [] as any[] };
+      const kycPrivateMap = new Map<
+        string,
+        {
+          fullName?: string | null;
+          phone?: string | null;
+          address?: string | null;
+          frontPath?: string | null;
+          backPath?: string | null;
+        }
+      >();
+      (kycPrivate ?? []).forEach((row) => {
+        const id = String(row.user_id ?? '');
+        if (!id) {
+          return;
+        }
+        kycPrivateMap.set(id, {
+          fullName: row.full_name ?? null,
+          phone: row.phone ?? null,
+          address: row.address ?? null,
+          frontPath: row.id_doc_front_path ?? null,
+          backPath: row.id_doc_back_path ?? null,
+        });
+      });
+      setKycRequests(
+        (kycRes.data ?? []).map((row) => {
+          const userId = row.user_id ? String(row.user_id) : 'unknown';
+          const details = kycPrivateMap.get(userId);
+          return {
+            id: String(row.id ?? ''),
+            userId,
+            status: row.status ?? 'pending',
+            notes: row.notes ?? null,
+            createdAt: row.created_at ?? null,
+            fullName: details?.fullName ?? null,
+            phone: details?.phone ?? null,
+            address: details?.address ?? null,
+            frontPath: details?.frontPath ?? null,
+            backPath: details?.backPath ?? null,
+          } satisfies KycVerificationRequest;
+        })
+      );
 
       if (Array.isArray(flagsRes.data) && flagsRes.data.length > 0) {
         const nextFlags = { ...flags };
@@ -7090,6 +7317,33 @@ const AdminPortalScreen = () => {
     }
     setVerificationRequests((prev) => prev.filter((entry) => entry.id !== requestId));
   };
+
+  const handleReviewKyc = async (requestId: string, status: 'approved' | 'rejected') => {
+    if (!supabase) {
+      return;
+    }
+    const { error } = await supabase.rpc('review_kyc_verification', {
+      p_request_id: requestId,
+      p_status: status,
+      p_notes: null,
+    });
+    if (error) {
+      await supabase.from('kyc_verification_requests').update({ status }).eq('id', requestId);
+    }
+    setKycRequests((prev) => prev.filter((entry) => entry.id !== requestId));
+  };
+
+  const handleOpenKycDoc = async (path?: string | null) => {
+    if (!supabase || !path) {
+      return;
+    }
+    const { data, error } = await supabase.storage.from('kyc-docs').createSignedUrl(path, 120);
+    if (error || !data?.signedUrl) {
+      setNotice('Unable to open document.');
+      return;
+    }
+    void Linking.openURL(data.signedUrl);
+  };
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -7120,7 +7374,9 @@ const AdminPortalScreen = () => {
               </View>
               <View style={styles.adminStatCard}>
                 <Text style={styles.metaText}>Verifications</Text>
-                <Text style={styles.adminStatValue}>{verificationRequests.length}</Text>
+                <Text style={styles.adminStatValue}>
+                  {verificationRequests.length + kycRequests.length}
+                </Text>
               </View>
             </View>
           )}
@@ -7173,6 +7429,69 @@ const AdminPortalScreen = () => {
                   >
                     <Text style={styles.secondaryButtonText}>Reject</Text>
                   </Pressable>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+        <View style={styles.adminSectionCard}>
+          <SectionTitle icon="id-card-outline" label="KYC verification queue" />
+          {loading ? (
+            <View style={styles.skeletonStack}>
+              {Array.from({ length: 3 }).map((_, index) => (
+                <SkeletonRowItem key={`kyc-skel-${index}`} />
+              ))}
+            </View>
+          ) : kycRequests.length === 0 ? (
+            <Text style={styles.metaText}>No pending KYC requests.</Text>
+          ) : (
+            kycRequests.map((request) => (
+              <View key={request.id} style={styles.listRow}>
+                <View style={styles.listRowInfo}>
+                  <Text style={styles.cardTitle}>{request.fullName ?? request.userId}</Text>
+                  <Text style={styles.metaText}>Status: {request.status}</Text>
+                  {request.phone ? (
+                    <Text style={styles.metaText}>Phone: {request.phone}</Text>
+                  ) : null}
+                  {request.address ? (
+                    <Text style={styles.metaText}>Address: {request.address}</Text>
+                  ) : null}
+                </View>
+                <View style={styles.columnStack}>
+                  <View style={styles.rowBetween}>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => handleOpenKycDoc(request.frontPath)}
+                      disabled={!request.frontPath}
+                    >
+                      <Text style={styles.secondaryButtonText}>
+                        {request.frontPath ? 'Open front' : 'Front missing'}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => handleOpenKycDoc(request.backPath)}
+                      disabled={!request.backPath}
+                    >
+                      <Text style={styles.secondaryButtonText}>
+                        {request.backPath ? 'Open back' : 'Back missing'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.rowBetween}>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => handleReviewKyc(request.id, 'approved')}
+                    >
+                      <Text style={styles.secondaryButtonText}>Approve</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => handleReviewKyc(request.id, 'rejected')}
+                    >
+                      <Text style={styles.secondaryButtonText}>Reject</Text>
+                    </Pressable>
+                  </View>
                 </View>
               </View>
             ))
@@ -8455,6 +8774,9 @@ const useStyles = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 8,
+        },
+        columnStack: {
           gap: 8,
         },
         stepRow: {
