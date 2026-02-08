@@ -455,7 +455,7 @@ The sections below map “product features” to concrete implementation artifac
   - `BusinessScreen` shows business-side orders.
   - Orders show an in-app receipt summary after submission.
   - Order submission can trigger push notifications (requires `push-send` keys).
-  - Email/SMS receipts are pending (provider chosen: SendGrid email + Twilio SMS).
+  - Email/SMS receipts are pending (provider chosen: SendGrid email + SMS4Connect SMS).
 - DB:
   - RLS: orders visible by buyer or business owner; items share similar rules.
   - Inserts are rate-limited.

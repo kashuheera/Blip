@@ -672,6 +672,6 @@ BLIP is a map-first, location-based, pseudonymous social layer + local business 
 ## Business growth & ops backlog
 - Business analytics (views, chat volume, saves, order conversion) beyond demo estimates.
 - Media uploads for business hero/logo (storage-backed, not URL-only).
-- Order status notifications + receipts (email/SMS/push; provider plan: SendGrid email + Twilio SMS).
+- Order status notifications + receipts (email/SMS/push; provider plan: SendGrid email + SMS4Connect SMS).
 - Business hours exceptions (holiday hours, temporary closures).
 - Customer loyalty / coupon codes for repeat users.

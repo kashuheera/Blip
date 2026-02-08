@@ -4301,12 +4301,12 @@ const OrdersScreen = () => {
       <Pressable
         style={styles.secondaryButton}
         onPress={() =>
-          setNotice('Receipts pending. Provider: SendGrid (email) + Twilio (SMS).')
+          setNotice('Receipts pending. Provider: SendGrid (email) + SMS4Connect (SMS).')
         }
       >
         <Text style={styles.secondaryButtonText}>Email/SMS receipt (pending)</Text>
       </Pressable>
-      <Text style={styles.metaText}>Provider: SendGrid (email) + Twilio (SMS).</Text>
+      <Text style={styles.metaText}>Provider: SendGrid (email) + SMS4Connect (SMS).</Text>
     </View>
   );
 
