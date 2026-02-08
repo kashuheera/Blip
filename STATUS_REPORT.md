@@ -49,7 +49,7 @@
 - MUST-HAVE before rollout: Google OAuth (explicitly not implemented)
 - MUST-HAVE before rollout: payments / billing (provider planned: Safepay; subscriptions are placeholders)
 - MUST-HAVE before rollout: web support parity (location disabled on web; mobile-first only)
-- Order notifications + receipts (provider chosen: SendGrid email + SMS4Connect SMS; integration pending)
+- Order notifications + receipts (provider chosen: SendGrid email + SMS4Connect SMS for Pakistan coverage; integration pending)
 - KYC ID upload + verification workflow (backend pending)
 - A4 Invite-only tiers / access (disabled; open signup per decision)
 - F1 Paid tiers (users) (disabled; no tiers for now)
