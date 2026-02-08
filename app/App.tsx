@@ -4430,6 +4430,9 @@ const ProfileScreen = () => {
     kycStatus === 'verified' ? 'Verified' : kycStatus === 'rejected' ? 'Rejected' : 'Pending';
   const kycTone =
     kycStatus === 'verified' ? colors.reward : kycStatus === 'rejected' ? colors.danger : colors.warning;
+  const handleKycPending = (label: string) => {
+    setKycNotice(`${label} setup pending. Coming soon.`);
+  };
 
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'profile' }, userId);
@@ -4678,11 +4681,25 @@ const ProfileScreen = () => {
                 {kycLoading ? 'Saving...' : 'Save verification'}
               </Text>
             </Pressable>
+            <View style={styles.sectionDivider} />
+            <Text style={styles.metaText}>Document upload (CNIC/ID)</Text>
             <Pressable
               style={styles.secondaryButton}
-              onPress={() => setKycNotice('ID upload coming soon.')}
+              onPress={() => handleKycPending('Upload ID front')}
             >
-              <Text style={styles.secondaryButtonText}>Upload ID (coming soon)</Text>
+              <Text style={styles.secondaryButtonText}>Upload ID front (pending)</Text>
+            </Pressable>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => handleKycPending('Upload ID back')}
+            >
+              <Text style={styles.secondaryButtonText}>Upload ID back (pending)</Text>
+            </Pressable>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => handleKycPending('Verification request')}
+            >
+              <Text style={styles.secondaryButtonText}>Request verification (pending)</Text>
             </Pressable>
           </View>
         ) : null}

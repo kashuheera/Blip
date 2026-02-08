@@ -43,6 +43,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Side panel navigation drawer (hamburger menu).
 - Account types enforced (personal vs business; business accounts blocked from user screens).
 - UI color system applied (brand/reward/categories + map styling).
+- KYC document upload placeholders (front/back + request verification UI; backend pending).
 
 ### Known broken, disabled, or deferred
 - Magic link / email OTP auth: deferred. Must-have before rollout with proper domain redirects/deep links (mobile cannot follow `127.0.0.1` links).
@@ -50,7 +51,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Payments/billing: not implemented (billing screen is placeholder only).
 - Stories + voice rooms: UI placeholders only (no functional media/voice backend).
 - Business admin access requires a business account (owner/staff). Personal-only accounts are blocked from admin controls.
-- KYC verification: CNIC/ID upload + verification workflow not implemented yet (badge UI is live).
+- KYC verification: CNIC/ID upload workflow + verification logic not implemented yet (UI placeholders are live).
 - Push notifications delivery: requires FCM/APNS keys + redeploy `push-send`.
 - Web support: location is disabled on web (mobile-first).
 - Advanced search filters: open now/verified/tags are wired for businesses/rooms.

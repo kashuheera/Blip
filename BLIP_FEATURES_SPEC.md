@@ -18,7 +18,7 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - Tiers: not included for now.
 - Ordering: included (no payments in MVP; pickup only in app; delivery handled by businesses outside BLIP).
 - Accounts: personal and business logins are separate; personal accounts cannot access business admin; business accounts cannot access user feeds/rooms/DMs.
-- KYC: users must provide name + phone + address to place orders; CNIC/ID upload + verification badge comes later.
+- KYC: users must provide name + phone + address to place orders; CNIC/ID upload has UI placeholders, backend verification comes later.
 - Orders: pickup + delivery options; delivery handled by business; businesses can view user contact + address for their orders only.
 - Location privacy: posts store coarse location for distance labels; exact user location is never shown to other users.
 - Safer onboarding: Supabase phone OTP + in-house device ID (lightweight device fingerprint).
@@ -37,7 +37,7 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - Implemented: Push plumbing (device tokens + test push), but delivery requires FCM/APNS keys.
 - Admin: Business Admin Portal + Blip Admin Portal in-app screens.
 - Implemented: UI placeholders for Stories (Feed) + Voice rooms (Messages).
-- Not implemented yet: magic link/OTP, Google OAuth, payments, stories/highlights/pinned, voice rooms, KYC badge/ID upload.
+- Not implemented yet: magic link/OTP, Google OAuth, payments, stories/highlights/pinned, voice rooms, KYC verification workflow.
 
 ## Scope Tags
 - MVP: required for the first release
