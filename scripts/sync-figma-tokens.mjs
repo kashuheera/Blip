@@ -12,12 +12,20 @@ if (!fs.existsSync(tokensPath)) {
 const tokens = JSON.parse(fs.readFileSync(tokensPath, 'utf8'));
 const theme = tokens?.theme;
 const categories = tokens?.categories;
+const spacing = tokens?.spacing;
+const typography = tokens?.typography;
 
 if (!theme?.dark || !theme?.light) {
   throw new Error('design/tokens.json must include theme.dark and theme.light');
 }
 if (!categories?.dark || !categories?.light) {
   throw new Error('design/tokens.json must include categories.dark and categories.light');
+}
+if (!spacing) {
+  throw new Error('design/tokens.json must include spacing');
+}
+if (!typography) {
+  throw new Error('design/tokens.json must include typography');
 }
 
 const mapStyles = {
@@ -67,6 +75,14 @@ export type ThemeColors = {
 };
 
 export type CategoryColors = { fg: string; bg: string };
+export type SpacingScale = Record<string, number>;
+export type TypographyTokens = {
+  fontFamilies: Record<string, string>;
+  fontSizes: Record<string, number>;
+  lineHeights: Record<string, number>;
+  fontWeights: Record<string, string>;
+  letterSpacing: Record<string, number>;
+};
 
 export const THEME_COLORS: Record<ResolvedThemeMode, ThemeColors> = ${JSON.stringify(
   theme,
@@ -85,6 +101,10 @@ export const CATEGORY_COLORS: Record<ResolvedThemeMode, Record<string, CategoryC
   null,
   2
 )};
+
+export const SPACING: SpacingScale = ${JSON.stringify(spacing, null, 2)};
+
+export const TYPOGRAPHY: TypographyTokens = ${JSON.stringify(typography, null, 2)};
 
 export const DEFAULT_THEME_MODE: ThemeMode = 'dark';
 `;

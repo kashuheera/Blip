@@ -89,6 +89,7 @@ From `c:\Blip\app`:
 - Update tokens in Figma using Tokens Studio and export to `design/tokens.json`.
 - Run `node scripts/sync-figma-tokens.mjs` to regenerate `app/theme/tokens.ts`.
 - `app/App.tsx` imports `THEME_COLORS`, `MAP_STYLES`, and `CATEGORY_COLORS` from `app/theme/tokens.ts`.
+- Tokens include spacing + typography scales (ready for UI refactors).
 - Map styles are manual (not from Figma); keep them aligned with the theme background.
 
 ## 4) Database (Supabase) — schema + “why it exists”
