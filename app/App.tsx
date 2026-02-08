@@ -2173,9 +2173,24 @@ const HomeScreen = () => {
         <View style={styles.mapShell}>
           {Platform.OS === 'web' ? (
             <View style={styles.webPlaceholder}>
-              <Text style={styles.mapLabel}>
-                Web support parity is pending. Map is mobile-only for now.
-              </Text>
+              <View style={styles.webPlaceholderCard}>
+                <SectionTitle icon="desktop-outline" label="Web preview" />
+                <Text style={styles.cardBody}>Map-first discovery is mobile-only today.</Text>
+                <View style={styles.webPlaceholderList}>
+                  <View style={styles.metaRow}>
+                    <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+                    <Text style={styles.metaText}>Location + map: mobile-only</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.textMuted} />
+                    <Text style={styles.metaText}>Chats and orders: mobile-only</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <Ionicons name="shield-checkmark-outline" size={14} color={colors.textMuted} />
+                    <Text style={styles.metaText}>Full experience: iOS/Android app</Text>
+                  </View>
+                </View>
+              </View>
             </View>
           ) : (
             <MapView
@@ -7818,6 +7833,13 @@ const useStyles = () => {
           alignItems: 'center',
           justifyContent: 'center',
           paddingHorizontal: 24,
+        },
+        webPlaceholderCard: {
+          width: '100%',
+        },
+        webPlaceholderList: {
+          marginTop: 8,
+          gap: 6,
         },
         mapRecenterButton: {
           position: 'absolute',
