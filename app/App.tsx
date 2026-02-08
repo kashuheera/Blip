@@ -4426,6 +4426,10 @@ const ProfileScreen = () => {
     }
     return 'New';
   }, [profile?.level, profile?.shadowbanned, profile?.u2uLocked]);
+  const kycLabel =
+    kycStatus === 'verified' ? 'Verified' : kycStatus === 'rejected' ? 'Rejected' : 'Pending';
+  const kycTone =
+    kycStatus === 'verified' ? colors.reward : kycStatus === 'rejected' ? colors.danger : colors.warning;
 
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'profile' }, userId);
@@ -4633,7 +4637,12 @@ const ProfileScreen = () => {
             <Text style={styles.cardBody}>
               Required to place orders. Businesses only see your verified details.
             </Text>
-            <Text style={styles.metaText}>Status: {kycStatus}</Text>
+            <View style={styles.rowBetween}>
+              <Text style={styles.metaText}>Status</Text>
+              <View style={[styles.postBadge, { backgroundColor: withOpacity(kycTone, 0.16) }]}>
+                <Text style={[styles.postBadgeText, { color: kycTone }]}>KYC {kycLabel}</Text>
+              </View>
+            </View>
             {kycNotice ? <Text style={styles.metaText}>{kycNotice}</Text> : null}
             <TextInput
               style={styles.input}

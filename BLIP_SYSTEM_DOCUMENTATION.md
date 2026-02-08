@@ -23,6 +23,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Feed actions updated: like + share + reply (business-only) + user profile drilldown + distance badge (coarse location).
 - Post engagement: likes (personal) + replies/comments (business-only).
 - Orders: pickup + delivery options + KYC-required user details (name/phone/address).
+- KYC status badge UI in profile (verified/pending/rejected).
 - Auth screen with Personal/Business/Fleet tabs + pending buttons for Magic link/OTP + Google OAuth.
 - Room chat with realtime updates + distance gating.
 - Business profile (menu, offers, Q&A chat) + chat join gating.
@@ -49,7 +50,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Payments/billing: not implemented (billing screen is placeholder only).
 - Stories + voice rooms: UI placeholders only (no functional media/voice backend).
 - Business admin access requires a business account (owner/staff). Personal-only accounts are blocked from admin controls.
-- KYC verification: CNIC/ID upload + verification badge not implemented yet (UI placeholder only).
+- KYC verification: CNIC/ID upload + verification workflow not implemented yet (badge UI is live).
 - Push notifications delivery: requires FCM/APNS keys + redeploy `push-send`.
 - Web support: location is disabled on web (mobile-first).
 - Advanced search filters: open now/verified/tags are wired for businesses/rooms.

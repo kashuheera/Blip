@@ -37,6 +37,7 @@
 - Business admin access gating (business accounts only)
 - Account type enforcement (personal vs business, UI + RLS)
 - KYC capture (name/phone/address) + delivery vs pickup order options
+- KYC status badge UI (profile)
 
 ## In-Progress
 - Push notifications: set FCM/APNS keys + redeploy `push-send`
@@ -47,7 +48,7 @@
 - MUST-HAVE before rollout: payments / billing (explicitly not implemented; subscriptions are placeholders)
 - MUST-HAVE before rollout: web support parity (location disabled on web; mobile-first only)
 - Order notifications + receipts (email/SMS provider pending; push requires keys)
-- KYC verification badge + ID upload (pending)
+- KYC ID upload + verification workflow (pending)
 - A4 Invite-only tiers / access (disabled; open signup per decision)
 - F1 Paid tiers (users) (disabled; no tiers for now)
 - F3 Paid invites (disabled; no invite system)
