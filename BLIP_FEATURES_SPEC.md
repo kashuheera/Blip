@@ -16,7 +16,7 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - Message retention: user-to-user chats expire after 1 hour; room messages do not expire; business chats do not expire.
 - Access: open signup; no invite-only or waitlist in MVP.
 - Tiers: not included for now.
-- Ordering: included (no payments in MVP; pickup only in app; delivery handled by businesses outside BLIP).
+- Ordering: included (no payments in MVP; provider planned: Safepay; pickup only in app; delivery handled by businesses outside BLIP).
 - Accounts: personal and business logins are separate; personal accounts cannot access business admin; business accounts cannot access user feeds/rooms/DMs.
 - KYC: users must provide name + phone + address to place orders; CNIC/ID upload has UI placeholders, backend verification comes later.
 - Orders: pickup + delivery options; delivery handled by business; businesses can view user contact + address for their orders only.
@@ -37,7 +37,7 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - Implemented: Push plumbing (device tokens + test push), but delivery requires FCM/APNS keys.
 - Admin: Business Admin Portal + Blip Admin Portal in-app screens.
 - Implemented: UI placeholders for Stories (Feed) + Voice rooms (Messages).
-- Not implemented yet: magic link/OTP, Google OAuth, payments, stories/highlights/pinned, voice rooms, KYC verification workflow.
+- Not implemented yet: magic link/OTP, Google OAuth, payments (provider planned: Safepay), stories/highlights/pinned, voice rooms, KYC verification workflow.
 
 ## Scope Tags
 - MVP: required for the first release

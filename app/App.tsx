@@ -4365,10 +4365,13 @@ const BillingScreen = () => {
           <Text style={styles.cardBody}>
             Payments, subscriptions, and invoices are not enabled yet.
           </Text>
+          <Text style={styles.metaText}>
+            Provider plan: Safepay (Pakistan checkout). Integration pending.
+          </Text>
           <Text style={styles.metaText}>This will unlock before rollout.</Text>
           {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Payments')}>
-            <Text style={styles.secondaryButtonText}>Connect payments provider</Text>
+          <Pressable style={styles.secondaryButton} onPress={() => handlePending('Safepay')}>
+            <Text style={styles.secondaryButtonText}>Connect Safepay (pending)</Text>
           </Pressable>
           <View style={styles.sectionDivider} />
           <Pressable style={styles.secondaryButton} onPress={() => handlePending('Paid tiers')}>

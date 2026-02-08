@@ -46,7 +46,7 @@
 ## Pending
 - MUST-HAVE before rollout: magic link + email OTP deep-link auth (explicitly deferred)
 - MUST-HAVE before rollout: Google OAuth (explicitly not implemented)
-- MUST-HAVE before rollout: payments / billing (explicitly not implemented; subscriptions are placeholders)
+- MUST-HAVE before rollout: payments / billing (provider planned: Safepay; subscriptions are placeholders)
 - MUST-HAVE before rollout: web support parity (location disabled on web; mobile-first only)
 - Order notifications + receipts (provider chosen: SendGrid email + Twilio SMS; integration pending)
 - KYC ID upload + verification workflow (backend pending)

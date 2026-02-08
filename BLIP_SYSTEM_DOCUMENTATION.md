@@ -32,7 +32,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Messages (business list + direct threads + direct chat).
 - Voice rooms placeholder card in Messages (UI only).
 - Profile (identity switch, level/xp, reputation/trust labels, device ID display).
-- Billing placeholder screen (no payments).
+- Billing placeholder screen (provider planned: Safepay; no payments yet).
 - Push notifications plumbing (device token capture + test push).
 - AI moderation checks for posts + room/business/direct messages.
 - Onboarding flow (privacy + interests).
@@ -746,10 +746,10 @@ This section lists missing features (not implemented yet) so you can track rollo
   - Function: 1-tap login via Google.
   - Status: not implemented.
   - Needed to implement: Google OAuth app + Supabase provider config + `signInWithOAuth` UI + redirect/deep-link handling.
-- Payments / billing (explicitly not implemented; subscriptions are placeholders)
+- Payments / billing (explicitly not implemented; provider planned: Safepay; subscriptions are placeholders)
   - Function: collect payments for subscriptions/tiers, payouts, and/or appeals.
-  - Status: not implemented (UI placeholders exist, no gating or provider).
-  - Needed to implement: payment provider (e.g., Stripe) + server-side verification/webhooks + DB tables for entitlements + client gating.
+  - Status: not implemented (UI placeholders exist, no gating or live provider).
+  - Needed to implement: Safepay integration + server-side verification/webhooks + DB tables for entitlements + client gating.
 - Web support parity (location disabled on web; mobile-first only)
   - Function: allow feature-complete web usage (map/feed/rooms/businesses).
   - Status: not supported; web path disables location flows.
