@@ -32,6 +32,7 @@
 - Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders)
 - Business replies inbox (business-only, recent post replies + thread jump)
 - UI color system applied (brand/reward/categories + map styling)
+- Figma tokens pipeline (design/tokens.json + sync script + app/theme/tokens.ts)
 - Web parity placeholder polish (info-only)
 - Blip Admin Portal (feature flags, verification queue, moderation ops)
 - Side panel navigation drawer
