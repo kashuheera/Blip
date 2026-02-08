@@ -4285,10 +4285,13 @@ const OrdersScreen = () => {
       ) : null}
       <Pressable
         style={styles.secondaryButton}
-        onPress={() => setNotice('Email/SMS receipt setup pending. Coming soon.')}
+        onPress={() =>
+          setNotice('Receipts pending. Provider: SendGrid (email) + Twilio (SMS).')
+        }
       >
-        <Text style={styles.secondaryButtonText}>Email/SMS receipt</Text>
+        <Text style={styles.secondaryButtonText}>Email/SMS receipt (pending)</Text>
       </Pressable>
+      <Text style={styles.metaText}>Provider: SendGrid (email) + Twilio (SMS).</Text>
     </View>
   );
 

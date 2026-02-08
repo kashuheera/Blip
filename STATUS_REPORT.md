@@ -48,7 +48,7 @@
 - MUST-HAVE before rollout: Google OAuth (explicitly not implemented)
 - MUST-HAVE before rollout: payments / billing (explicitly not implemented; subscriptions are placeholders)
 - MUST-HAVE before rollout: web support parity (location disabled on web; mobile-first only)
-- Order notifications + receipts (email/SMS provider pending; push requires keys)
+- Order notifications + receipts (provider chosen: SendGrid email + Twilio SMS; integration pending)
 - KYC ID upload + verification workflow (backend pending)
 - A4 Invite-only tiers / access (disabled; open signup per decision)
 - F1 Paid tiers (users) (disabled; no tiers for now)
