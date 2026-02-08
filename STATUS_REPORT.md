@@ -33,6 +33,7 @@
 - Business replies inbox (business-only, recent post replies + thread jump)
 - UI color system applied (brand/reward/categories + map styling)
 - Figma tokens pipeline (colors + spacing + typography via design/tokens.json + sync script + app/theme/tokens.ts)
+- Typography/spacing normalization pass in `App.tsx` (shared text presets + tokenized icon sizes/padding)
 - Web parity placeholder polish (info-only)
 - Blip Admin Portal (feature flags, verification queue, moderation ops)
 - Side panel navigation drawer

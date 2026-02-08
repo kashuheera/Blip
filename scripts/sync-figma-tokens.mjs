@@ -49,7 +49,9 @@ const mapStyles = {
   ],
 };
 
-const output = `// Generated from design/tokens.json via scripts/sync-figma-tokens.mjs
+const output = `import type { MapStyleElement } from 'react-native-maps';
+
+// Generated from design/tokens.json via scripts/sync-figma-tokens.mjs
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type ResolvedThemeMode = 'light' | 'dark';
 
@@ -90,7 +92,7 @@ export const THEME_COLORS: Record<ResolvedThemeMode, ThemeColors> = ${JSON.strin
   2
 )};
 
-export const MAP_STYLES: Record<ResolvedThemeMode, object[]> = ${JSON.stringify(
+export const MAP_STYLES: Record<ResolvedThemeMode, MapStyleElement[]> = ${JSON.stringify(
   mapStyles,
   null,
   2

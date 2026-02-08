@@ -5,6 +5,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 ## 1) Repo layout (what to open first)
 - `app/App.tsx`: The entire Expo / React Native app (all screens, state, Supabase calls, UI).
 - `app/theme/tokens.ts`: Theme + category tokens used by the app (generated from Figma export).
+- `app/theme/typography.ts`: Shared typography presets, icon sizes, and spacing aliases for UI consistency.
 - `design/tokens.json`: Figma Tokens Studio export (source of truth for colors).
 - `scripts/sync-figma-tokens.mjs`: Sync script (design tokens -> app theme tokens).
 - `supabase/migrations/*.sql`: Database schema, RLS policies, triggers, and RPC functions.
@@ -90,6 +91,7 @@ From `c:\Blip\app`:
 - Run `node scripts/sync-figma-tokens.mjs` to regenerate `app/theme/tokens.ts`.
 - `app/App.tsx` imports `THEME_COLORS`, `MAP_STYLES`, and `CATEGORY_COLORS` from `app/theme/tokens.ts`.
 - Tokens include spacing + typography scales (ready for UI refactors).
+- `app/App.tsx` now uses shared text presets (`TYPE_PRESETS`) and spacing/icon scales (`SPACE_SCALE`, `ICON_SIZES`) for normalized 12/14/16 text rhythm and padding.
 - Map styles are manual (not from Figma); keep them aligned with the theme background.
 
 ## 4) Database (Supabase) — schema + “why it exists”

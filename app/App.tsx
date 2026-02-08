@@ -1,4 +1,4 @@
-import 'react-native-url-polyfill/auto';
+﻿import 'react-native-url-polyfill/auto';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -46,6 +46,7 @@ import type {
   ThemeColors,
   ThemeMode,
 } from './theme/tokens';
+import { ICON_SIZES, SPACE_SCALE, TYPE_PRESETS } from './theme/typography';
 
 const APP_VERSION = Constants.expoConfig?.version ?? 'dev';
 
@@ -477,8 +478,8 @@ const useAuth = () => {
       deviceId: null,
       profile: null,
       loading: false,
-      signIn: async () => false,
-      signUp: async () => false,
+      signIn: async () => null,
+      signUp: async () => null,
       signOut: async () => {},
     }
   );
@@ -832,7 +833,7 @@ const AppHeader = () => {
     <View style={styles.appBar}>
       <View style={styles.appBarLeft}>
         <Pressable style={styles.appBarIconButton} onPress={() => setMenuOpen(true)}>
-          <Ionicons name="menu" size={22} color={colors.text} />
+          <Ionicons name="menu" size={ICON_SIZES.xl} color={colors.text} />
         </Pressable>
         <View style={styles.appBarBrand}>
           <Text style={styles.appBarBrandText}>BLIP</Text>
@@ -846,10 +847,10 @@ const AppHeader = () => {
       </View>
       <View style={styles.appBarRight}>
         <Pressable style={styles.appBarIconButton} onPress={() => navigation.navigate('BugReport')}>
-          <Ionicons name="bug-outline" size={20} color={colors.text} />
+          <Ionicons name="bug-outline" size={ICON_SIZES.lg} color={colors.text} />
         </Pressable>
         <Pressable style={styles.appBarIconButton} onPress={() => navigation.navigate('Orders')}>
-          <Ionicons name="cart-outline" size={20} color={colors.text} />
+          <Ionicons name="cart-outline" size={ICON_SIZES.lg} color={colors.text} />
         </Pressable>
       </View>
       <Modal transparent animationType="fade" visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
@@ -859,7 +860,7 @@ const AppHeader = () => {
             <View style={styles.sideSheetHeader}>
               <Text style={styles.sideSheetTitle}>Menu</Text>
               <Pressable style={styles.iconButtonSm} onPress={() => setMenuOpen(false)}>
-                <Ionicons name="close" size={18} color={colors.text} />
+                <Ionicons name="close" size={ICON_SIZES.md} color={colors.text} />
               </Pressable>
             </View>
             <Text style={styles.metaText}>
@@ -867,31 +868,31 @@ const AppHeader = () => {
             </Text>
             <View style={styles.sideSheetList}>
               <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('Profile')}>
-                <Ionicons name="person-outline" size={18} color={colors.text} />
+                <Ionicons name="person-outline" size={ICON_SIZES.md} color={colors.text} />
                 <Text style={styles.sideSheetItemText}>Profile</Text>
               </Pressable>
               <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('Messages')}>
-                <Ionicons name="chatbubbles-outline" size={18} color={colors.text} />
+                <Ionicons name="chatbubbles-outline" size={ICON_SIZES.md} color={colors.text} />
                 <Text style={styles.sideSheetItemText}>Messages</Text>
               </Pressable>
               <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('Orders')}>
-                <Ionicons name="receipt-outline" size={18} color={colors.text} />
+                <Ionicons name="receipt-outline" size={ICON_SIZES.md} color={colors.text} />
                 <Text style={styles.sideSheetItemText}>Orders</Text>
               </Pressable>
               {profile?.accountType === 'business' ? (
                 <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('BusinessAdmin')}>
-                  <Ionicons name="storefront-outline" size={18} color={colors.text} />
+                  <Ionicons name="storefront-outline" size={ICON_SIZES.md} color={colors.text} />
                   <Text style={styles.sideSheetItemText}>Business admin</Text>
                 </Pressable>
               ) : null}
               {profile?.isAdmin ? (
                 <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('AdminPortal')}>
-                  <Ionicons name="shield-checkmark-outline" size={18} color={colors.text} />
+                  <Ionicons name="shield-checkmark-outline" size={ICON_SIZES.md} color={colors.text} />
                   <Text style={styles.sideSheetItemText}>Blip admin</Text>
                 </Pressable>
               ) : null}
               <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('Help')}>
-                <Ionicons name="help-circle-outline" size={18} color={colors.text} />
+                <Ionicons name="help-circle-outline" size={ICON_SIZES.md} color={colors.text} />
                 <Text style={styles.sideSheetItemText}>Help & support</Text>
               </Pressable>
             </View>
@@ -917,7 +918,7 @@ const SectionTitle = ({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; l
   const { colors } = useTheme();
   return (
     <View style={styles.sectionTitleRow}>
-      <Ionicons name={icon} size={16} color={colors.text} />
+      <Ionicons name={icon} size={ICON_SIZES.sm} color={colors.text} />
       <Text style={styles.sectionTitleText}>{label}</Text>
     </View>
   );
@@ -1003,7 +1004,7 @@ const BottomNav = () => {
     <View style={styles.tabBar}>
       {items.map((item) => (
         <Pressable key={item.label} style={styles.tabItem} onPress={() => navigation.navigate(item.target)}>
-          <Ionicons name={item.icon} size={20} color={colors.text} />
+          <Ionicons name={item.icon} size={ICON_SIZES.lg} color={colors.text} />
           <Text style={styles.tabLabel}>{item.label}</Text>
         </Pressable>
       ))}
@@ -1853,22 +1854,22 @@ const HomeScreen = () => {
             {profile?.handle ? (
               <Text style={styles.avatarText}>{profile.handle.slice(0, 2).toUpperCase()}</Text>
             ) : (
-              <Ionicons name="person" size={18} color={colors.text} />
+              <Ionicons name="person" size={ICON_SIZES.md} color={colors.text} />
             )}
           </Pressable>
           <View style={styles.locationPill}>
-            <Ionicons name="navigate-outline" size={14} color={colors.textMuted} />
+            <Ionicons name="navigate-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
             <Text style={styles.locationPillText}>You're in Lahore North</Text>
           </View>
           <Pressable style={styles.iconButton} onPress={() => setSearchOpen(true)}>
-            <Ionicons name="search" size={20} color={colors.text} />
+            <Ionicons name="search" size={ICON_SIZES.lg} color={colors.text} />
           </Pressable>
         </View>
         {searchOpen ? (
           <View style={styles.searchOverlay}>
           <View style={styles.searchOverlayHeader}>
             <View style={styles.searchInputWrap}>
-              <Ionicons name="search" size={18} color={colors.textMuted} />
+              <Ionicons name="search" size={ICON_SIZES.md} color={colors.textMuted} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search rooms, businesses, posts"
@@ -1893,7 +1894,7 @@ const HomeScreen = () => {
                   }
                 }}
               >
-                <Ionicons name="close" size={20} color={colors.text} />
+                <Ionicons name="close" size={ICON_SIZES.lg} color={colors.text} />
               </Pressable>
             </View>
             <View style={styles.filterRow}>
@@ -2023,12 +2024,12 @@ const HomeScreen = () => {
                         navigation.navigate('Room', { roomId: room.id });
                       }}
                     >
-                      <Ionicons name="chatbubbles-outline" size={16} color={colors.textMuted} />
+                      <Ionicons name="chatbubbles-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
                       <View style={styles.searchResultInfo}>
                         <Text style={styles.cardTitle}>{room.title}</Text>
                         <Text style={styles.metaText}>{room.category}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                      <Ionicons name="chevron-forward" size={ICON_SIZES.sm} color={colors.textMuted} />
                     </Pressable>
                   ))
                 )
@@ -2046,12 +2047,12 @@ const HomeScreen = () => {
                         navigation.navigate('Business', { businessId: business.id });
                       }}
                     >
-                      <Ionicons name="storefront-outline" size={16} color={colors.textMuted} />
+                      <Ionicons name="storefront-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
                       <View style={styles.searchResultInfo}>
                         <Text style={styles.cardTitle}>{business.name}</Text>
                         <Text style={styles.metaText}>{business.category}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                      <Ionicons name="chevron-forward" size={ICON_SIZES.sm} color={colors.textMuted} />
                     </Pressable>
                   ))
                 )
@@ -2063,7 +2064,7 @@ const HomeScreen = () => {
                   ) : (
                     postSearchResults.slice(0, 4).map((post) => (
                       <View key={post.id} style={styles.searchResultRow}>
-                        <Ionicons name="newspaper-outline" size={16} color={colors.textMuted} />
+                        <Ionicons name="newspaper-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
                         <View style={styles.searchResultInfo}>
                           <Text style={styles.cardTitle}>@{post.authorHandle}</Text>
                           <Text style={styles.metaText}>{post.body}</Text>
@@ -2093,15 +2094,15 @@ const HomeScreen = () => {
                 <Text style={styles.cardBody}>Map-first discovery is mobile-only today.</Text>
                 <View style={styles.webPlaceholderList}>
                   <View style={styles.metaRow}>
-                    <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+                    <Ionicons name="location-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
                     <Text style={styles.metaText}>Location + map: mobile-only</Text>
                   </View>
                   <View style={styles.metaRow}>
-                    <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.textMuted} />
+                    <Ionicons name="chatbubble-ellipses-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
                     <Text style={styles.metaText}>Chats and orders: mobile-only</Text>
                   </View>
                   <View style={styles.metaRow}>
-                    <Ionicons name="shield-checkmark-outline" size={14} color={colors.textMuted} />
+                    <Ionicons name="shield-checkmark-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
                     <Text style={styles.metaText}>Full experience: iOS/Android app</Text>
                   </View>
                 </View>
@@ -2166,7 +2167,7 @@ const HomeScreen = () => {
                           ) : (
                             <Ionicons
                               name={item.category === 'grocery' ? 'basket-outline' : 'restaurant-outline'}
-                              size={16}
+                              size={ICON_SIZES.sm}
                               color={categoryColors.fg}
                             />
                           )}
@@ -2191,7 +2192,7 @@ const HomeScreen = () => {
                         <PulseRing color={colors.brand} size={38} />
                         {item.saved ? <View style={styles.savedRing} /> : null}
                         <View style={styles.roomPin}>
-                          <Ionicons name="chatbubbles-outline" size={16} color={colors.brandText} />
+                          <Ionicons name="chatbubbles-outline" size={ICON_SIZES.sm} color={colors.brandText} />
                         </View>
                       </View>
                     </Marker>
@@ -2216,7 +2217,7 @@ const HomeScreen = () => {
                           {item.avatarUrl ? (
                             <Image source={{ uri: item.avatarUrl }} style={styles.userPinImage} />
                           ) : (
-                            <Ionicons name="person" size={14} color={colors.brandText} />
+                            <Ionicons name="person" size={ICON_SIZES.xs} color={colors.brandText} />
                           )}
                         </View>
                       </View>
@@ -2275,7 +2276,7 @@ const HomeScreen = () => {
                           ) : (
                             <Ionicons
                               name={pin.category === 'grocery' ? 'basket-outline' : 'restaurant-outline'}
-                              size={16}
+                              size={ICON_SIZES.sm}
                               color={categoryColors.fg}
                             />
                           )}
@@ -2299,7 +2300,7 @@ const HomeScreen = () => {
                         <PulseRing color={colors.brand} size={38} />
                         {pin.saved ? <View style={styles.savedRing} /> : null}
                         <View style={styles.roomPin}>
-                          <Ionicons name="chatbubbles-outline" size={16} color={colors.brandText} />
+                          <Ionicons name="chatbubbles-outline" size={ICON_SIZES.sm} color={colors.brandText} />
                         </View>
                       </View>
                     </Marker>
@@ -2317,7 +2318,7 @@ const HomeScreen = () => {
                         {pin.avatarUrl ? (
                           <Image source={{ uri: pin.avatarUrl }} style={styles.userPinImage} />
                         ) : (
-                          <Ionicons name="person" size={14} color={colors.brandText} />
+                          <Ionicons name="person" size={ICON_SIZES.xs} color={colors.brandText} />
                         )}
                       </View>
                     </View>
@@ -2339,7 +2340,7 @@ const HomeScreen = () => {
                         />
                       ) : (
                         <View style={styles.mapBusinessPlaceholder}>
-                          <Ionicons name="image-outline" size={20} color={colors.textMuted} />
+                          <Ionicons name="image-outline" size={ICON_SIZES.lg} color={colors.textMuted} />
                           <Text style={styles.mapBusinessPlaceholderText}>Image</Text>
                         </View>
                       )}
@@ -2348,7 +2349,7 @@ const HomeScreen = () => {
                       <Text style={styles.mapBusinessTitle}>{selectedBusiness.name}</Text>
                       <Text style={styles.mapBusinessDescription}>{selectedBusiness.description}</Text>
                       <View style={styles.mapBusinessMetaRow}>
-                        <Ionicons name="star" size={14} color={colors.prestige} />
+                        <Ionicons name="star" size={ICON_SIZES.xs} color={colors.prestige} />
                         <Text style={styles.mapBusinessMetaText}>
                           {selectedBusiness.rating.toFixed(1)}
                         </Text>
@@ -2382,7 +2383,7 @@ const HomeScreen = () => {
                 <>
                   <View style={styles.mapBusinessHeader}>
                     <View style={styles.roomPinLarge}>
-                      <Ionicons name="chatbubbles-outline" size={18} color={colors.brandText} />
+                      <Ionicons name="chatbubbles-outline" size={ICON_SIZES.md} color={colors.brandText} />
                     </View>
                     <View style={styles.mapBusinessInfo}>
                       <Text style={styles.mapBusinessTitle}>{selectedRoom.title}</Text>
@@ -2408,20 +2409,20 @@ const HomeScreen = () => {
             </View>
           ) : null}
           <Pressable style={styles.mapRecenterButton} onPress={() => void handleRecenter()}>
-            <Ionicons name="locate" size={20} color={colors.text} />
+            <Ionicons name="locate" size={ICON_SIZES.lg} color={colors.text} />
           </Pressable>
         </View>
         <View style={styles.mapFabBar}>
           <Pressable style={styles.fabButton} onPress={() => navigation.navigate('Create')}>
-            <Ionicons name="add-circle-outline" size={20} color={colors.rewardText} />
+            <Ionicons name="add-circle-outline" size={ICON_SIZES.lg} color={colors.rewardText} />
             <Text style={styles.fabText}>Create Room</Text>
           </Pressable>
           <Pressable style={styles.fabButton} onPress={() => navigation.navigate('BusinessAdmin')}>
-            <Ionicons name="storefront-outline" size={20} color={colors.rewardText} />
+            <Ionicons name="storefront-outline" size={ICON_SIZES.lg} color={colors.rewardText} />
             <Text style={styles.fabText}>Add Business</Text>
           </Pressable>
           <Pressable style={styles.fabButton} onPress={() => navigation.navigate('Feed')}>
-            <Ionicons name="newspaper-outline" size={20} color={colors.rewardText} />
+            <Ionicons name="newspaper-outline" size={ICON_SIZES.lg} color={colors.rewardText} />
             <Text style={styles.fabText}>View Feed</Text>
           </Pressable>
         </View>
@@ -2656,6 +2657,75 @@ const FeedScreen = ({ route }: FeedProps) => {
     navigation.navigate('PostReplies', { postId: post.id, authorHandle: post.authorHandle });
   };
 
+  const feedHeader = (
+    <View style={styles.feedHeader}>
+      <View style={styles.card}>
+        <SectionTitle icon="newspaper-outline" label="Discovery feed" />
+        <TextInput
+          style={styles.input}
+          placeholder="Search posts"
+          placeholderTextColor={colors.placeholder}
+          value={searchValue}
+          onChangeText={setSearchValue}
+        />
+        <View style={styles.feedTabs}>
+          {[
+            { key: 'trending', label: 'Trending' },
+            { key: 'forYou', label: 'For you' },
+            { key: 'newest', label: 'Newest' },
+          ].map((entry) => (
+            <Pressable
+              key={entry.key}
+              style={[styles.tabPill, activeTab === entry.key && styles.tabPillActive]}
+              onPress={() => {
+                setActiveTab(entry.key as 'trending' | 'forYou' | 'newest');
+                void trackAnalyticsEvent('filter_toggle', { filter: 'feed_tab', value: entry.key }, userId);
+              }}
+            >
+              <Text style={[styles.tabPillText, activeTab === entry.key && styles.tabPillTextActive]}>
+                {entry.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.storyRow}>
+          {tags.map((tag) => (
+            <Pressable
+              key={tag}
+              style={[styles.filterChip, activeTag === tag && styles.filterChipActive]}
+              onPress={() => {
+                const nextTag = activeTag === tag ? null : tag;
+                setActiveTag(nextTag);
+                void trackAnalyticsEvent(
+                  'filter_toggle',
+                  { filter: 'feed_tag', value: nextTag ?? 'none' },
+                  userId
+                );
+              }}
+            >
+              <Text style={[styles.filterChipText, activeTag === tag && styles.filterChipTextActive]}>
+                #{tag}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.storyRow}>
+          {storyLabels.map((label) => (
+            <Pressable
+              key={label}
+              style={styles.storyPill}
+              onPress={() => setStoriesNotice('Stories setup pending. Coming soon.')}
+            >
+              <Text style={styles.storyPillText}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null}
+        {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -2663,7 +2733,7 @@ const FeedScreen = ({ route }: FeedProps) => {
         contentContainerStyle={styles.listContent}
         data={filteredPosts}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={orderHeader}
+        ListHeaderComponent={feedHeader}
         renderItem={({ item }) => (
           <View style={styles.postCard}>
             <Pressable
@@ -2686,14 +2756,14 @@ const FeedScreen = ({ route }: FeedProps) => {
               <Image source={{ uri: item.mediaUrl }} style={styles.feedMediaImage} />
             ) : null}
             <View style={styles.postContext}>
-              <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+              <Ionicons name="location-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
               <Text style={styles.metaText}>Room / Business context</Text>
             </View>
             <View style={styles.postActions}>
               <Pressable style={styles.postActionButton} onPress={() => void handleLike(item.id)}>
                 <Ionicons
                   name={likedPosts[item.id] ? 'heart' : 'heart-outline'}
-                  size={16}
+                  size={ICON_SIZES.sm}
                   color={likedPosts[item.id] ? colors.brand : colors.text}
                 />
                 <Text style={styles.postActionText}>
@@ -2701,11 +2771,11 @@ const FeedScreen = ({ route }: FeedProps) => {
                 </Text>
               </Pressable>
               <Pressable style={styles.postActionButton} onPress={() => handleShare(item)}>
-                <Ionicons name="share-social-outline" size={16} color={colors.text} />
+                <Ionicons name="share-social-outline" size={ICON_SIZES.sm} color={colors.text} />
                 <Text style={styles.postActionText}>Share</Text>
               </Pressable>
               <Pressable style={styles.postActionButton} onPress={() => handleReply(item)}>
-                <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.text} />
+                <Ionicons name="chatbubble-ellipses-outline" size={ICON_SIZES.sm} color={colors.text} />
                 <Text style={styles.postActionText}>
                   Reply{commentCounts[item.id] ? ` ${commentCounts[item.id]}` : ''}
                 </Text>
@@ -3326,7 +3396,7 @@ const MessagesScreen = () => {
             </Pressable>
           </View>
           <View style={styles.searchInputWrap}>
-            <Ionicons name="search" size={18} color={colors.textMuted} />
+            <Ionicons name="search" size={ICON_SIZES.md} color={colors.textMuted} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search chats"
@@ -3373,13 +3443,13 @@ const MessagesScreen = () => {
                     onPress={() => navigation.navigate('Business', { businessId: business.id, tab: 'qa' })}
                   >
                     <View style={styles.messageAvatar}>
-                      <Ionicons name="storefront-outline" size={16} color={colors.text} />
+                      <Ionicons name="storefront-outline" size={ICON_SIZES.sm} color={colors.text} />
                     </View>
                     <View style={styles.listRowInfo}>
                       <Text style={styles.cardTitle}>{business.name}</Text>
                       <Text style={styles.metaText}>{business.category}</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                    <Ionicons name="chevron-forward" size={ICON_SIZES.sm} color={colors.textMuted} />
                   </Pressable>
                 ))
             )}
@@ -3407,7 +3477,7 @@ const MessagesScreen = () => {
                     }
                   >
                     <View style={styles.messageAvatar}>
-                      <Ionicons name="person-outline" size={16} color={colors.text} />
+                      <Ionicons name="person-outline" size={ICON_SIZES.sm} color={colors.text} />
                     </View>
                     <View style={styles.listRowInfo}>
                       <Text style={styles.cardTitle}>@{thread.handle}</Text>
@@ -3617,7 +3687,7 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
           })}
           <View style={styles.inputRow}>
             <Pressable style={styles.iconButtonSm} onPress={() => void handleAttachDirectMedia()}>
-              <Ionicons name="attach-outline" size={18} color={colors.text} />
+              <Ionicons name="attach-outline" size={ICON_SIZES.md} color={colors.text} />
             </Pressable>
             <TextInput
               style={styles.input}
@@ -4159,11 +4229,11 @@ const OrdersScreen = () => {
               </View>
               <View style={styles.cartControls}>
                 <Pressable style={styles.cartButton} onPress={() => updateCart(item, -1)}>
-                  <Ionicons name="remove" size={16} color={colors.text} />
+                  <Ionicons name="remove" size={ICON_SIZES.sm} color={colors.text} />
                 </Pressable>
                 <Text style={styles.cardTitle}>{inCart?.quantity ?? 0}</Text>
                 <Pressable style={styles.cartButton} onPress={() => updateCart(item, 1)}>
-                  <Ionicons name="add" size={16} color={colors.text} />
+                  <Ionicons name="add" size={ICON_SIZES.sm} color={colors.text} />
                 </Pressable>
               </View>
             </View>
@@ -4202,7 +4272,7 @@ const OrdersScreen = () => {
             <View key={item.id} style={styles.rowBetween}>
               <Text style={styles.metaText}>{item.name}</Text>
               <Text style={styles.metaText}>
-                x{item.quantity} • Rs{' '}
+                x{item.quantity} â€¢ Rs{' '}
                 {item.priceCents ? ((item.priceCents * item.quantity) / 100).toFixed(0) : '0'}
               </Text>
             </View>
@@ -4241,7 +4311,7 @@ const OrdersScreen = () => {
             </View>
             {item.deliveryMethod ? (
               <View style={styles.metaRow}>
-                <Ionicons name="bicycle-outline" size={14} color={colors.textMuted} />
+                <Ionicons name="bicycle-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
                 <Text style={styles.metaText}>
                   {item.deliveryMethod === 'delivery' ? 'Delivery' : 'Pickup'}
                 </Text>
@@ -4265,7 +4335,7 @@ const OrdersScreen = () => {
               </View>
             ) : null}
             <View style={styles.metaRow}>
-              <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+              <Ionicons name="time-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
               <Text style={styles.metaText}>{item.createdAt || 'Recently'}</Text>
             </View>
           </View>
@@ -4685,7 +4755,7 @@ const ProfileScreen = () => {
           <SectionTitle icon="shield-checkmark-outline" label="Safety & verification" />
           <View style={styles.rowBetween}>
             <View style={styles.metaRow}>
-              <Ionicons name="call-outline" size={14} color={colors.textMuted} />
+              <Ionicons name="call-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
               <Text style={styles.metaText}>Phone</Text>
             </View>
             <Text style={styles.metaText}>Not verified</Text>
@@ -4695,7 +4765,7 @@ const ProfileScreen = () => {
           </Pressable>
           <View style={styles.rowBetween}>
             <View style={styles.metaRow}>
-              <Ionicons name="hardware-chip-outline" size={14} color={colors.textMuted} />
+              <Ionicons name="hardware-chip-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
               <Text style={styles.metaText}>Device ID</Text>
             </View>
             <Text style={styles.metaText}>{deviceId ?? 'Pending'}</Text>
@@ -5470,7 +5540,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
               <Image source={{ uri: business.imageUrl }} style={styles.businessHeroImage} />
             ) : (
               <View style={styles.mapBusinessPlaceholder}>
-                <Ionicons name="image-outline" size={22} color={colors.textMuted} />
+                <Ionicons name="image-outline" size={ICON_SIZES.xl} color={colors.textMuted} />
                 <Text style={styles.mapBusinessPlaceholderText}>Hero image</Text>
               </View>
             )}
@@ -5622,7 +5692,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
             {userId && !isChatRestricted && hasJoinedChat ? (
               <View style={styles.inputRow}>
                 <Pressable style={styles.iconButtonSm} onPress={() => void handleAttachBusinessMedia()}>
-                  <Ionicons name="attach-outline" size={18} color={colors.text} />
+                  <Ionicons name="attach-outline" size={ICON_SIZES.md} color={colors.text} />
                 </Pressable>
                 <TextInput
                   style={styles.input}
@@ -5660,7 +5730,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
                     >
                       <Ionicons
                         name={rating <= reviewRating ? 'star' : 'star-outline'}
-                        size={18}
+                        size={ICON_SIZES.md}
                         color={rating <= reviewRating ? colors.prestige : colors.textMuted}
                       />
                     </Pressable>
@@ -5695,7 +5765,7 @@ const BusinessScreen = ({ route }: BusinessProps) => {
                         <Ionicons
                           key={`${review.id}-star-${rating}`}
                           name={rating <= review.rating ? 'star' : 'star-outline'}
-                          size={14}
+                          size={ICON_SIZES.xs}
                           color={rating <= review.rating ? colors.prestige : colors.textMuted}
                         />
                       ))}
@@ -6009,7 +6079,7 @@ const RoomScreen = ({ route }: RoomProps) => {
             </View>
           ) : null}
           <View style={styles.metaRow}>
-            <Ionicons name="navigate-outline" size={14} color={colors.textMuted} />
+            <Ionicons name="navigate-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
             <Text style={styles.metaText}>{room?.category ?? 'local'}</Text>
           </View>
           <Text style={styles.metaText}>
@@ -6037,7 +6107,7 @@ const RoomScreen = ({ route }: RoomProps) => {
           {canChat ? (
             <View style={styles.inputRow}>
               <Pressable style={styles.iconButtonSm} onPress={() => void handleAttach()}>
-                <Ionicons name="attach-outline" size={18} color={colors.text} />
+                <Ionicons name="attach-outline" size={ICON_SIZES.md} color={colors.text} />
               </Pressable>
               <TextInput
                 style={styles.input}
@@ -6703,7 +6773,7 @@ const BusinessAdminScreen = () => {
                   <Image source={{ uri: activeBusiness.imageUrl }} style={styles.mediaImage} />
                 ) : (
                   <View style={styles.mediaPlaceholder}>
-                    <Ionicons name="image-outline" size={20} color={colors.textMuted} />
+                    <Ionicons name="image-outline" size={ICON_SIZES.lg} color={colors.textMuted} />
                     <Text style={styles.metaText}>Hero image</Text>
                   </View>
                 )}
@@ -6724,7 +6794,7 @@ const BusinessAdminScreen = () => {
                   <Image source={{ uri: activeBusiness.logoUrl }} style={styles.mediaImage} />
                 ) : (
                   <View style={styles.mediaPlaceholder}>
-                    <Ionicons name="image-outline" size={20} color={colors.textMuted} />
+                    <Ionicons name="image-outline" size={ICON_SIZES.lg} color={colors.textMuted} />
                     <Text style={styles.metaText}>Logo</Text>
                   </View>
                 )}
@@ -7644,21 +7714,21 @@ const HelpScreen = () => {
                 <Text style={styles.cardTitle}>Getting started</Text>
                 <Text style={styles.metaText}>Map basics, rooms, and privacy.</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={ICON_SIZES.sm} color={colors.textMuted} />
             </View>
             <View style={styles.listRow}>
               <View style={styles.listRowInfo}>
                 <Text style={styles.cardTitle}>Orders & pickup</Text>
                 <Text style={styles.metaText}>How pickup orders work.</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={ICON_SIZES.sm} color={colors.textMuted} />
             </View>
             <View style={styles.listRow}>
               <View style={styles.listRowInfo}>
                 <Text style={styles.cardTitle}>Safety & trust</Text>
                 <Text style={styles.metaText}>Reporting, appeals, and verification.</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={ICON_SIZES.sm} color={colors.textMuted} />
             </View>
         </View>
         <View style={styles.adminSectionCard}>
@@ -7809,6 +7879,8 @@ export default function App() {
 
 const useStyles = () => {
   const { colors } = useTheme();
+  const space = SPACE_SCALE;
+  const type = TYPE_PRESETS;
   return useMemo(
     () =>
       StyleSheet.create({
@@ -7820,9 +7892,9 @@ const useStyles = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingHorizontal: 12,
-          paddingTop: 6,
-          paddingBottom: 8,
+          paddingHorizontal: space.sm,
+          paddingTop: space.xs,
+          paddingBottom: space.xs,
           borderBottomWidth: 1,
           borderBottomColor: colors.border,
           backgroundColor: colors.surface,
@@ -7830,43 +7902,43 @@ const useStyles = () => {
         appBarLeft: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 8,
+          gap: space.xs,
         },
         appBarRight: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 6,
+          gap: space.xs,
         },
         appBarIconButton: {
-          borderRadius: 12,
-          padding: 8,
+          borderRadius: space.sm,
+          padding: space.xs,
         },
         appBarBrand: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 8,
+          gap: space.xs,
         },
         appBarBrandText: {
-          fontSize: 14,
+          ...type.title14,
           fontWeight: '900',
           letterSpacing: 1.2,
           color: colors.text,
         },
         appBarVersion: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '600',
           color: colors.textMuted,
         },
         betaPill: {
           borderRadius: 999,
           paddingVertical: 2,
-          paddingHorizontal: 8,
+          paddingHorizontal: space.xs,
           borderWidth: 1,
           borderColor: withOpacity(colors.brand, 0.35),
           backgroundColor: withOpacity(colors.brand, 0.12),
         },
         betaPillText: {
-          fontSize: 10,
+          ...type.caption12,
           fontWeight: '800',
           textTransform: 'uppercase',
           letterSpacing: 0.8,
@@ -7875,10 +7947,10 @@ const useStyles = () => {
         sectionTitleRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 8,
+          gap: space.xs,
         },
         sectionTitleText: {
-          fontSize: 14,
+          ...type.title14,
           fontWeight: '700',
           color: colors.text,
         },
@@ -7890,8 +7962,8 @@ const useStyles = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingHorizontal: 16,
-          paddingTop: 8,
+          paddingHorizontal: space.lg,
+          paddingTop: space.xs,
           zIndex: 5,
         },
         avatarButton: {
@@ -7905,7 +7977,7 @@ const useStyles = () => {
           borderColor: colors.border,
         },
         avatarText: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '700',
           color: colors.text,
         },
@@ -7932,40 +8004,40 @@ const useStyles = () => {
         locationPill: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 6,
-          paddingHorizontal: 12,
-          paddingVertical: 6,
+          gap: space.xs,
+          paddingHorizontal: space.sm,
+          paddingVertical: space.xs,
           borderRadius: 999,
           backgroundColor: colors.surface,
           borderWidth: 1,
           borderColor: colors.border,
         },
         locationPillText: {
-          fontSize: 12,
+          ...type.body12,
           color: colors.textMuted,
         },
         searchInputWrap: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 8,
-          borderRadius: 16,
+          gap: space.xs,
+          borderRadius: space.lg,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surfaceMuted,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
+          paddingHorizontal: space.sm,
+          paddingVertical: space.md,
         },
         searchInput: {
           flex: 1,
-          fontSize: 14,
+          ...type.body14,
           color: colors.text,
         },
         searchOverlay: {
           position: 'absolute',
-          left: 16,
-          right: 16,
+          left: space.lg,
+          right: space.lg,
           top: 60,
-          padding: 12,
+          padding: space.sm,
           borderRadius: 18,
           borderWidth: 1,
           borderColor: colors.border,
@@ -7979,25 +8051,25 @@ const useStyles = () => {
         searchOverlayHeader: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 10,
+          gap: space.md,
         },
         filterRow: {
           flexDirection: 'row',
           flexWrap: 'wrap',
-          gap: 8,
-          marginTop: 8,
+          gap: space.xs,
+          marginTop: space.xs,
         },
         searchResults: {
-          marginTop: 10,
-          gap: 8,
+          marginTop: space.md,
+          gap: space.xs,
         },
         searchResultRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 10,
-          paddingVertical: 8,
-          paddingHorizontal: 10,
-          borderRadius: 12,
+          gap: space.md,
+          paddingVertical: space.xs,
+          paddingHorizontal: space.md,
+          borderRadius: space.sm,
           backgroundColor: colors.surfaceMuted,
           borderWidth: 1,
           borderColor: colors.border,
@@ -8007,11 +8079,11 @@ const useStyles = () => {
           gap: 2,
         },
         searchPostWrap: {
-          gap: 10,
+          gap: space.md,
         },
         filterChip: {
-          paddingVertical: 6,
-          paddingHorizontal: 12,
+          paddingVertical: space.xs,
+          paddingHorizontal: space.sm,
           borderRadius: 999,
           borderWidth: 1,
           borderColor: colors.borderStrong,
@@ -8022,7 +8094,7 @@ const useStyles = () => {
           borderColor: colors.brand,
         },
         filterChipText: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '600',
           color: colors.text,
         },
@@ -8031,8 +8103,8 @@ const useStyles = () => {
         },
         mapShell: {
           flex: 1,
-          marginHorizontal: 16,
-          marginTop: 10,
+          marginHorizontal: space.lg,
+          marginTop: space.md,
           marginBottom: 90,
           borderRadius: 24,
           borderWidth: 1,
@@ -8044,7 +8116,7 @@ const useStyles = () => {
           flex: 1,
         },
         mapLabel: {
-          fontSize: 16,
+          ...type.body16,
           color: colors.textSubtle,
           textAlign: 'center',
         },
@@ -8052,14 +8124,14 @@ const useStyles = () => {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          paddingHorizontal: 24,
+          paddingHorizontal: space.xxl,
         },
         webPlaceholderCard: {
           width: '100%',
         },
         webPlaceholderList: {
-          marginTop: 8,
-          gap: 6,
+          marginTop: space.xs,
+          gap: space.xs,
         },
         mapRecenterButton: {
           position: 'absolute',
@@ -8080,15 +8152,15 @@ const useStyles = () => {
         },
         mapBusinessCard: {
           position: 'absolute',
-          left: 12,
-          right: 12,
-          bottom: 12,
+          left: space.sm,
+          right: space.sm,
+          bottom: space.sm,
           borderRadius: 20,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surface,
-          padding: 12,
-          gap: 10,
+          padding: space.sm,
+          gap: space.md,
           shadowColor: colors.overlay,
           shadowOpacity: 0.08,
           shadowRadius: 12,
@@ -8096,15 +8168,15 @@ const useStyles = () => {
         },
         mapBottomSheet: {
           position: 'absolute',
-          left: 12,
-          right: 12,
-          bottom: 12,
+          left: space.sm,
+          right: space.sm,
+          bottom: space.sm,
           borderRadius: 22,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surface,
-          padding: 12,
-          gap: 10,
+          padding: space.sm,
+          gap: space.md,
           shadowColor: colors.overlay,
           shadowOpacity: 0.12,
           shadowRadius: 14,
@@ -8112,7 +8184,7 @@ const useStyles = () => {
         },
         mapBusinessHeader: {
           flexDirection: 'row',
-          gap: 12,
+          gap: space.sm,
         },
         mapBusinessImageWrap: {
           width: 72,
@@ -8134,7 +8206,7 @@ const useStyles = () => {
           gap: 4,
         },
         mapBusinessPlaceholderText: {
-          fontSize: 12,
+          ...type.body12,
           color: colors.textSubtle,
         },
         mapBusinessInfo: {
@@ -8142,35 +8214,35 @@ const useStyles = () => {
           gap: 4,
         },
         mapBusinessTitle: {
-          fontSize: 16,
+          ...type.title16,
           fontWeight: '700',
           color: colors.text,
         },
         mapBusinessDescription: {
-          fontSize: 12,
+          ...type.body12,
           color: colors.textMuted,
         },
         mapBusinessMetaRow: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 6,
+          gap: space.xs,
           flexWrap: 'wrap',
         },
         mapBusinessMetaText: {
-          fontSize: 12,
+          ...type.body12,
           color: colors.textMuted,
         },
         mapBusinessActions: {
           flexDirection: 'row',
-          gap: 10,
+          gap: space.md,
         },
         mapFabBar: {
           position: 'absolute',
-          left: 16,
-          right: 16,
+          left: space.lg,
+          right: space.lg,
           bottom: 90,
           flexDirection: 'row',
-          gap: 8,
+          gap: space.xs,
           justifyContent: 'space-between',
           zIndex: 5,
         },
@@ -8179,16 +8251,16 @@ const useStyles = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 6,
+          gap: space.xs,
           borderRadius: 999,
-          paddingVertical: 10,
-          paddingHorizontal: 12,
+          paddingVertical: space.md,
+          paddingHorizontal: space.sm,
           backgroundColor: colors.reward,
           borderWidth: 1,
           borderColor: colors.reward,
         },
         fabText: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '700',
           color: colors.rewardText,
         },
@@ -8203,7 +8275,7 @@ const useStyles = () => {
           borderColor: colors.background,
         },
         clusterMarkerText: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '700',
           color: colors.brandText,
         },
@@ -8273,12 +8345,12 @@ const useStyles = () => {
         },
         tabRow: {
           flexDirection: 'row',
-          gap: 8,
-          marginTop: 8,
+          gap: space.xs,
+          marginTop: space.xs,
         },
         tabPill: {
-          paddingVertical: 6,
-          paddingHorizontal: 12,
+          paddingVertical: space.xs,
+          paddingHorizontal: space.sm,
           borderRadius: 999,
           borderWidth: 1,
           borderColor: colors.borderStrong,
@@ -8289,7 +8361,7 @@ const useStyles = () => {
           borderColor: colors.brand,
         },
         tabPillText: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '600',
           color: colors.text,
         },
@@ -8297,21 +8369,21 @@ const useStyles = () => {
           color: colors.brandText,
         },
         feedHeader: {
-          gap: 12,
+          gap: space.sm,
         },
         feedTabs: {
           flexDirection: 'row',
-          gap: 8,
+          gap: space.xs,
         },
         messagesHeader: {
-          gap: 12,
+          gap: space.sm,
         },
         tabBar: {
           flexDirection: 'row',
           alignItems: 'center',
-          paddingHorizontal: 10,
-          paddingTop: 10,
-          paddingBottom: 10,
+          paddingHorizontal: space.md,
+          paddingTop: space.md,
+          paddingBottom: space.md,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           backgroundColor: colors.surface,
@@ -8323,37 +8395,37 @@ const useStyles = () => {
           gap: 4,
         },
         tabLabel: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '600',
           color: colors.textSubtle,
         },
         listContent: {
-          padding: 16,
-          gap: 12,
+          padding: space.lg,
+          gap: space.sm,
         },
         scrollContent: {
-          padding: 16,
-          gap: 12,
+          padding: space.lg,
+          gap: space.sm,
         },
         card: {
-          borderRadius: 16,
+          borderRadius: space.lg,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surface,
-          padding: 14,
-          gap: 10,
+          padding: space.md,
+          gap: space.md,
         },
         cardTitle: {
-          fontSize: 16,
+          ...type.title16,
           fontWeight: '700',
           color: colors.text,
         },
         cardBody: {
-          fontSize: 14,
+          ...type.body14,
           color: colors.textMuted,
         },
         listEmpty: {
-          fontSize: 14,
+          ...type.body14,
           color: colors.textMuted,
         },
         listRow: {
@@ -8377,8 +8449,8 @@ const useStyles = () => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 12,
-          marginTop: 10,
+          gap: space.sm,
+          marginTop: space.md,
         },
         mediaPreview: {
           width: 140,
@@ -8412,8 +8484,8 @@ const useStyles = () => {
           gap: 4,
         },
         reviewComposer: {
-          marginTop: 12,
-          gap: 10,
+          marginTop: space.sm,
+          gap: space.md,
         },
         ratingRow: {
           flexDirection: 'row',
@@ -8424,13 +8496,13 @@ const useStyles = () => {
           padding: 2,
         },
         reviewRow: {
-          marginTop: 12,
-          padding: 12,
+          marginTop: space.sm,
+          padding: space.sm,
           borderRadius: 14,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surfaceMuted,
-          gap: 6,
+          gap: space.xs,
         },
         reviewHeader: {
           flexDirection: 'row',
@@ -8440,10 +8512,10 @@ const useStyles = () => {
         sectionDivider: {
           height: 1,
           backgroundColor: colors.border,
-          marginVertical: 12,
+          marginVertical: space.sm,
         },
         exceptionList: {
-          marginTop: 8,
+          marginTop: space.xs,
           gap: 4,
         },
         exceptionRow: {
@@ -8469,8 +8541,8 @@ const useStyles = () => {
         },
         messageBubble: {
           maxWidth: '80%',
-          paddingHorizontal: 12,
-          paddingVertical: 8,
+          paddingHorizontal: space.sm,
+          paddingVertical: space.xs,
           borderRadius: 16,
         },
         messageBubbleMine: {
@@ -8480,14 +8552,14 @@ const useStyles = () => {
           backgroundColor: colors.surfaceMuted,
         },
         messageText: {
-          fontSize: 14,
+          ...type.body14,
           color: colors.text,
         },
         messageTextMine: {
           color: colors.brandText,
         },
         messageTimestamp: {
-          fontSize: 11,
+          ...type.caption12,
           color: colors.textMuted,
           marginTop: 4,
         },
@@ -8519,20 +8591,20 @@ const useStyles = () => {
           height: '100%',
         },
         businessHeroInfo: {
-          padding: 14,
-          gap: 8,
+          padding: space.md,
+          gap: space.xs,
         },
         businessTitle: {
-          fontSize: 18,
+          ...type.title18,
           fontWeight: '800',
           color: colors.text,
         },
         faqCard: {
-          borderRadius: 12,
+          borderRadius: space.sm,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surfaceMuted,
-          padding: 10,
+          padding: space.md,
           gap: 4,
         },
         postCard: {
@@ -8540,8 +8612,8 @@ const useStyles = () => {
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surface,
-          padding: 14,
-          gap: 10,
+          padding: space.md,
+          gap: space.md,
         },
         postHeader: {
           flexDirection: 'row',
@@ -8559,7 +8631,7 @@ const useStyles = () => {
           borderColor: colors.border,
         },
         postAvatarText: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '700',
           color: colors.text,
         },
@@ -8574,7 +8646,7 @@ const useStyles = () => {
           backgroundColor: colors.surfaceMuted,
         },
         postBadgeText: {
-          fontSize: 10,
+          ...type.caption12,
           fontWeight: '700',
           color: colors.textMuted,
         },
@@ -8600,29 +8672,29 @@ const useStyles = () => {
         postActionButton: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 6,
-          paddingVertical: 6,
-          paddingHorizontal: 10,
+          gap: space.xs,
+          paddingVertical: space.xs,
+          paddingHorizontal: space.md,
           borderRadius: 999,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surface,
         },
         postActionText: {
-          fontSize: 11,
+          ...type.label12,
           fontWeight: '600',
           color: colors.textMuted,
         },
         skeletonStack: {
-          gap: 12,
+          gap: space.sm,
         },
         skeletonCard: {
-          borderRadius: 16,
+          borderRadius: space.lg,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surface,
-          padding: 14,
-          gap: 10,
+          padding: space.md,
+          gap: space.md,
         },
         skeletonRowCard: {
           flexDirection: 'row',
@@ -8663,11 +8735,11 @@ const useStyles = () => {
           width: '50%',
         },
         badge: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '600',
           color: colors.info,
           backgroundColor: colors.surfaceMuted,
-          paddingHorizontal: 8,
+          paddingHorizontal: space.xs,
           paddingVertical: 4,
           borderRadius: 999,
         },
@@ -8696,7 +8768,7 @@ const useStyles = () => {
           borderColor: colors.border,
         },
         stepBadgeText: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '700',
           color: colors.text,
         },
@@ -8731,17 +8803,17 @@ const useStyles = () => {
           alignItems: 'center',
         },
         receiptCard: {
-          marginTop: 12,
-          padding: 12,
+          marginTop: space.sm,
+          padding: space.sm,
           borderRadius: 14,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surfaceMuted,
-          gap: 6,
+          gap: space.xs,
         },
         adminStatRow: {
           flexDirection: 'row',
-          gap: 10,
+          gap: space.md,
         },
         adminStatCard: {
           flex: 1,
@@ -8749,12 +8821,12 @@ const useStyles = () => {
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surfaceMuted,
-          padding: 10,
+          padding: space.md,
           alignItems: 'center',
-          gap: 6,
+          gap: space.xs,
         },
         adminStatValue: {
-          fontSize: 18,
+          ...type.title18,
           fontWeight: '800',
           color: colors.text,
         },
@@ -8764,12 +8836,12 @@ const useStyles = () => {
           marginTop: 6,
         },
         adminSectionCard: {
-          borderRadius: 16,
+          borderRadius: space.lg,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surface,
-          padding: 14,
-          gap: 10,
+          padding: space.md,
+          gap: space.md,
         },
         metaRow: {
           flexDirection: 'row',
@@ -8777,17 +8849,17 @@ const useStyles = () => {
           gap: 6,
         },
         metaText: {
-          fontSize: 12,
+          ...type.body12,
           color: colors.textMuted,
         },
         input: {
-          borderRadius: 12,
+          borderRadius: space.sm,
           borderWidth: 1,
           borderColor: colors.border,
           backgroundColor: colors.surfaceMuted,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          fontSize: 14,
+          paddingHorizontal: space.sm,
+          paddingVertical: space.md,
+          ...type.body14,
           color: colors.text,
         },
         inputRow: {
@@ -8803,8 +8875,8 @@ const useStyles = () => {
           flex: 1,
           borderRadius: 22,
           backgroundColor: colors.reward,
-          paddingVertical: 12,
-          paddingHorizontal: 16,
+          paddingVertical: space.sm,
+          paddingHorizontal: space.lg,
           minHeight: 46,
           justifyContent: 'center',
           alignItems: 'center',
@@ -8814,7 +8886,7 @@ const useStyles = () => {
           alignSelf: 'stretch',
         },
         primaryButtonText: {
-          fontSize: 15,
+          ...type.label16,
           fontWeight: '700',
           color: colors.rewardText,
         },
@@ -8823,33 +8895,33 @@ const useStyles = () => {
           borderRadius: 14,
           borderWidth: 1,
           borderColor: colors.borderStrong,
-          paddingVertical: 10,
-          paddingHorizontal: 16,
+          paddingVertical: space.md,
+          paddingHorizontal: space.lg,
           alignItems: 'center',
         },
         secondaryButtonText: {
-          fontSize: 14,
+          ...type.label14,
           fontWeight: '600',
           color: colors.text,
         },
         secondaryButtonTextSmall: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '600',
           color: colors.text,
         },
         authBody: {
           flex: 1,
-          paddingHorizontal: 16,
-          paddingBottom: 12,
+          paddingHorizontal: space.lg,
+          paddingBottom: space.sm,
           justifyContent: 'space-between',
-          gap: 12,
+          gap: space.sm,
         },
         authSubhead: {
-          fontSize: 12,
+          ...type.body12,
           color: colors.textMuted,
         },
         authHint: {
-          fontSize: 13,
+          ...type.label14,
           fontWeight: '600',
           color: colors.text,
         },
@@ -8860,7 +8932,7 @@ const useStyles = () => {
           gap: 16,
         },
         linkText: {
-          fontSize: 12,
+          ...type.label12,
           fontWeight: '600',
           color: colors.textMuted,
         },
@@ -8885,9 +8957,9 @@ const useStyles = () => {
           borderBottomRightRadius: 20,
           borderRightWidth: 1,
           borderColor: colors.border,
-          padding: 16,
+          padding: space.lg,
           paddingTop: 40,
-          gap: 12,
+          gap: space.sm,
         },
         sideSheetHeader: {
           flexDirection: 'row',
@@ -8895,12 +8967,12 @@ const useStyles = () => {
           justifyContent: 'space-between',
         },
         sideSheetTitle: {
-          fontSize: 18,
+          ...type.title18,
           fontWeight: '700',
           color: colors.text,
         },
         sideSheetList: {
-          gap: 10,
+          gap: space.md,
         },
         sideSheetItem: {
           flexDirection: 'row',
@@ -8912,7 +8984,7 @@ const useStyles = () => {
           backgroundColor: colors.surfaceMuted,
         },
         sideSheetItemText: {
-          fontSize: 14,
+          ...type.label14,
           fontWeight: '600',
           color: colors.text,
         },
@@ -8928,10 +9000,11 @@ const useStyles = () => {
           backgroundColor: colors.surfaceMuted,
         },
         storyPillText: {
-          fontSize: 12,
+          ...type.body12,
           color: colors.text,
         },
       }),
     [colors]
   );
 };
+

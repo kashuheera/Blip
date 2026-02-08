@@ -1,3 +1,5 @@
+import type { MapStyleElement } from 'react-native-maps';
+
 // Generated from design/tokens.json via scripts/sync-figma-tokens.mjs
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type ResolvedThemeMode = 'light' | 'dark';
@@ -76,7 +78,7 @@ export const THEME_COLORS: Record<ResolvedThemeMode, ThemeColors> = {
   }
 };
 
-export const MAP_STYLES: Record<ResolvedThemeMode, object[]> = {
+export const MAP_STYLES: Record<ResolvedThemeMode, MapStyleElement[]> = {
   "dark": [
     {
       "elementType": "geometry",
