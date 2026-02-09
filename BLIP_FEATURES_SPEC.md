@@ -37,8 +37,8 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - Implemented: Push plumbing (device tokens + test push), but delivery requires FCM/APNS keys.
 - Admin: Business Admin Portal + Blip Admin Portal in-app screens.
 - Implemented: Stories (image + caption + 24h expiry) in Feed + viewer modal.
-- Implemented: Voice rooms presence (create/join/leave + participant counts) in Messages.
-- Not implemented yet: magic link/OTP, Google OAuth, payments (provider planned: Safepay), story highlights/pinned posts, full RTC voice transport.
+- Implemented: Voice rooms with RTC audio transport + push-to-talk (create/join/leave + participant counts) in Messages.
+- Not implemented yet: magic link/OTP, Google OAuth, payments (provider planned: Safepay), story highlights/pinned posts.
 
 ## Scope Tags
 - MVP: required for the first release
@@ -659,7 +659,7 @@ BLIP is a map-first, location-based, pseudonymous social layer + local business 
 - Creator-style features still missing: highlights and pinned posts.
 
 ## Messaging & community missing (vs Discord/Snap/Bumble)
-- Full RTC voice rooms / channels (current implementation is presence-first without full audio transport).
+- None currently tracked in this section (voice rooms implemented with RTC + push-to-talk).
 
 ## Local + map experience missing (vs Google Maps/Snap Map)
 - None currently tracked; map polish and business metadata are implemented.

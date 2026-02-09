@@ -34,7 +34,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Business reviews (storage + UI) with ratings + text.
 - Orders flow (menu -> cart -> order + order_items).
 - Messages (business list + direct threads + direct chat).
-- Voice rooms with live presence (create/join/leave + participant counts).
+- Voice rooms with RTC audio transport + push-to-talk (create/join/leave + participant counts).
 - Profile (identity switch, level/xp, reputation/trust labels, device ID display).
 - Billing placeholder screen (provider planned: Safepay; no payments yet).
 - Push notifications plumbing (device token capture + test push).
@@ -54,7 +54,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Magic link / email OTP auth: deferred. Must-have before rollout with proper domain redirects/deep links (mobile cannot follow `127.0.0.1` links).
 - Google OAuth: not implemented.
 - Payments/billing: not implemented (billing screen is placeholder only).
-- Voice transport in rooms is beta/placeholder (presence is live, full RTC audio transport still pending).
+- Voice rooms use RTC audio transport with push-to-talk; requires custom dev build/native config (`react-native-webrtc`).
 - Business admin access requires a business account (owner/staff). Personal-only accounts are blocked from admin controls.
 - KYC verification: document uploads + admin review queue are implemented (private storage).
 - Push notifications delivery: requires FCM/APNS keys + redeploy `push-send`.
@@ -120,7 +120,7 @@ From `c:\Blip\app`:
 - Business coupons: `supabase/migrations/20260129105000_add_business_coupons.sql`
 - Account types + KYC + delivery + post location: `supabase/migrations/20260131093000_account_type_kyc_delivery_posts.sql`
 - KYC verification workflow + storage: `supabase/migrations/20260208083000_add_kyc_verification_workflow.sql`
-- Stories + voice rooms (presence-first): `supabase/migrations/20260209094000_add_stories_and_voice_rooms.sql`
+- Stories + voice rooms: `supabase/migrations/20260209094000_add_stories_and_voice_rooms.sql`
 - Business verification workflow: `supabase/migrations/20260120091000_add_business_verification_workflow.sql`
 - Analytics events: `supabase/migrations/20260120093000_add_analytics_events.sql`
 - Safety + push + reputation + room roles: `supabase/migrations/20260122090000_add_safety_push_reputation.sql`
@@ -397,13 +397,13 @@ The sections below map “product features” to concrete implementation artifac
   - `room_messages` is public-readable; inserts rate-limited.
 
 #### C10 — Voice rooms (presence-first)
-- What it does: supports discover/create/join/leave voice rooms with live participant counts.
+- What it does: supports discover/create/join/leave voice rooms with RTC audio and push-to-talk.
 - Client:
   - `MessagesScreen` loads voice rooms, creates new rooms, and toggles participant presence.
+  - `VoiceRoomScreen` handles signaling + peer connections + push-to-talk speaking state.
 - DB:
   - `voice_rooms` stores room metadata and status.
   - `voice_room_participants` stores live listener/host rows.
-  - Full RTC audio transport remains a later layer.
   - Media uploads are stored in `media_type`, `media_url`, `media_meta`.
 
 #### C6 — Direct messaging presence (online/typing/read receipts)
@@ -795,7 +795,7 @@ This section lists missing features (not implemented yet) so you can track rollo
 - Creator-style features still missing: story highlights and pinned stories/posts.
 
 ### Messaging & community missing (vs Discord/Snap/Bumble)
-- Voice rooms are presence-live (create/join/leave + counts), but full RTC audio transport is still pending.
+- None currently tracked in this section.
 
 ### Local + map experience missing (vs Google Maps/Snap Map)
 - None currently tracked; core map polish and business metadata are implemented.

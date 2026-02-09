@@ -67,6 +67,7 @@ type RootStackParamList = {
   BusinessReplies: undefined;
   Create: undefined;
   Messages: undefined;
+  VoiceRoom: { roomId: string; title: string } | undefined;
   DirectChat: { threadId: string; title: string } | undefined;
   Orders: undefined;
   Profile: undefined;
@@ -210,6 +211,15 @@ type VoiceRoomEntry = {
   startedAt: string;
   participantCount: number;
   joined: boolean;
+};
+
+type VoiceRtcSignalPayload = {
+  from: string;
+  to: string;
+  data:
+    | { type: 'offer'; sdp: any }
+    | { type: 'answer'; sdp: any }
+    | { type: 'candidate'; candidate: any };
 };
 
 type OrderEntry = {
@@ -3728,7 +3738,7 @@ const MessagesScreen = () => {
         setVoiceNotice('Unable to join voice room.');
         return;
       }
-      setVoiceNotice('Joined as listener. Live audio transport is in beta.');
+      setVoiceNotice('Joined voice room.');
       void trackAnalyticsEvent('voice_room_join', { room_id: room.id }, userId);
     }
     void refreshVoiceRooms();
@@ -3843,7 +3853,7 @@ const MessagesScreen = () => {
         <View style={styles.card}>
           <SectionTitle icon="mic-outline" label="Voice rooms" />
           <Text style={styles.cardBody}>
-            Drop-in neighborhood audio channels. Join/leave presence is live; audio transport is beta.
+            Drop-in neighborhood audio channels with live RTC audio and push-to-talk.
           </Text>
           <View style={styles.columnStack}>
             <TextInput
@@ -3895,12 +3905,20 @@ const MessagesScreen = () => {
                       {room.participantCount} listening • {room.city ?? 'Local'}
                     </Text>
                   </View>
-                  <Pressable
-                    style={[styles.secondaryButton, styles.voiceJoinButton]}
-                    onPress={() => void handleToggleVoiceRoom(room)}
-                  >
-                    <Text style={styles.secondaryButtonText}>{room.joined ? 'Leave' : 'Join'}</Text>
-                  </Pressable>
+                  <View style={styles.voiceRoomButtonRow}>
+                    <Pressable
+                      style={[styles.secondaryButton, styles.voiceJoinButton]}
+                      onPress={() => navigation.navigate('VoiceRoom', { roomId: room.id, title: room.title })}
+                    >
+                      <Text style={styles.secondaryButtonText}>Open</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.secondaryButton, styles.voiceJoinButton]}
+                      onPress={() => void handleToggleVoiceRoom(room)}
+                    >
+                      <Text style={styles.secondaryButtonText}>{room.joined ? 'Leave' : 'Join'}</Text>
+                    </Pressable>
+                  </View>
                 </View>
               ))
           )}
@@ -3975,6 +3993,503 @@ const MessagesScreen = () => {
             )}
           </View>
         )}
+      </ScrollView>
+      <BottomNav />
+      <StatusBar style="auto" />
+    </SafeAreaView>
+  );
+};
+
+type VoiceRoomProps = NativeStackScreenProps<RootStackParamList, 'VoiceRoom'>;
+
+const VoiceRoomScreen = ({ route }: VoiceRoomProps) => {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { userId, profile } = useAuth();
+  const roomId = route.params?.roomId ?? '';
+  const roomTitle = route.params?.title ?? 'Voice room';
+  const [rtcModule, setRtcModule] = useState<any | null>(null);
+  const [rtcError, setRtcError] = useState<string | null>(null);
+  const [joined, setJoined] = useState(false);
+  const [pttReady, setPttReady] = useState(false);
+  const [isTalking, setIsTalking] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<
+    { peerId: string; handle: string; speaking: boolean; local: boolean }[]
+  >([]);
+  const [remoteStreamUrls, setRemoteStreamUrls] = useState<Record<string, string>>({});
+  const selfPeerIdRef = useRef(
+    `peer_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+  );
+  const channelRef = useRef<any>(null);
+  const peerConnectionsRef = useRef<Map<string, any>>(new Map());
+  const localStreamRef = useRef<any>(null);
+  const localTrackRef = useRef<any>(null);
+
+  useEffect(() => {
+    void trackAnalyticsEvent('screen_view', { screen: 'voice_room', room_id: roomId }, userId);
+  }, [roomId, userId]);
+
+  const cleanupPeer = (peerId: string) => {
+    const pc = peerConnectionsRef.current.get(peerId);
+    if (pc) {
+      try {
+        pc.onicecandidate = null;
+        pc.ontrack = null;
+        pc.close();
+      } catch {
+        // ignore
+      }
+      peerConnectionsRef.current.delete(peerId);
+    }
+    setRemoteStreamUrls((prev) => {
+      if (!(peerId in prev)) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[peerId];
+      return next;
+    });
+    setParticipants((prev) => prev.filter((entry) => entry.peerId !== peerId));
+  };
+
+  const sendSignal = async (payload: VoiceRtcSignalPayload) => {
+    const channel = channelRef.current;
+    if (!channel) {
+      return;
+    }
+    await channel.send({
+      type: 'broadcast',
+      event: 'signal',
+      payload,
+    });
+  };
+
+  const sendPttState = async (speaking: boolean) => {
+    const channel = channelRef.current;
+    if (!channel) {
+      return;
+    }
+    await channel.send({
+      type: 'broadcast',
+      event: 'ptt',
+      payload: {
+        peerId: selfPeerIdRef.current,
+        speaking,
+      },
+    });
+  };
+
+  const createPeerConnection = async (
+    moduleRef: any,
+    peerId: string,
+    initiator: boolean
+  ): Promise<any | null> => {
+    if (peerConnectionsRef.current.has(peerId)) {
+      return peerConnectionsRef.current.get(peerId) ?? null;
+    }
+    try {
+      const pc = new moduleRef.RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }],
+      });
+
+      const stream = localStreamRef.current;
+      if (stream?.getTracks) {
+        stream.getTracks().forEach((track: any) => {
+          pc.addTrack(track, stream);
+        });
+      }
+
+      pc.onicecandidate = (event: any) => {
+        if (!event?.candidate) {
+          return;
+        }
+        void sendSignal({
+          from: selfPeerIdRef.current,
+          to: peerId,
+          data: { type: 'candidate', candidate: event.candidate },
+        });
+      };
+
+      pc.ontrack = (event: any) => {
+        const streamFromPeer = event?.streams?.[0];
+        if (!streamFromPeer) {
+          return;
+        }
+        const streamUrl =
+          typeof streamFromPeer.toURL === 'function'
+            ? streamFromPeer.toURL()
+            : `stream-${peerId}-${Date.now()}`;
+        setRemoteStreamUrls((prev) => ({ ...prev, [peerId]: streamUrl }));
+      };
+
+      pc.onconnectionstatechange = () => {
+        const state = pc.connectionState;
+        if (state === 'failed' || state === 'closed' || state === 'disconnected') {
+          cleanupPeer(peerId);
+        }
+      };
+
+      peerConnectionsRef.current.set(peerId, pc);
+
+      if (initiator) {
+        const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
+        await pc.setLocalDescription(offer);
+        await sendSignal({
+          from: selfPeerIdRef.current,
+          to: peerId,
+          data: { type: 'offer', sdp: offer },
+        });
+      }
+
+      return pc;
+    } catch {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    if (!roomId) {
+      setRtcError('Room is missing. Open a room from Messages.');
+      return () => {
+        active = false;
+      };
+    }
+    if (!supabase || !userId) {
+      setRtcError('Sign in is required to join voice rooms.');
+      return () => {
+        active = false;
+      };
+    }
+
+    const init = async () => {
+      try {
+        const moduleRef = await import('react-native-webrtc');
+        if (!active) {
+          return;
+        }
+        if (typeof moduleRef.registerGlobals === 'function') {
+          moduleRef.registerGlobals();
+        }
+        setRtcModule(moduleRef);
+
+        const localStream = await moduleRef.mediaDevices.getUserMedia({
+          audio: true,
+          video: false,
+        });
+        if (!active) {
+          return;
+        }
+        localStreamRef.current = localStream;
+        const firstTrack = localStream.getAudioTracks?.()[0] ?? null;
+        localTrackRef.current = firstTrack;
+        if (firstTrack) {
+          firstTrack.enabled = false;
+          setPttReady(true);
+        }
+
+        await supabase.from('voice_room_participants').upsert(
+          {
+            room_id: roomId,
+            user_id: userId,
+            role: 'listener',
+          },
+          { onConflict: 'room_id,user_id' }
+        );
+
+        const channel = supabase.channel(`voice-rtc-${roomId}`, {
+          config: {
+            broadcast: { self: true },
+            presence: { key: selfPeerIdRef.current },
+          },
+        });
+        channelRef.current = channel;
+
+        const handlePresenceSync = () => {
+          const presenceState = channel.presenceState() as Record<string, Array<Record<string, unknown>>>;
+          const nextParticipants: { peerId: string; handle: string; speaking: boolean; local: boolean }[] = [];
+          const activePeerIds = new Set<string>();
+          Object.entries(presenceState).forEach(([peerId, presences]) => {
+            const payload =
+              Array.isArray(presences) && presences.length > 0
+                ? presences[presences.length - 1]
+                : null;
+            if (!payload) {
+              return;
+            }
+            const handle =
+              typeof payload.handle === 'string' && payload.handle.length > 0
+                ? payload.handle
+                : 'User';
+            const speaking = Boolean(payload.speaking);
+            const local = peerId === selfPeerIdRef.current;
+            nextParticipants.push({ peerId, handle, speaking, local });
+            activePeerIds.add(peerId);
+            if (!local && !peerConnectionsRef.current.has(peerId)) {
+              const initiator = selfPeerIdRef.current > peerId;
+              void createPeerConnection(moduleRef, peerId, initiator);
+            }
+          });
+
+          Array.from(peerConnectionsRef.current.keys()).forEach((peerId) => {
+            if (!activePeerIds.has(peerId)) {
+              cleanupPeer(peerId);
+            }
+          });
+
+          nextParticipants.sort((a, b) => {
+            if (a.local) {
+              return -1;
+            }
+            if (b.local) {
+              return 1;
+            }
+            return a.handle.localeCompare(b.handle);
+          });
+          setParticipants(nextParticipants);
+        };
+
+        const handleSignal = async (payload: VoiceRtcSignalPayload) => {
+          if (!payload || payload.to !== selfPeerIdRef.current) {
+            return;
+          }
+          const from = payload.from;
+          if (!from) {
+            return;
+          }
+          let pc = peerConnectionsRef.current.get(from) ?? null;
+          if (!pc) {
+            pc = await createPeerConnection(moduleRef, from, false);
+          }
+          if (!pc) {
+            return;
+          }
+          if (payload.data.type === 'offer') {
+            await pc.setRemoteDescription(new moduleRef.RTCSessionDescription(payload.data.sdp));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await sendSignal({
+              from: selfPeerIdRef.current,
+              to: from,
+              data: { type: 'answer', sdp: answer },
+            });
+            return;
+          }
+          if (payload.data.type === 'answer') {
+            await pc.setRemoteDescription(new moduleRef.RTCSessionDescription(payload.data.sdp));
+            return;
+          }
+          if (payload.data.type === 'candidate' && payload.data.candidate) {
+            await pc.addIceCandidate(new moduleRef.RTCIceCandidate(payload.data.candidate));
+          }
+        };
+
+        channel
+          .on('presence', { event: 'sync' }, handlePresenceSync)
+          .on('broadcast', { event: 'signal' }, ({ payload }: { payload: VoiceRtcSignalPayload }) => {
+            void handleSignal(payload);
+          })
+          .on('broadcast', { event: 'ptt' }, ({ payload }: { payload: any }) => {
+            const peerId = typeof payload?.peerId === 'string' ? payload.peerId : '';
+            if (!peerId || peerId === selfPeerIdRef.current) {
+              return;
+            }
+            const speaking = Boolean(payload?.speaking);
+            setParticipants((prev) =>
+              prev.map((entry) => (entry.peerId === peerId ? { ...entry, speaking } : entry))
+            );
+          })
+          .subscribe(async (status: string) => {
+            if (status !== 'SUBSCRIBED') {
+              return;
+            }
+            await channel.track({
+              peerId: selfPeerIdRef.current,
+              userId,
+              handle: profile?.handle ?? 'User',
+              speaking: false,
+              joinedAt: new Date().toISOString(),
+            });
+            if (!active) {
+              return;
+            }
+            setJoined(true);
+            setNotice('Connected. Hold Push-to-Talk to speak.');
+          });
+      } catch {
+        if (!active) {
+          return;
+        }
+        setRtcError('RTC voice needs a custom dev build with react-native-webrtc enabled.');
+      }
+    };
+
+    void init();
+
+    return () => {
+      active = false;
+      setJoined(false);
+      setIsTalking(false);
+      const channel = channelRef.current;
+      channelRef.current = null;
+      if (channel) {
+        void channel.untrack();
+        channel.unsubscribe();
+      }
+      peerConnectionsRef.current.forEach((pc) => {
+        try {
+          pc.close();
+        } catch {
+          // ignore
+        }
+      });
+      peerConnectionsRef.current.clear();
+      localTrackRef.current = null;
+      const stream = localStreamRef.current;
+      if (stream?.getTracks) {
+        stream.getTracks().forEach((track: any) => {
+          try {
+            track.stop();
+          } catch {
+            // ignore
+          }
+        });
+      }
+      localStreamRef.current = null;
+      setRemoteStreamUrls({});
+      if (supabase && userId) {
+        void supabase.from('voice_room_participants').delete().eq('room_id', roomId).eq('user_id', userId);
+      }
+    };
+  }, [profile?.handle, roomId, userId]);
+
+  const handlePressIn = () => {
+    if (!pttReady || !localTrackRef.current) {
+      return;
+    }
+    localTrackRef.current.enabled = true;
+    setIsTalking(true);
+    setParticipants((prev) =>
+      prev.map((entry) =>
+        entry.peerId === selfPeerIdRef.current ? { ...entry, speaking: true } : entry
+      )
+    );
+    const channel = channelRef.current;
+    if (channel) {
+      void channel.track({
+        peerId: selfPeerIdRef.current,
+        userId,
+        handle: profile?.handle ?? 'User',
+        speaking: true,
+        joinedAt: new Date().toISOString(),
+      });
+    }
+    void sendPttState(true);
+  };
+
+  const handlePressOut = () => {
+    if (!localTrackRef.current) {
+      return;
+    }
+    localTrackRef.current.enabled = false;
+    setIsTalking(false);
+    setParticipants((prev) =>
+      prev.map((entry) =>
+        entry.peerId === selfPeerIdRef.current ? { ...entry, speaking: false } : entry
+      )
+    );
+    const channel = channelRef.current;
+    if (channel) {
+      void channel.track({
+        peerId: selfPeerIdRef.current,
+        userId,
+        handle: profile?.handle ?? 'User',
+        speaking: false,
+        joinedAt: new Date().toISOString(),
+      });
+    }
+    void sendPttState(false);
+  };
+
+  const RTCViewComponent =
+    rtcModule && typeof rtcModule.RTCView === 'function' ? (rtcModule.RTCView as React.ComponentType<any>) : null;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <AppHeader />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.card}>
+          <SectionTitle icon="mic-outline" label={roomTitle} />
+          <Text style={styles.cardBody}>
+            Room: {roomId.slice(0, 8)} • {participants.length} connected
+          </Text>
+          {rtcError ? <Text style={styles.metaText}>{rtcError}</Text> : null}
+          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+          <View style={styles.voiceRoomParticipantList}>
+            {participants.length === 0 ? (
+              <Text style={styles.metaText}>Waiting for participants...</Text>
+            ) : (
+              participants.map((entry) => (
+                <View key={entry.peerId} style={styles.voiceRoomParticipantRow}>
+                  <View style={styles.listRowInfo}>
+                    <Text style={styles.cardTitle}>
+                      @{entry.handle}
+                      {entry.local ? ' (You)' : ''}
+                    </Text>
+                    <Text style={styles.metaText}>
+                      {entry.speaking ? 'Speaking' : 'Listening'}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.voiceRoomParticipantBadge,
+                      entry.speaking && styles.voiceRoomParticipantBadgeTalking,
+                    ]}
+                  >
+                    <Text style={styles.secondaryButtonTextSmall}>
+                      {entry.speaking ? 'Live' : 'Idle'}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+          <Pressable
+            style={[
+              styles.pttButton,
+              isTalking && styles.pttButtonTalking,
+              (!joined || !pttReady) && styles.pttButtonDisabled,
+            ]}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            disabled={!joined || !pttReady || Boolean(rtcError)}
+          >
+            <Text
+              style={[
+                styles.pttButtonText,
+                isTalking && { color: colors.rewardText },
+                (!joined || !pttReady || Boolean(rtcError)) && { color: colors.textMuted },
+              ]}
+            >
+              {isTalking ? 'Talking...' : 'Hold to talk'}
+            </Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.secondaryButtonText}>Back to messages</Text>
+          </Pressable>
+        </View>
+        {RTCViewComponent
+          ? Object.entries(remoteStreamUrls).map(([peerId, streamURL]) => (
+              <RTCViewComponent
+                key={`rtc-audio-${peerId}`}
+                streamURL={streamURL}
+                style={styles.rtcAudioView}
+                objectFit="cover"
+              />
+            ))
+          : null}
       </ScrollView>
       <BottomNav />
       <StatusBar style="auto" />
@@ -8340,6 +8855,7 @@ export default function App() {
               <Stack.Screen name="BusinessReplies" component={BusinessRepliesScreen} />
               <Stack.Screen name="Create" component={CreateScreen} />
               <Stack.Screen name="Messages" component={MessagesScreen} />
+              <Stack.Screen name="VoiceRoom" component={VoiceRoomScreen} />
               <Stack.Screen name="DirectChat" component={DirectChatScreen} />
               <Stack.Screen name="Orders" component={OrdersScreen} />
               <Stack.Screen name="Billing" component={BillingScreen} />
@@ -9567,9 +10083,69 @@ const useStyles = () => {
           padding: space.sm,
           backgroundColor: colors.surfaceMuted,
         },
+        voiceRoomButtonRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.xs,
+        },
         voiceJoinButton: {
           flex: 0,
           minWidth: 88,
+        },
+        voiceRoomParticipantList: {
+          gap: space.xs,
+        },
+        voiceRoomParticipantRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: space.sm,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          padding: space.sm,
+          backgroundColor: colors.surfaceMuted,
+        },
+        voiceRoomParticipantBadge: {
+          borderRadius: 999,
+          paddingHorizontal: space.xs,
+          paddingVertical: 4,
+          borderWidth: 1,
+          borderColor: colors.borderStrong,
+          backgroundColor: colors.surface,
+        },
+        voiceRoomParticipantBadgeTalking: {
+          borderColor: colors.reward,
+          backgroundColor: withOpacity(colors.reward, 0.12),
+        },
+        pttButton: {
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: colors.brand,
+          backgroundColor: colors.brand,
+          minHeight: 54,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: space.lg,
+          paddingVertical: space.sm,
+        },
+        pttButtonTalking: {
+          borderColor: colors.reward,
+          backgroundColor: colors.reward,
+        },
+        pttButtonDisabled: {
+          borderColor: colors.borderStrong,
+          backgroundColor: colors.surfaceMuted,
+        },
+        pttButtonText: {
+          ...type.label16,
+          fontWeight: '700',
+          color: colors.brandText,
+        },
+        rtcAudioView: {
+          width: 1,
+          height: 1,
+          opacity: 0.01,
         },
       }),
     [colors]

@@ -28,7 +28,7 @@
 - Onboarding flow (privacy + interests)
 - Help/support + bug reporting
 - Stories (publish image + caption, 24h expiry, viewer modal)
-- Voice rooms (create room + join/leave presence + participant counts)
+- Voice rooms (full RTC audio transport + push-to-talk + create/join/leave + participant counts)
 - Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders)
 - Business replies inbox (business-only, recent post replies + thread jump)
 - UI color system applied (brand/reward/categories + map styling)
@@ -58,4 +58,3 @@
 
 ## Upcoming
 - Social: story highlights + pinned stories/posts
-- Messaging: live voice transport (WebRTC/Agora-style audio channels)
