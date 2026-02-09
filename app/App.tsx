@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   FlatList,
   Image,
@@ -6043,13 +6044,18 @@ const AuthScreen = () => {
     return `BETA V${majorMinor}`;
   }, []);
 
+  const showAuthComingSoon = () => {
+    setNotice(null);
+    Alert.alert('Coming soon', 'This login method is coming soon, please login using \"Email\" for now.');
+  };
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       setNotice('Email and password are required.');
       return;
     }
     if (authMode === 'fleet') {
-      setNotice('Fleet login setup pending. Coming soon.');
+      showAuthComingSoon();
       return;
     }
     setSubmitting(true);
@@ -6087,7 +6093,7 @@ const AuthScreen = () => {
       return;
     }
     if (authMode === 'fleet') {
-      setNotice('Fleet signup setup pending. Coming soon.');
+      showAuthComingSoon();
       return;
     }
     setSubmitting(true);
@@ -6106,8 +6112,8 @@ const AuthScreen = () => {
     setSubmitting(false);
   };
 
-  const handlePending = (label: string) => {
-    setNotice(`${label} setup pending. Coming soon.`);
+  const handlePending = (_label: string) => {
+    showAuthComingSoon();
   };
 
   const handleContinueEmail = () => {
@@ -6116,7 +6122,7 @@ const AuthScreen = () => {
   };
 
   const handleContinuePhone = () => {
-    setNotice('Phone sign-in setup pending. Coming soon.');
+    showAuthComingSoon();
   };
 
   const handleBackToProviders = () => {
