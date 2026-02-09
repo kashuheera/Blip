@@ -80,6 +80,7 @@ type RootStackParamList = {
   DirectChat: { threadId: string; title: string } | undefined;
   Orders: undefined;
   Profile: undefined;
+  Account: undefined;
   UserProfile: { handle: string } | undefined;
   Auth: undefined;
   Business: { businessId?: string; tab?: 'menu' | 'qa' | 'reviews' | 'offers' } | undefined;
@@ -1029,6 +1030,10 @@ const AppHeader = () => {
                 <Ionicons name="person-outline" size={ICON_SIZES.md} color={colors.text} />
                 <Text style={styles.sideSheetItemText}>Profile</Text>
               </Pressable>
+              <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('Account')}>
+                <Ionicons name="settings-outline" size={ICON_SIZES.md} color={colors.text} />
+                <Text style={styles.sideSheetItemText}>Account</Text>
+              </Pressable>
               <Pressable style={styles.sideSheetItem} onPress={() => handleNavigate('Messages')}>
                 <Ionicons name="chatbubbles-outline" size={ICON_SIZES.md} color={colors.text} />
                 <Text style={styles.sideSheetItemText}>Messages</Text>
@@ -1079,6 +1084,50 @@ const SectionTitle = ({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; l
       <Ionicons name={icon} size={ICON_SIZES.sm} color={colors.text} />
       <Text style={styles.sectionTitleText}>{label}</Text>
     </View>
+  );
+};
+
+const ListRow = ({
+  icon,
+  title,
+  subtitle,
+  rightMeta,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle?: string;
+  rightMeta?: string;
+  onPress: () => void;
+}) => {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  return (
+    <Pressable style={styles.actionRow} onPress={onPress}>
+      <View style={styles.actionRowLeft}>
+        <View style={styles.actionRowIconWrap}>
+          <Ionicons name={icon} size={ICON_SIZES.md} color={colors.text} />
+        </View>
+        <View style={styles.actionRowTextWrap}>
+          <Text style={styles.actionRowTitle} numberOfLines={1}>
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text style={styles.actionRowSubtitle} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+      <View style={styles.actionRowRight}>
+        {rightMeta ? (
+          <Text style={styles.actionRowMeta} numberOfLines={1}>
+            {rightMeta}
+          </Text>
+        ) : null}
+        <Ionicons name="chevron-forward" size={ICON_SIZES.md} color={colors.textSubtle} />
+      </View>
+    </Pressable>
   );
 };
 
@@ -5319,11 +5368,255 @@ const BillingScreen = () => {
 
 const ProfileScreen = () => {
   const styles = useStyles();
+  const { colors } = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { userId, profile, loading } = useAuth();
+  const [ownedBusinessName, setOwnedBusinessName] = useState<string | null>(null);
+  const [kycStatusQuick, setKycStatusQuick] = useState<string | null>(null);
+  const isBusinessAccount = profile?.accountType === 'business';
+  const level = profile?.level ?? 1;
+  const xp = profile?.xp ?? 0;
+  const reputationScore = useMemo(() => {
+    const raw = xp / 10 + level * 5;
+    return Math.max(0, Math.min(100, Math.round(raw)));
+  }, [level, xp]);
+  const trustLabel = useMemo(() => {
+    if (profile?.shadowbanned) {
+      return 'Restricted';
+    }
+    if (profile?.u2uLocked) {
+      return 'Limited';
+    }
+    if ((profile?.level ?? 1) >= 6) {
+      return 'High';
+    }
+    if ((profile?.level ?? 1) >= 3) {
+      return 'Growing';
+    }
+    return 'New';
+  }, [profile?.level, profile?.shadowbanned, profile?.u2uLocked]);
+  const xpProgress = useMemo(() => {
+    let nextLevel = 1;
+    let threshold = 2;
+    let remaining = Math.max(0, xp);
+    while (remaining >= threshold) {
+      remaining -= threshold;
+      nextLevel += 1;
+      threshold *= 2;
+    }
+    const progress = threshold > 0 ? remaining / threshold : 0;
+    const toNext = Math.max(0, threshold - remaining);
+    return { computedLevel: nextLevel, progress, toNext, threshold };
+  }, [xp]);
+
+  useEffect(() => {
+    void trackAnalyticsEvent('screen_view', { screen: 'profile' }, userId);
+  }, [userId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadOwnedBusiness = async () => {
+      if (!supabase || !userId || !isBusinessAccount) {
+        return;
+      }
+      const { data } = await supabase
+        .from('businesses')
+        .select('name')
+        .eq('owner_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (!isMounted) {
+        return;
+      }
+      setOwnedBusinessName(data?.[0]?.name ?? null);
+    };
+    void loadOwnedBusiness();
+    return () => {
+      isMounted = false;
+    };
+  }, [isBusinessAccount, userId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadKycStatus = async () => {
+      if (!supabase || !userId || isBusinessAccount) {
+        return;
+      }
+      const { data } = await supabase
+        .from('user_private')
+        .select('kyc_status')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (!isMounted) {
+        return;
+      }
+      setKycStatusQuick(data?.kyc_status ?? null);
+    };
+    void loadKycStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, [isBusinessAccount, userId]);
+
+  const safetyMeta = useMemo(() => {
+    if (isBusinessAccount) {
+      return trustLabel;
+    }
+    const status = (kycStatusQuick ?? '').toLowerCase();
+    if (status === 'verified') {
+      return 'KYC Verified';
+    }
+    if (status === 'rejected') {
+      return 'KYC Rejected';
+    }
+    if (status === 'submitted') {
+      return 'KYC Submitted';
+    }
+    if (status === 'pending') {
+      return 'KYC Pending';
+    }
+    return 'KYC Not started';
+  }, [isBusinessAccount, kycStatusQuick, trustLabel]);
+
+  const displayName = useMemo(() => {
+    if (isBusinessAccount) {
+      return ownedBusinessName ?? 'Business';
+    }
+    if (profile?.handle) {
+      return `@${profile.handle}`;
+    }
+    if (userId) {
+      return `@${userId.slice(0, 6)}`;
+    }
+    return '@guest';
+  }, [isBusinessAccount, ownedBusinessName, profile?.handle, userId]);
+
+  const avatarLabel = useMemo(() => {
+    const plain = displayName.replace('@', '');
+    return plain.slice(0, 2).toUpperCase();
+  }, [displayName]);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <AppHeader />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.profileHero}>
+          <View style={styles.profileHeaderRow}>
+            <View style={styles.profileAvatar}>
+              <Text style={styles.profileAvatarText}>{avatarLabel}</Text>
+            </View>
+            <View style={styles.profileHeaderText}>
+              <View style={styles.profileHandleRow}>
+                <Text style={styles.profileHandle}>{displayName}</Text>
+                <View style={[styles.profileIdentityPill, { backgroundColor: colors.brand }]}>
+                  <Text style={styles.profileIdentityPillText}>{isBusinessAccount ? 'Business' : 'Personal'}</Text>
+                </View>
+                {profile?.isAdmin ? (
+                  <View style={[styles.profileIdentityPill, { backgroundColor: withOpacity(colors.prestige, 0.18) }]}>
+                    <Text style={[styles.profileIdentityPillText, { color: colors.prestige }]}>Admin</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.profileMeta}>
+                {isBusinessAccount
+                  ? 'Business account: personal feed, rooms, and DMs are disabled.'
+                  : `Handle rotates every ${HANDLE_ROTATION_MINUTES} minutes.`}
+              </Text>
+              {profile?.shadowbanned || profile?.u2uLocked ? (
+                <Text style={[styles.profileMeta, { color: colors.warning }]}>Account review in progress.</Text>
+              ) : null}
+            </View>
+            <Pressable style={styles.profileEditButton} onPress={() => navigation.navigate('Account')}>
+              <Ionicons name="settings-outline" size={ICON_SIZES.lg} color={colors.text} />
+            </Pressable>
+          </View>
+
+          <View style={styles.profileStatsPanel}>
+            <View style={styles.profileStatsTop}>
+              <View style={[styles.levelBadge, { backgroundColor: withOpacity(colors.brand, 0.18) }]}>
+                <Text style={[styles.levelBadgeText, { color: colors.brand }]}>Lv {level}</Text>
+              </View>
+              <Text style={styles.profileStatInline}>{xp} XP</Text>
+              <Text style={styles.profileStatInline}>{reputationScore} Rep</Text>
+              <View style={[styles.trustPill, { backgroundColor: withOpacity(colors.prestige, 0.16) }]}>
+                <Text style={[styles.trustPillText, { color: colors.prestige }]}>{trustLabel}</Text>
+              </View>
+            </View>
+            <View style={styles.meterBlock}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.meterLabel}>XP to next level</Text>
+                <Text style={styles.meterMeta}>{xpProgress.toNext} XP</Text>
+              </View>
+              <View style={styles.meterTrack}>
+                <View style={[styles.meterFill, { width: `${Math.round(xpProgress.progress * 100)}%`, backgroundColor: colors.reward }]} />
+              </View>
+            </View>
+            <View style={styles.meterBlock}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.meterLabel}>Reputation</Text>
+                <Text style={styles.meterMeta}>{reputationScore}/100</Text>
+              </View>
+              <View style={styles.meterTrack}>
+                <View style={[styles.meterFill, { width: `${reputationScore}%`, backgroundColor: colors.prestige }]} />
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.listGroup}>
+          <ListRow
+            icon="bookmark-outline"
+            title="Saved"
+            subtitle="Posts, rooms, and businesses"
+            rightMeta="Coming soon"
+            onPress={() => Alert.alert('Coming soon', 'Saved items are coming soon.')}
+          />
+          <View style={styles.listDivider} />
+          <ListRow
+            icon="shield-checkmark-outline"
+            title="Safety & verification"
+            subtitle="Phone, device, KYC"
+            rightMeta={safetyMeta}
+            onPress={() => navigation.navigate('Account')}
+          />
+          <View style={styles.listDivider} />
+          <ListRow
+            icon="receipt-outline"
+            title="Orders"
+            subtitle="Pickup and delivery (business-handled)"
+            onPress={() => navigation.navigate('Orders')}
+          />
+          <View style={styles.listDivider} />
+          <ListRow
+            icon="settings-outline"
+            title="Account & settings"
+            subtitle="Notifications, support, logout"
+            onPress={() => navigation.navigate('Account')}
+          />
+          {isBusinessAccount ? (
+            <>
+              <View style={styles.listDivider} />
+              <ListRow
+                icon="storefront-outline"
+                title="Business admin"
+                subtitle="Manage profile, menu, offers, staff"
+                onPress={() => navigation.navigate('BusinessAdmin')}
+              />
+            </>
+          ) : null}
+        </View>
+      </ScrollView>
+      <BottomNav />
+      <StatusBar style="auto" />
+    </SafeAreaView>
+  );
+};
+
+const AccountScreen = () => {
+  const styles = useStyles();
   const { colors, toggle, mode } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { userId, email, deviceId, profile, signOut, loading } = useAuth();
-  const { businesses: businessList } = useBusinesses();
-  const [identity, setIdentity] = useState<'personal' | 'business'>('personal');
   const [pushEnabled, setPushEnabled] = useState(true);
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [pushStatus, setPushStatus] = useState<string | null>(null);
@@ -5340,29 +5633,7 @@ const ProfileScreen = () => {
   const [kycRequestStatus, setKycRequestStatus] = useState<string | null>(null);
   const [kycUploading, setKycUploading] = useState(false);
   const [kycRequesting, setKycRequesting] = useState(false);
-  const activeBusiness = businessList[0];
   const isBusinessAccount = profile?.accountType === 'business';
-  const reputationScore = useMemo(() => {
-    const xp = profile?.xp ?? 0;
-    const level = profile?.level ?? 1;
-    const raw = xp / 10 + level * 5;
-    return Math.max(0, Math.min(100, Math.round(raw)));
-  }, [profile?.level, profile?.xp]);
-  const trustLabel = useMemo(() => {
-    if (profile?.shadowbanned) {
-      return 'Restricted';
-    }
-    if (profile?.u2uLocked) {
-      return 'Limited';
-    }
-    if ((profile?.level ?? 1) >= 6) {
-      return 'High';
-    }
-    if ((profile?.level ?? 1) >= 3) {
-      return 'Growing';
-    }
-    return 'New';
-  }, [profile?.level, profile?.shadowbanned, profile?.u2uLocked]);
   const kycLabel =
     kycStatus === 'verified'
       ? 'Verified'
@@ -5381,21 +5652,10 @@ const ProfileScreen = () => {
           : colors.warning;
   const kycRequestLocked =
     kycRequesting || kycRequestStatus === 'pending' || kycStatus === 'submitted' || kycStatus === 'verified';
-  const handleKycPending = (label: string) => {
-    setKycNotice(`${label} setup pending. Coming soon.`);
-  };
 
   useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'profile' }, userId);
+    void trackAnalyticsEvent('screen_view', { screen: 'account' }, userId);
   }, [userId]);
-
-  useEffect(() => {
-    if (profile?.accountType === 'business') {
-      setIdentity('business');
-    } else if (profile?.accountType === 'personal') {
-      setIdentity('personal');
-    }
-  }, [profile?.accountType]);
 
   useEffect(() => {
     let isMounted = true;
@@ -5618,31 +5878,22 @@ const ProfileScreen = () => {
     }
     setPushNotice(`Push queued (${data?.sent ?? 0} sent).`);
   };
+
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <SectionTitle icon="person-circle-outline" label="Active identity" />
-          {isBusinessAccount ? (
-            <Text style={styles.metaText}>Business account (personal features disabled).</Text>
-          ) : (
-            <View style={styles.tabRow}>
-              <Pressable style={[styles.tabPill, styles.tabPillActive]}>
-                <Text style={[styles.tabPillText, styles.tabPillTextActive]}>Personal</Text>
-              </Pressable>
-            </View>
-          )}
+        <View style={styles.profileHero}>
           {loading ? (
-            <Text style={styles.metaText}>Loading...</Text>
+            <Text style={styles.metaText}>Loading account...</Text>
           ) : userId ? (
             <>
-              <Text style={styles.cardTitle}>
-                {identity === 'business' ? activeBusiness?.name ?? 'Business' : profile?.handle ?? userId.slice(0, 6)}
+              <Text style={styles.profileHandle}>{email ?? 'Signed in'}</Text>
+              <Text style={styles.profileMeta}>
+                {isBusinessAccount ? 'Business account' : 'Personal account'} • {profile?.handle ? `@${profile.handle}` : 'Handle pending'}
               </Text>
-              <Text style={styles.metaText}>{email ?? 'Signed in'}</Text>
               {profile?.shadowbanned || profile?.u2uLocked ? (
-                <Text style={styles.metaText}>Account review in progress.</Text>
+                <Text style={[styles.profileMeta, { color: colors.warning }]}>Account review in progress.</Text>
               ) : null}
             </>
           ) : (
@@ -5653,29 +5904,6 @@ const ProfileScreen = () => {
               </Pressable>
             </>
           )}
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="sparkles-outline" label="Stats" />
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaText}>Level</Text>
-            <Text style={styles.cardTitle}>{profile?.level ?? 1}</Text>
-          </View>
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaText}>XP</Text>
-            <Text style={styles.cardTitle}>{profile?.xp ?? 0}</Text>
-          </View>
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaText}>Reputation</Text>
-            <Text style={styles.cardTitle}>{reputationScore}</Text>
-          </View>
-          <View style={styles.rowBetween}>
-            <Text style={styles.metaText}>Trust</Text>
-            <Text style={styles.cardTitle}>{trustLabel}</Text>
-          </View>
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="bookmark-outline" label="Saved" />
-          <Text style={styles.cardBody}>Saved posts, rooms, and businesses.</Text>
         </View>
         <View style={styles.card}>
           <SectionTitle icon="shield-checkmark-outline" label="Safety & verification" />
@@ -8988,6 +9216,7 @@ const AppNavigator = () => {
         <Stack.Screen name="Room" component={RoomScreen} />
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="Account" component={AccountScreen} />
         <Stack.Screen name="UserProfile" component={UserProfileScreen} />
         <Stack.Screen name="Auth" component={AuthScreen} />
         <Stack.Screen name="Business" component={BusinessScreen} />
@@ -9015,7 +9244,7 @@ export default function App() {
 }
 
 const useStyles = () => {
-  const { colors } = useTheme();
+  const { colors, resolvedMode } = useTheme();
   const space = SPACE_SCALE;
   const type = TYPE_PRESETS;
   return useMemo(
@@ -9593,6 +9822,201 @@ const useStyles = () => {
         listRowInfo: {
           flex: 1,
           gap: 4,
+        },
+        profileHero: {
+          borderRadius: 22,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.surface,
+          padding: space.lg,
+          gap: space.md,
+          shadowColor: colors.overlay,
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 8 },
+        },
+        profileHeaderRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.md,
+        },
+        profileAvatar: {
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: withOpacity(colors.brand, 0.38),
+          backgroundColor: withOpacity(colors.brand, 0.14),
+        },
+        profileAvatarText: {
+          ...type.title18,
+          fontWeight: '800',
+          color: colors.brand,
+        },
+        profileHeaderText: {
+          flex: 1,
+          gap: 6,
+        },
+        profileHandleRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: space.xs,
+        },
+        profileHandle: {
+          ...type.title20,
+          fontWeight: '800',
+          color: colors.text,
+        },
+        profileIdentityPill: {
+          paddingHorizontal: space.sm,
+          paddingVertical: 4,
+          borderRadius: 999,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        profileIdentityPillText: {
+          ...type.label12,
+          fontWeight: '700',
+          color: colors.brandText,
+        },
+        profileMeta: {
+          ...type.body12,
+          color: colors.textSubtle,
+        },
+        profileEditButton: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: withOpacity(colors.surfaceMuted, 0.7),
+          borderWidth: 1,
+          borderColor: withOpacity(colors.border, 0.7),
+        },
+        profileStatsPanel: {
+          gap: space.sm,
+        },
+        profileStatsTop: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: space.sm,
+        },
+        levelBadge: {
+          paddingHorizontal: space.sm,
+          paddingVertical: 4,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: withOpacity(colors.brand, 0.22),
+        },
+        levelBadgeText: {
+          ...type.label12,
+          fontWeight: '800',
+          color: colors.brand,
+        },
+        profileStatInline: {
+          ...type.label12,
+          fontWeight: '700',
+          color: colors.textMuted,
+        },
+        trustPill: {
+          paddingHorizontal: space.sm,
+          paddingVertical: 4,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: withOpacity(colors.prestige, 0.24),
+        },
+        trustPillText: {
+          ...type.label12,
+          fontWeight: '800',
+          color: colors.prestige,
+        },
+        meterBlock: {
+          gap: 6,
+        },
+        meterLabel: {
+          ...type.label12,
+          fontWeight: '700',
+          color: colors.textSubtle,
+        },
+        meterMeta: {
+          ...type.label12,
+          fontWeight: '700',
+          color: colors.textMuted,
+        },
+        meterTrack: {
+          height: 8,
+          borderRadius: 999,
+          backgroundColor: withOpacity(colors.borderStrong, resolvedMode === 'dark' ? 0.6 : 0.9),
+          overflow: 'hidden',
+        },
+        meterFill: {
+          height: '100%',
+          borderRadius: 999,
+        },
+        listGroup: {
+          marginTop: space.lg,
+          borderRadius: 22,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.surface,
+          overflow: 'hidden',
+        },
+        listDivider: {
+          height: 1,
+          backgroundColor: colors.border,
+        },
+        actionRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: space.md,
+          paddingHorizontal: space.lg,
+          paddingVertical: space.md,
+        },
+        actionRowLeft: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.md,
+          flex: 1,
+          minWidth: 0,
+        },
+        actionRowIconWrap: {
+          width: 36,
+          height: 36,
+          borderRadius: 14,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.surfaceMuted,
+          borderWidth: 1,
+          borderColor: withOpacity(colors.border, 0.8),
+        },
+        actionRowTextWrap: {
+          flex: 1,
+          gap: 2,
+          minWidth: 0,
+        },
+        actionRowTitle: {
+          ...type.body16,
+          fontWeight: '800',
+          color: colors.text,
+        },
+        actionRowSubtitle: {
+          ...type.body12,
+          color: colors.textMuted,
+        },
+        actionRowRight: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.xs,
+        },
+        actionRowMeta: {
+          ...type.label12,
+          fontWeight: '700',
+          color: colors.textSubtle,
         },
         chatMediaImage: {
           width: 180,

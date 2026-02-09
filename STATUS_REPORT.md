@@ -17,7 +17,7 @@
 - Business media uploads (hero/logo via storage; requires `business-media` bucket)
 - Orders flow (menu -> cart -> order + order_items)
 - Messages (business list + direct threads + direct chat)
-- Profile (identity switch, level/xp, reputation/trust, device ID)
+- Profile + Account split (Profile: handle/stats/quick actions; Account: device ID, push, KYC, billing, settings)
 - Billing screen placeholder (no payments)
 - Push notifications plumbing (device token capture + test push)
 - AI moderation checks for posts + room/business/direct messages

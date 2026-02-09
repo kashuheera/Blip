@@ -32,7 +32,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Feed actions updated: like + share + reply (business-only) + user profile drilldown + distance badge (coarse location).
 - Post engagement: likes (personal) + replies/comments (business-only).
 - Orders: pickup + delivery options + KYC-required user details (name/phone/address).
-- KYC status badge UI in profile (verified/pending/rejected).
+- KYC status shown in Profile (quick row meta) + full KYC workflow lives in Account.
 - Auth screen (provider-first): Personal/Business/Fleet tabs, provider buttons (pending), Continue with Email (password auth), Continue with Phone (coming soon). Clicking any pending login method shows a popup prompting to use Email for now. Clickable Terms + Privacy modal. Uses `app/assets/blip-auth-bg.jpg` as the background and `app/assets/blip-mark.png` as the logo mark.
 - Startup auth gate: logged-out users land on Auth first (session-gated navigator boot route).
 - Room chat with realtime updates + distance gating.
@@ -41,7 +41,9 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Orders flow (menu -> cart -> order + order_items).
 - Messages (business list + direct threads + direct chat).
 - Voice rooms with RTC audio transport + push-to-talk (create/join/leave + participant counts).
-- Profile (identity switch, level/xp, reputation/trust labels, device ID display).
+- Profile + Account split:
+  - Profile: editorial identity dashboard (handle, level/XP, reputation/trust, quick actions).
+  - Account: private settings (device ID, push, KYC, billing, logout).
 - Billing placeholder screen (provider planned: Safepay; no payments yet).
 - Push notifications plumbing (device token capture + test push).
 - AI moderation checks for posts + room/business/direct messages.
@@ -256,8 +258,10 @@ The sections below map “product features” to concrete implementation artifac
 - What it does: provides a lightweight identity (bio + interests + badges + social proof) without real-name social graph.
 - Client:
   - Profile loading/creation: `AuthProvider.loadProfile()` selects/creates a `profiles` row after login.
-  - Profile editing: `ProfileScreen` (bio + birth year + avatar URL + interests).
-  - Badges + social proof: computed on the profile using posts, rooms, orders, and connections.
+  - Profile (public): `ProfileScreen` is an editorial dashboard (rotating handle + level/XP + reputation/trust + quick actions). It does **not** show account email.
+  - Account (private): `AccountScreen` contains device ID, push settings, KYC workflow, billing placeholder, and logout.
+  - Public user lookup: `UserProfileScreen` shows basic public stats for a handle (no account/private fields).
+  - Profile editing (bio/avatar/interests UI): not wired yet (deferred).
 - DB:
   - `profiles` table stores `birth_year`, `bio`, `avatar_url`, `interests`, plus flags and XP fields.
   - RLS restricts profile reads/writes to the owner.
@@ -270,13 +274,13 @@ The sections below map “product features” to concrete implementation artifac
   - `handle_history` stores per-user handle usage timestamps to enforce the reuse ban.
 
 #### A4 - Dual profiles (personal vs business identity)
-- What it does: lets a signed-in user switch between their personal handle and a business identity when posting or commenting.
+- What it does (current): separates personal vs business accounts and uses business identity where applicable.
 - Client:
-  - `IdentityProvider` persists the active identity in AsyncStorage (`blip.identity.v1`) and resets on sign-out.
-  - `ProfileScreen` shows the active identity card + switcher modal; owned businesses load from `businesses.owner_id`.
-  - `CreateScreen` and `PostCommentsScreen` use the active identity label as `author_handle`.
+  - Business accounts are UI-gated away from user Home/Feed/Rooms/DMs; they use Business Admin + business chat tooling.
+  - Business replies in threads use the business name (resolved from owned/staff business rows).
+  - A full in-app “identity switcher” (post/comment as business vs personal from one account) is not implemented yet.
 - DB:
-  - Uses existing `businesses` rows to populate owned identities (no new schema).
+  - `profiles.account_type` enforces personal vs business account type and drives RLS checks.
 
 ### B) Location, Map & Discovery
 
