@@ -2304,20 +2304,6 @@ const HomeScreen = () => {
             </View>
           ) : null}
         </View>
-        <View style={styles.mapFabBar}>
-          <Pressable style={styles.fabButton} onPress={() => navigation.navigate('Create')}>
-            <Ionicons name="add-circle-outline" size={ICON_SIZES.lg} color={colors.rewardText} />
-            <Text style={styles.fabText}>Create Room</Text>
-          </Pressable>
-          <Pressable style={styles.fabButton} onPress={() => navigation.navigate('BusinessAdmin')}>
-            <Ionicons name="storefront-outline" size={ICON_SIZES.lg} color={colors.rewardText} />
-            <Text style={styles.fabText}>Add Business</Text>
-          </Pressable>
-          <Pressable style={styles.fabButton} onPress={() => navigation.navigate('Feed')}>
-            <Ionicons name="newspaper-outline" size={ICON_SIZES.lg} color={colors.rewardText} />
-            <Text style={styles.fabText}>View Feed</Text>
-          </Pressable>
-        </View>
       </View>
       <BottomNav />
       <StatusBar style="auto" />
@@ -9280,34 +9266,6 @@ const useStyles = () => {
         mapBusinessActions: {
           flexDirection: 'row',
           gap: space.md,
-        },
-        mapFabBar: {
-          position: 'absolute',
-          left: space.lg,
-          right: space.lg,
-          bottom: 90,
-          flexDirection: 'row',
-          gap: space.xs,
-          justifyContent: 'space-between',
-          zIndex: 5,
-        },
-        fabButton: {
-          flex: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: space.xs,
-          borderRadius: 999,
-          paddingVertical: space.md,
-          paddingHorizontal: space.sm,
-          backgroundColor: colors.reward,
-          borderWidth: 1,
-          borderColor: colors.reward,
-        },
-        fabText: {
-          ...type.label12,
-          fontWeight: '700',
-          color: colors.rewardText,
         },
         clusterMarker: {
           width: 34,
