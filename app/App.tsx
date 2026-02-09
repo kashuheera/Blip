@@ -5,6 +5,7 @@ import {
   Animated,
   FlatList,
   Image,
+  ImageBackground,
   Linking,
   Modal,
   Platform,
@@ -50,6 +51,8 @@ import type {
 import { ICON_SIZES, SPACE_SCALE, TYPE_PRESETS } from './theme/typography';
 
 const APP_VERSION = Constants.expoConfig?.version ?? 'dev';
+const AUTH_BG_IMAGE = require('./assets/blip-auth-bg.jpg');
+const BLIP_MARK_IMAGE = require('./assets/blip-mark.png');
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -870,6 +873,7 @@ const AppHeader = () => {
           </Pressable>
         ) : null}
         <View style={styles.appBarBrand}>
+          <Image source={BLIP_MARK_IMAGE} style={styles.appBarBrandMark} />
           <Text style={styles.appBarBrandText}>BLIP</Text>
           <View style={styles.betaPill}>
             <Text style={styles.betaPillText}>beta</Text>
@@ -6036,7 +6040,7 @@ const AuthScreen = () => {
     const raw = APP_VERSION.startsWith('v') ? APP_VERSION.slice(1) : APP_VERSION;
     const parts = raw.split('.');
     const majorMinor = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : raw;
-    return `BETA version ${majorMinor}`;
+    return `BETA V${majorMinor}`;
   }, []);
 
   const handleLogin = async () => {
@@ -6121,196 +6125,203 @@ const AuthScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.authBody}>
-        <View style={styles.authBrandHeader}>
-          <View style={styles.authBrandBlock}>
-            <Text
-              style={styles.authBrandText}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.6}
-              maxFontSizeMultiplier={1.2}
-            >
-              BLIP
-            </Text>
-            <Text style={styles.authBrandMetaBelow}>{versionLabel}</Text>
-          </View>
-        </View>
-        <View style={[styles.card, styles.authCard]}>
-          {step === 'providers' ? (
-            <>
-              <View style={styles.authModeHeader}>
-                {[
-                  { key: 'personal', label: 'Personal' },
-                  { key: 'business', label: 'Business' },
-                  { key: 'fleet', label: 'Fleet' },
-                ].map((item) => (
-                  <Pressable
-                    key={item.key}
-                    style={[styles.tabPill, styles.authModePill, authMode === item.key && styles.tabPillActive]}
-                    onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
+    <ImageBackground source={AUTH_BG_IMAGE} style={styles.authBackground} resizeMode="cover">
+      <View style={styles.authBackgroundOverlay}>
+        <SafeAreaView style={[styles.container, styles.transparentContainer]}>
+          <View style={styles.authBody}>
+            <View style={styles.authBrandHeader}>
+              <View style={styles.authBrandBlock}>
+                <View style={styles.authBrandTopRow}>
+                  <Image source={BLIP_MARK_IMAGE} style={styles.authBrandMark} />
+                  <Text
+                    style={styles.authBrandText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
+                    maxFontSizeMultiplier={1.2}
                   >
-                    <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
-                      {item.label}
+                    BLIP
+                  </Text>
+                </View>
+                <Text style={styles.authBrandMetaBelow}>{versionLabel}</Text>
+              </View>
+            </View>
+            <View style={[styles.card, styles.authCard]}>
+              {step === 'providers' ? (
+                <>
+                  <View style={styles.authModeHeader}>
+                    {[
+                      { key: 'personal', label: 'Personal' },
+                      { key: 'business', label: 'Business' },
+                      { key: 'fleet', label: 'Fleet' },
+                    ].map((item) => (
+                      <Pressable
+                        key={item.key}
+                        style={[styles.tabPill, styles.authModePill, authMode === item.key && styles.tabPillActive]}
+                        onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
+                      >
+                        <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+                  <View style={styles.authProviderStack}>
+                    <Pressable
+                      style={[styles.authProviderButton, styles.authProviderGoogle]}
+                      onPress={() => handlePending('Google OAuth')}
+                    >
+                      <Ionicons name="logo-google" size={ICON_SIZES.md} color={colors.text} />
+                      <Text style={[styles.authProviderButtonText, styles.authProviderGoogleText]}>
+                        Continue with Google
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.authProviderButton, styles.authProviderFacebook]}
+                      onPress={() => handlePending('Facebook login')}
+                    >
+                      <Ionicons name="logo-facebook" size={ICON_SIZES.md} color="#FFFFFF" />
+                      <Text style={[styles.authProviderButtonText, styles.authProviderFacebookText]}>
+                        Continue with Facebook
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.authProviderButton, styles.authProviderApple]}
+                      onPress={() => handlePending('Apple login')}
+                    >
+                      <Ionicons name="logo-apple" size={ICON_SIZES.md} color="#0B0B10" />
+                      <Text style={[styles.authProviderButtonText, styles.authProviderAppleText]}>
+                        Continue with Apple
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.authDividerRow}>
+                    <View style={styles.authDividerLine} />
+                    <Text style={styles.authDividerText}>or</Text>
+                    <View style={styles.authDividerLine} />
+                  </View>
+                  <View style={styles.authChoiceRow}>
+                    <Pressable style={styles.authChoiceButton} onPress={handleContinueEmail}>
+                      <Ionicons name="mail-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
+                      <Text style={styles.authChoiceText}>Continue with Email</Text>
+                    </Pressable>
+                    <Pressable style={styles.authChoiceButton} onPress={handleContinuePhone}>
+                      <Ionicons name="call-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
+                      <Text style={styles.authChoiceText}>Continue with Phone</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={styles.authTermsText}>
+                    By signing up you agree to our{' '}
+                    <Text style={styles.authTermsLink} onPress={() => setLegalModal('terms')}>
+                      Terms and Conditions
+                    </Text>{' '}
+                    and{' '}
+                    <Text style={styles.authTermsLink} onPress={() => setLegalModal('privacy')}>
+                      Privacy Policy
                     </Text>
-                  </Pressable>
-                ))}
-              </View>
-              {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-              <View style={styles.authProviderStack}>
-                <Pressable
-                  style={[styles.authProviderButton, styles.authProviderGoogle]}
-                  onPress={() => handlePending('Google OAuth')}
-                >
-                  <Ionicons name="logo-google" size={ICON_SIZES.md} color={colors.text} />
-                  <Text style={[styles.authProviderButtonText, styles.authProviderGoogleText]}>
-                    Continue with Google
+                    .
                   </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.authProviderButton, styles.authProviderFacebook]}
-                  onPress={() => handlePending('Facebook login')}
-                >
-                  <Ionicons name="logo-facebook" size={ICON_SIZES.md} color="#FFFFFF" />
-                  <Text style={[styles.authProviderButtonText, styles.authProviderFacebookText]}>
-                    Continue with Facebook
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.authProviderButton, styles.authProviderApple]}
-                  onPress={() => handlePending('Apple login')}
-                >
-                  <Ionicons name="logo-apple" size={ICON_SIZES.md} color="#0B0B10" />
-                  <Text style={[styles.authProviderButtonText, styles.authProviderAppleText]}>
-                    Continue with Apple
-                  </Text>
-                </Pressable>
-              </View>
-              <View style={styles.authDividerRow}>
-                <View style={styles.authDividerLine} />
-                <Text style={styles.authDividerText}>or</Text>
-                <View style={styles.authDividerLine} />
-              </View>
-              <View style={styles.authChoiceRow}>
-                <Pressable style={styles.authChoiceButton} onPress={handleContinueEmail}>
-                  <Ionicons name="mail-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
-                  <Text style={styles.authChoiceText}>Continue with Email</Text>
-                </Pressable>
-                <Pressable style={styles.authChoiceButton} onPress={handleContinuePhone}>
-                  <Ionicons name="call-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
-                  <Text style={styles.authChoiceText}>Continue with Phone</Text>
-                </Pressable>
-              </View>
-              <Text style={styles.authTermsText}>
-                By signing up you agree to our{' '}
-                <Text style={styles.authTermsLink} onPress={() => setLegalModal('terms')}>
-                  Terms and Conditions
-                </Text>{' '}
-                and{' '}
-                <Text style={styles.authTermsLink} onPress={() => setLegalModal('privacy')}>
-                  Privacy Policy
-                </Text>
-                .
-              </Text>
-            </>
-          ) : (
-            <>
-              <View style={styles.rowBetween}>
-                <Pressable style={styles.iconButtonSm} onPress={handleBackToProviders}>
-                  <Ionicons name="close" size={ICON_SIZES.md} color={colors.text} />
-                </Pressable>
-                <View style={{ width: 32 }} />
-              </View>
-              <View style={styles.authModeHeader}>
-                {[
-                  { key: 'personal', label: 'Personal' },
-                  { key: 'business', label: 'Business' },
-                  { key: 'fleet', label: 'Fleet' },
-                ].map((item) => (
+                </>
+              ) : (
+                <>
+                  <View style={styles.rowBetween}>
+                    <Pressable style={styles.iconButtonSm} onPress={handleBackToProviders}>
+                      <Ionicons name="close" size={ICON_SIZES.md} color={colors.text} />
+                    </Pressable>
+                    <View style={{ width: 32 }} />
+                  </View>
+                  <View style={styles.authModeHeader}>
+                    {[
+                      { key: 'personal', label: 'Personal' },
+                      { key: 'business', label: 'Business' },
+                      { key: 'fleet', label: 'Fleet' },
+                    ].map((item) => (
+                      <Pressable
+                        key={item.key}
+                        style={[styles.tabPill, styles.authModePill, authMode === item.key && styles.tabPillActive]}
+                        onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
+                      >
+                        <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Email"
+                    placeholderTextColor={colors.placeholder}
+                    autoCapitalize="none"
+                  />
+                  <TextInput
+                    style={styles.input}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="Password"
+                    placeholderTextColor={colors.placeholder}
+                    secureTextEntry
+                  />
+                  {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
                   <Pressable
-                    key={item.key}
-                    style={[styles.tabPill, styles.authModePill, authMode === item.key && styles.tabPillActive]}
-                    onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
+                    style={[styles.primaryButton, styles.primaryButtonFull]}
+                    onPress={handleLogin}
+                    disabled={submitting}
                   >
-                    <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
-                      {item.label}
-                    </Text>
+                    <Text style={styles.primaryButtonText}>{submitting ? 'Please wait...' : 'Sign in'}</Text>
                   </Pressable>
-                ))}
-              </View>
-              <TextInput
-                style={styles.input}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Email"
-                placeholderTextColor={colors.placeholder}
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Password"
-                placeholderTextColor={colors.placeholder}
-                secureTextEntry
-              />
-              {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-              <Pressable
-                style={[styles.primaryButton, styles.primaryButtonFull]}
-                onPress={handleLogin}
-                disabled={submitting}
-              >
-                <Text style={styles.primaryButtonText}>{submitting ? 'Please wait...' : 'Sign in'}</Text>
+                  <Pressable
+                    style={[styles.primaryButton, styles.primaryButtonFull]}
+                    onPress={handleSignup}
+                    disabled={submitting}
+                  >
+                    <Text style={styles.primaryButtonText}>Sign up</Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
+            <View style={styles.authFooterLinks}>
+              <Pressable onPress={() => navigation.navigate('AdminPortal')}>
+                <Text style={styles.linkText}>Admin</Text>
               </Pressable>
-              <Pressable
-                style={[styles.primaryButton, styles.primaryButtonFull]}
-                onPress={handleSignup}
-                disabled={submitting}
-              >
-                <Text style={styles.primaryButtonText}>Sign up</Text>
-              </Pressable>
-            </>
-          )}
-        </View>
-        <View style={styles.authFooterLinks}>
-          <Pressable onPress={() => navigation.navigate('AdminPortal')}>
-            <Text style={styles.linkText}>Admin</Text>
-          </Pressable>
-          <Pressable onPress={() => navigation.navigate('Demo')}>
-            <Text style={styles.linkText}>Demo</Text>
-          </Pressable>
-        </View>
-      </View>
-      <Modal
-        transparent
-        animationType="fade"
-        visible={legalModal !== null}
-        onRequestClose={() => setLegalModal(null)}
-      >
-        <View style={styles.legalModalContainer}>
-          <Pressable style={styles.legalModalOverlay} onPress={() => setLegalModal(null)} />
-          <View style={styles.legalModalCard}>
-            <View style={styles.rowBetween}>
-              <Text style={styles.legalModalTitle}>
-                {legalModal === 'privacy' ? 'Privacy Policy' : 'Terms and Conditions'}
-              </Text>
-              <Pressable style={styles.iconButtonSm} onPress={() => setLegalModal(null)}>
-                <Ionicons name="close" size={ICON_SIZES.md} color={colors.text} />
+              <Pressable onPress={() => navigation.navigate('Demo')}>
+                <Text style={styles.linkText}>Demo</Text>
               </Pressable>
             </View>
-            <ScrollView contentContainerStyle={styles.legalModalBody}>
-              <Text style={styles.cardBody}>
-                {legalModal === 'privacy'
-                  ? 'Privacy policy drafting is in progress. For the demo, assume: no user location or personal details are exposed to other users; businesses only see customer KYC details after checkout.'
-                  : 'Terms and conditions drafting is in progress. For the demo, assume: posts are ephemeral; abuse and fraud are prohibited; Blip may suspend accounts for safety.'}
-              </Text>
-            </ScrollView>
           </View>
-        </View>
-      </Modal>
-      <StatusBar style="auto" />
-    </SafeAreaView>
+          <Modal
+            transparent
+            animationType="fade"
+            visible={legalModal !== null}
+            onRequestClose={() => setLegalModal(null)}
+          >
+            <View style={styles.legalModalContainer}>
+              <Pressable style={styles.legalModalOverlay} onPress={() => setLegalModal(null)} />
+              <View style={styles.legalModalCard}>
+                <View style={styles.rowBetween}>
+                  <Text style={styles.legalModalTitle}>
+                    {legalModal === 'privacy' ? 'Privacy Policy' : 'Terms and Conditions'}
+                  </Text>
+                  <Pressable style={styles.iconButtonSm} onPress={() => setLegalModal(null)}>
+                    <Ionicons name="close" size={ICON_SIZES.md} color={colors.text} />
+                  </Pressable>
+                </View>
+                <ScrollView contentContainerStyle={styles.legalModalBody}>
+                  <Text style={styles.cardBody}>
+                    {legalModal === 'privacy'
+                      ? 'Privacy policy drafting is in progress. For the demo, assume: no user location or personal details are exposed to other users; businesses only see customer KYC details after checkout.'
+                      : 'Terms and conditions drafting is in progress. For the demo, assume: posts are ephemeral; abuse and fraud are prohibited; Blip may suspend accounts for safety.'}
+                  </Text>
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+          <StatusBar style="light" />
+        </SafeAreaView>
+      </View>
+    </ImageBackground>
   );
 };
 
@@ -9055,6 +9066,9 @@ const useStyles = () => {
           flex: 1,
           backgroundColor: colors.background,
         },
+        transparentContainer: {
+          backgroundColor: 'transparent',
+        },
         authGateLoading: {
           flex: 1,
           alignItems: 'center',
@@ -9090,6 +9104,10 @@ const useStyles = () => {
           flexDirection: 'row',
           alignItems: 'center',
           gap: space.xs,
+        },
+        appBarBrandMark: {
+          width: 18,
+          height: 18,
         },
         appBarBrandText: {
           ...type.title14,
@@ -10082,6 +10100,14 @@ const useStyles = () => {
           fontWeight: '600',
           color: colors.text,
         },
+        authBackground: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
+        authBackgroundOverlay: {
+          flex: 1,
+          backgroundColor: withOpacity(colors.background, 0.18),
+        },
         authBody: {
           flex: 1,
           paddingHorizontal: space.lg,
@@ -10102,6 +10128,16 @@ const useStyles = () => {
         authBrandBlock: {
           alignSelf: 'center',
           alignItems: 'flex-start',
+        },
+        authBrandTopRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: space.sm,
+        },
+        authBrandMark: {
+          width: 56,
+          height: 56,
         },
         authBrandText: {
           ...type.display32,
@@ -10135,6 +10171,8 @@ const useStyles = () => {
           paddingVertical: space.lg,
           paddingHorizontal: space.lg,
           gap: space.lg,
+          backgroundColor: withOpacity(colors.surface, 0.55),
+          borderColor: withOpacity(colors.border, 0.4),
         },
         authSubhead: {
           ...type.body12,
