@@ -6030,12 +6030,6 @@ const AuthScreen = () => {
   const [authMode, setAuthMode] = useState<'personal' | 'business' | 'fleet'>('personal');
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const authHint =
-    authMode === 'business'
-      ? 'Business sign-in uses a separate business account and opens the Business Admin Portal.'
-      : authMode === 'fleet'
-        ? 'Fleet access is not live yet.'
-        : 'Personal sign-in takes you to the map.';
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -6108,9 +6102,7 @@ const AuthScreen = () => {
       <AppHeader />
       <View style={styles.authBody}>
         <View style={styles.card}>
-          <SectionTitle icon="key-outline" label="Sign in" />
-          <Text style={styles.authSubhead}>Choose your access type</Text>
-          <View style={styles.tabRow}>
+          <View style={styles.authModeHeader}>
             {[
               { key: 'personal', label: 'Personal' },
               { key: 'business', label: 'Business' },
@@ -6118,7 +6110,7 @@ const AuthScreen = () => {
             ].map((item) => (
               <Pressable
                 key={item.key}
-                style={[styles.tabPill, authMode === item.key && styles.tabPillActive]}
+                style={[styles.tabPill, styles.authModePill, authMode === item.key && styles.tabPillActive]}
                 onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
               >
                 <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
@@ -6127,10 +6119,7 @@ const AuthScreen = () => {
               </Pressable>
             ))}
           </View>
-          <Text style={styles.authHint}>{authHint}</Text>
-          <Text style={styles.authSubhead}>
-            Email + password for demo access. Magic link and Google OAuth are coming soon.
-          </Text>
+          <Text style={styles.authSubhead}>Choose your access type</Text>
           <TextInput
             style={styles.input}
             value={email}
@@ -6165,9 +6154,6 @@ const AuthScreen = () => {
           <View style={styles.sectionDivider} />
           <Text style={styles.authSubhead}>Other sign-in options</Text>
           <View style={styles.filterRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Magic link / OTP')}>
-              <Text style={styles.secondaryButtonText}>Magic link / OTP</Text>
-            </Pressable>
             <Pressable style={styles.secondaryButton} onPress={() => handlePending('Google OAuth')}>
               <Text style={styles.secondaryButtonText}>Google OAuth</Text>
             </Pressable>
@@ -9966,10 +9952,16 @@ const useStyles = () => {
           ...type.body12,
           color: colors.textMuted,
         },
-        authHint: {
-          ...type.label14,
-          fontWeight: '600',
-          color: colors.text,
+        authModeHeader: {
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: space.xs,
+          marginBottom: space.xs,
+        },
+        authModePill: {
+          paddingHorizontal: space.md,
         },
         authFooterLinks: {
           paddingHorizontal: 8,
