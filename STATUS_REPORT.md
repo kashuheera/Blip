@@ -34,7 +34,7 @@
 - UI color system applied (brand/reward/categories + map styling)
 - Figma tokens pipeline (colors + spacing + typography via design/tokens.json + sync script + app/theme/tokens.ts)
 - Typography/spacing normalization pass in `App.tsx` (shared text presets + tokenized icon sizes/padding)
-- Dependency alignment smoke fix (Expo SDK 54): added direct `expo-font`, upgraded `expo-notifications` to `~0.32.16`, deduped `expo-constants`
+- Dependency alignment + security hardening (Expo SDK 54): upgraded `expo` to `~54.0.33`, `expo-device` to `~8.0.10`, deduped `expo-constants`, and fixed audit chain overrides (`tar@7.5.7`, `@isaacs/brace-expansion@5.0.1`)
 - Expo doctor config: excluded `react-native-webrtc` from React Native Directory new-architecture warning check
 - Web parity placeholder polish (info-only)
 - Blip Admin Portal (feature flags, verification queue, moderation ops)

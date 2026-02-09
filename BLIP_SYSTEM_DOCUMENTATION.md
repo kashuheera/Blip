@@ -20,7 +20,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 ## 2) Quick "works vs broken" summary (today)
 
 ### Works (implemented + expected to function)
-- Build smoke baseline: `npx tsc --noEmit` passes and `npx expo export --platform android` succeeds.
+- Build smoke baseline: `npx tsc --noEmit`, `npx expo-doctor`, and `npx expo export --platform android` all pass.
 - Map-first home with clustering + spiderfy + recenter.
 - Map search overlay with scope (rooms/businesses/posts) and text match.
 - Feed screen (tabs + search + tags) + create post.
@@ -56,7 +56,6 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Google OAuth: not implemented.
 - Payments/billing: not implemented (billing screen is placeholder only).
 - Voice rooms use RTC audio transport with push-to-talk; requires custom dev build/native config (`react-native-webrtc`).
-- `expo-doctor` package-version check can crash on Node 24 (`expo install --check` exit code `3221226505`); use Node 20 LTS for cleaner diagnostics.
 - Business admin access requires a business account (owner/staff). Personal-only accounts are blocked from admin controls.
 - KYC verification: document uploads + admin review queue are implemented (private storage).
 - Push notifications delivery: requires FCM/APNS keys + redeploy `push-send`.
@@ -69,7 +68,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 ## 3) How to run the app (local dev)
 
 ### Prereqs
-- Node.js 20 LTS (recommended; Node 24 can break `expo-doctor` package checks)
+- Node.js LTS (recommended)
 - Expo tooling (`npx expo` works; the repo uses `expo start`)
 
 ### App env vars
@@ -764,10 +763,8 @@ If `supabase.cmd` says the CLI is missing:
 
 Last audit summary:
 - Command: `npm.cmd audit --audit-level=high` (2026-02-09)
-- Result: 5 high vulnerabilities
-- Affected packages: `@isaacs/brace-expansion`, `tar` (transitive via Expo CLI + Supabase CLI package)
-- Current mitigation in repo: `overrides.tar = 7.5.6`
-- Next remediation: bump `tar` override to `>= 7.5.7` and rerun audit, then revalidate app smoke tests.
+- Result: 0 vulnerabilities
+- Remediation applied: upgraded SDK-aligned packages (`expo ~54.0.33`, `expo-device ~8.0.10`) and pinned overrides for the audit chain (`tar = 7.5.7`, `@isaacs/brace-expansion = 5.0.1`).
 
 ## 9) Feature gaps (must-have + parity wishlist)
 
