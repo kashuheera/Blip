@@ -58,6 +58,7 @@ const BLIP_MARK_IMAGE = require('./assets/blip-mark.png');
 
 const HANDLE_ROTATION_MINUTES = 5;
 const HANDLE_REUSE_WINDOW_DAYS = 90;
+const MAHMOOD_PHARMACY_BUSINESS_ID = '2a2dfb6f-0b53-4ad2-a7d1-7e5c01902f6c';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -1432,6 +1433,22 @@ const PulseRing = ({ color, size }: { color: string; size: number }) => {
   );
 };
 
+const MahmoodPharmacyMiniIcon = () => {
+  const styles = useStyles();
+  return (
+    <View style={styles.mahmoodPinIcon}>
+      <View style={styles.mahmoodPinIconInner}>
+        <View style={styles.mahmoodPinIconLeft}>
+          <Text style={styles.mahmoodPinIconLeftText}>M</Text>
+        </View>
+        <View style={styles.mahmoodPinIconRight}>
+          <Text style={styles.mahmoodPinIconRightText}>P</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 const buildBusinessFromRow = (row: any): Business | null => {
   const id = String(row?.id ?? '');
   if (!id) {
@@ -2193,6 +2210,7 @@ const HomeScreen = () => {
                   const business = businessById.get(item.businessId);
                   const logoUrl = business?.logoUrl ?? business?.imageUrl ?? null;
                   const categoryColors = getCategoryColors(item.category ?? null, resolvedMode);
+                  const isMahmood = item.businessId === MAHMOOD_PHARMACY_BUSINESS_ID;
                   return (
                     <Marker
                       key={item.id}
@@ -2212,7 +2230,9 @@ const HomeScreen = () => {
                             { backgroundColor: categoryColors.bg, borderColor: categoryColors.fg },
                           ]}
                         >
-                          {logoUrl ? (
+                          {isMahmood ? (
+                            <MahmoodPharmacyMiniIcon />
+                          ) : logoUrl ? (
                             <Image source={{ uri: logoUrl }} style={styles.businessPinImage} />
                           ) : (
                             <Ionicons
@@ -2302,6 +2322,7 @@ const HomeScreen = () => {
                   const business = businessById.get(pin.businessId);
                   const logoUrl = business?.logoUrl ?? business?.imageUrl ?? null;
                   const categoryColors = getCategoryColors(pin.category ?? null, resolvedMode);
+                  const isMahmood = pin.businessId === MAHMOOD_PHARMACY_BUSINESS_ID;
                   return (
                     <Marker
                       key={pin.id}
@@ -2321,7 +2342,9 @@ const HomeScreen = () => {
                             { backgroundColor: categoryColors.bg, borderColor: categoryColors.fg },
                           ]}
                         >
-                          {logoUrl ? (
+                          {isMahmood ? (
+                            <MahmoodPharmacyMiniIcon />
+                          ) : logoUrl ? (
                             <Image source={{ uri: logoUrl }} style={styles.businessPinImage} />
                           ) : (
                             <Ionicons
@@ -9755,6 +9778,43 @@ const useStyles = () => {
           width: '100%',
           height: '100%',
           resizeMode: 'cover',
+        },
+        mahmoodPinIcon: {
+          width: '100%',
+          height: '100%',
+          backgroundColor: '#0B6B1E',
+        },
+        mahmoodPinIconInner: {
+          flex: 1,
+          flexDirection: 'row',
+          padding: 2,
+          gap: 2,
+        },
+        mahmoodPinIconLeft: {
+          flex: 1,
+          backgroundColor: '#FFFFFF',
+          borderRadius: 6,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        mahmoodPinIconLeftText: {
+          ...type.label12,
+          fontWeight: '900',
+          color: '#0B6B1E',
+          letterSpacing: 0.5,
+        },
+        mahmoodPinIconRight: {
+          flex: 1,
+          backgroundColor: '#1E2A7A',
+          borderRadius: 6,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        mahmoodPinIconRightText: {
+          ...type.label12,
+          fontWeight: '900',
+          color: '#0B6B1E',
+          letterSpacing: 0.5,
         },
         userPin: {
           width: 26,
