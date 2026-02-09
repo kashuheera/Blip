@@ -110,6 +110,8 @@ type Business = {
   description: string;
   rating: number;
   featured: string;
+  phone?: string | null;
+  city?: string | null;
   imageUrl?: string | null;
   logoUrl?: string | null;
   verified?: boolean;
@@ -603,6 +605,27 @@ const demoBusinesses: Business[] = [
     longitude: 74.4339,
     openNow: false,
   },
+  {
+    id: 'b4',
+    name: 'Mahmood Pharmacy',
+    category: 'grocery',
+    description: 'Askari 11 pharmacy for prescriptions, OTC essentials, and quick pickup.',
+    rating: 4.8,
+    featured: 'Pain relief essentials',
+    verified: false,
+    categories: ['Pharmacy', 'Health', 'Askari 11'],
+    amenities: ['Delivery', 'Pickup'],
+    hours: '24/7',
+    phone: '+92 42 0000 0000',
+    city: 'Lahore',
+    latitude: 31.4525218,
+    longitude: 74.4331413,
+    openNow: true,
+    imageUrl:
+      'https://images.unsplash.com/photo-1580281658628-bd1b1f1e5d0b?auto=format&fit=crop&w=800&q=80',
+    logoUrl:
+      'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f48a.png',
+  },
 ];
 
 const demoRooms: Room[] = [
@@ -665,7 +688,7 @@ const BusinessProvider = ({ children }: { children: React.ReactNode }) => {
       const { data, error } = await supabase
         .from('businesses')
         .select(
-          'id, name, category, categories, amenities, hours, description, latitude, longitude, rating, avg_rating, featured_item, featured_item_name, featured_item_title, featured_item_description, featured_item_price_cents, card_image_url, image_url, logo_url, pin_icon_url, open_now, is_open, saved, verified'
+          'id, name, category, categories, amenities, hours, phone, city, flags, latitude, longitude, verified, verification_status, description, hero_image_url, featured_item_name, featured_item_price_cents, pin_icon_url'
         )
         .limit(200);
       if (!isMounted || error || !Array.isArray(data)) {
@@ -1444,8 +1467,8 @@ const buildBusinessFromRow = (row: any): Business | null => {
     row.featured_item ??
     row.featured_item_description ??
     'Top pick';
-  const imageUrl = row.card_image_url ?? row.image_url ?? null;
-  const logoUrl = row.pin_icon_url ?? row.logo_url ?? row.card_image_url ?? null;
+  const imageUrl = row.hero_image_url ?? row.card_image_url ?? row.image_url ?? null;
+  const logoUrl = row.pin_icon_url ?? row.logo_url ?? imageUrl ?? null;
   const openNow =
     typeof row.open_now === 'boolean'
       ? row.open_now
@@ -1460,6 +1483,8 @@ const buildBusinessFromRow = (row: any): Business | null => {
     description: row.description ?? 'Local favorite.',
     rating: Number.isFinite(ratingValue) ? ratingValue : 4.6,
     featured: typeof featured === 'string' && featured.trim() ? featured : 'Top pick',
+    phone: typeof row.phone === 'string' ? row.phone : null,
+    city: typeof row.city === 'string' ? row.city : null,
     imageUrl: typeof imageUrl === 'string' ? imageUrl : null,
     logoUrl: typeof logoUrl === 'string' ? logoUrl : null,
     verified: Boolean(row.verified),
@@ -1953,7 +1978,7 @@ const HomeScreen = () => {
       const { data: businessRows, error: businessError } = await supabase
         .from('businesses')
         .select(
-          'id, name, category, categories, amenities, hours, description, latitude, longitude, rating, avg_rating, featured_item, featured_item_name, featured_item_title, featured_item_description, featured_item_price_cents, card_image_url, image_url, logo_url, pin_icon_url, open_now, is_open, saved, verified'
+          'id, name, category, categories, amenities, hours, phone, city, flags, latitude, longitude, verified, verification_status, description, hero_image_url, featured_item_name, featured_item_price_cents, pin_icon_url'
         )
         .limit(200);
       if (isMounted && !businessError && Array.isArray(businessRows) && businessRows.length > 0) {
@@ -6512,6 +6537,10 @@ const BusinessScreen = ({ route }: BusinessProps) => {
     return sum / reviews.length;
   }, [business.rating, reviews]);
   const hasJoinedChat = Boolean(joinedChats[business.id]);
+  const mapsUrl =
+    business.latitude && business.longitude
+      ? `https://www.google.com/maps/search/?api=1&query=${business.latitude},${business.longitude}`
+      : null;
 
   useEffect(() => {
     if (business?.id) {
@@ -6879,7 +6908,23 @@ const BusinessScreen = ({ route }: BusinessProps) => {
                 </View>
               ))}
             </View>
+            {business.phone ? (
+              <View style={styles.metaRow}>
+                <Ionicons name="call-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
+                <Text style={styles.metaText}>{business.phone}</Text>
+              </View>
+            ) : null}
             <Text style={styles.metaText}>{business.hours ?? 'Hours not set'}</Text>
+            {mapsUrl ? (
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => {
+                  void Linking.openURL(mapsUrl);
+                }}
+              >
+                <Text style={styles.secondaryButtonText}>Open in Maps</Text>
+              </Pressable>
+            ) : null}
             {exceptionsLoading ? (
               <Text style={styles.metaText}>Loading hour exceptions...</Text>
             ) : exceptions.length > 0 ? (
@@ -7575,7 +7620,7 @@ const BusinessAdminScreen = () => {
       setNotice(null);
       const { data: ownedRows, error: businessError } = await supabase
         .from('businesses')
-        .select('id, name, image_url, logo_url, card_image_url, pin_icon_url')
+        .select('id, name, hero_image_url, pin_icon_url')
         .eq('owner_id', userId);
       if (!isMounted) {
         return;
@@ -7595,7 +7640,7 @@ const BusinessAdminScreen = () => {
       const staffBusinessesRes = staffBusinessIds.length
         ? await supabase
             .from('businesses')
-            .select('id, name, image_url, logo_url, card_image_url, pin_icon_url')
+            .select('id, name, hero_image_url, pin_icon_url')
             .in('id', staffBusinessIds)
         : { data: [] as any[] };
       const combinedRows = [...(ownedRows ?? []), ...(staffBusinessesRes.data ?? [])];
@@ -7609,8 +7654,8 @@ const BusinessAdminScreen = () => {
       });
       const businesses = Array.from(uniqueRows.values())
         .map((row) => {
-          const imageUrl = row.card_image_url ?? row.image_url ?? null;
-          const logoUrl = row.pin_icon_url ?? row.logo_url ?? null;
+          const imageUrl = row.hero_image_url ?? null;
+          const logoUrl = row.pin_icon_url ?? null;
           return {
             id: String(row.id ?? ''),
             name: row.name ?? 'Business',
@@ -7830,8 +7875,8 @@ const BusinessAdminScreen = () => {
       const publicUrl = data.publicUrl;
       const updates =
         kind === 'hero'
-          ? { image_url: publicUrl, card_image_url: publicUrl }
-          : { logo_url: publicUrl, pin_icon_url: publicUrl };
+          ? { hero_image_url: publicUrl }
+          : { pin_icon_url: publicUrl };
       const { error: updateError } = await supabase
         .from('businesses')
         .update(updates)
