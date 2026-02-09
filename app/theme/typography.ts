@@ -28,6 +28,7 @@ export const TYPE_PRESETS = {
   title16: makeText('md', 'md', w.bold, 'tight'),
   title18: makeText('lg', 'lg', w.bold, 'tight'),
   title20: makeText('xl', 'xl', w.bold, 'tight'),
+  display32: makeText('display', 'display', w.bold, 'tight'),
   caption12: makeText('xs', 'xs', w.regular, 'normal'),
 };
 

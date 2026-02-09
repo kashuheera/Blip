@@ -6025,11 +6025,18 @@ const AuthScreen = () => {
   const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { signIn, signUp, signOut } = useAuth();
+  const [step, setStep] = useState<'providers' | 'email'>('providers');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authMode, setAuthMode] = useState<'personal' | 'business' | 'fleet'>('personal');
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const versionLabel = useMemo(() => {
+    const raw = APP_VERSION.startsWith('v') ? APP_VERSION.slice(1) : APP_VERSION;
+    const parts = raw.split('.');
+    const majorMinor = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : raw;
+    return `beta v${majorMinor}`;
+  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -6097,67 +6104,158 @@ const AuthScreen = () => {
   const handlePending = (label: string) => {
     setNotice(`${label} setup pending. Coming soon.`);
   };
+
+  const handleContinueEmail = () => {
+    setNotice(null);
+    setStep('email');
+  };
+
+  const handleContinuePhone = () => {
+    setNotice('Phone sign-in setup pending. Coming soon.');
+  };
+
+  const handleBackToProviders = () => {
+    setNotice(null);
+    setStep('providers');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <AppHeader />
       <View style={styles.authBody}>
-        <View style={styles.card}>
-          <View style={styles.authModeHeader}>
-            {[
-              { key: 'personal', label: 'Personal' },
-              { key: 'business', label: 'Business' },
-              { key: 'fleet', label: 'Fleet' },
-            ].map((item) => (
+        <View style={styles.authBrandHeader}>
+          <View style={styles.authBrandRow}>
+            <Text style={styles.authBrandText}>BLIP</Text>
+            <Text style={styles.authBrandMeta}>{versionLabel}</Text>
+          </View>
+          <Text style={styles.authBrandSubhead}>Log in or Sign Up</Text>
+        </View>
+        <View style={[styles.card, styles.authCard]}>
+          {step === 'providers' ? (
+            <>
+              <View style={styles.authModeHeader}>
+                {[
+                  { key: 'personal', label: 'Personal' },
+                  { key: 'business', label: 'Business' },
+                  { key: 'fleet', label: 'Fleet' },
+                ].map((item) => (
+                  <Pressable
+                    key={item.key}
+                    style={[styles.tabPill, styles.authModePill, authMode === item.key && styles.tabPillActive]}
+                    onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
+                  >
+                    <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
+              <View style={styles.authProviderStack}>
+                <Pressable
+                  style={[styles.authProviderButton, styles.authProviderGoogle]}
+                  onPress={() => handlePending('Google OAuth')}
+                >
+                  <Ionicons name="logo-google" size={ICON_SIZES.md} color={colors.text} />
+                  <Text style={[styles.authProviderButtonText, styles.authProviderGoogleText]}>
+                    Continue with Google
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.authProviderButton, styles.authProviderFacebook]}
+                  onPress={() => handlePending('Facebook login')}
+                >
+                  <Ionicons name="logo-facebook" size={ICON_SIZES.md} color="#FFFFFF" />
+                  <Text style={[styles.authProviderButtonText, styles.authProviderFacebookText]}>
+                    Continue with Facebook
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.authProviderButton, styles.authProviderApple]}
+                  onPress={() => handlePending('Apple login')}
+                >
+                  <Ionicons name="logo-apple" size={ICON_SIZES.md} color="#0B0B10" />
+                  <Text style={[styles.authProviderButtonText, styles.authProviderAppleText]}>
+                    Continue with Apple
+                  </Text>
+                </Pressable>
+              </View>
+              <View style={styles.authDividerRow}>
+                <View style={styles.authDividerLine} />
+                <Text style={styles.authDividerText}>or</Text>
+                <View style={styles.authDividerLine} />
+              </View>
+              <View style={styles.authChoiceRow}>
+                <Pressable style={styles.authChoiceButton} onPress={handleContinueEmail}>
+                  <Ionicons name="mail-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
+                  <Text style={styles.authChoiceText}>Continue with Email</Text>
+                </Pressable>
+                <Pressable style={styles.authChoiceButton} onPress={handleContinuePhone}>
+                  <Ionicons name="call-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
+                  <Text style={styles.authChoiceText}>Continue with Phone</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.authTermsText}>
+                By signing up you agree to our Terms and Conditions and Privacy Policy
+              </Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.rowBetween}>
+                <Pressable style={styles.iconButtonSm} onPress={handleBackToProviders}>
+                  <Ionicons name="close" size={ICON_SIZES.md} color={colors.text} />
+                </Pressable>
+                <View style={{ width: 32 }} />
+              </View>
+              <View style={styles.authModeHeader}>
+                {[
+                  { key: 'personal', label: 'Personal' },
+                  { key: 'business', label: 'Business' },
+                  { key: 'fleet', label: 'Fleet' },
+                ].map((item) => (
+                  <Pressable
+                    key={item.key}
+                    style={[styles.tabPill, styles.authModePill, authMode === item.key && styles.tabPillActive]}
+                    onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
+                  >
+                    <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor={colors.placeholder}
+                autoCapitalize="none"
+              />
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor={colors.placeholder}
+                secureTextEntry
+              />
+              {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
               <Pressable
-                key={item.key}
-                style={[styles.tabPill, styles.authModePill, authMode === item.key && styles.tabPillActive]}
-                onPress={() => setAuthMode(item.key as 'personal' | 'business' | 'fleet')}
+                style={[styles.primaryButton, styles.primaryButtonFull]}
+                onPress={handleLogin}
+                disabled={submitting}
               >
-                <Text style={[styles.tabPillText, authMode === item.key && styles.tabPillTextActive]}>
-                  {item.label}
-                </Text>
+                <Text style={styles.primaryButtonText}>{submitting ? 'Please wait...' : 'Sign in'}</Text>
               </Pressable>
-            ))}
-          </View>
-          <Text style={styles.authSubhead}>Choose your access type</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            placeholderTextColor={colors.placeholder}
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            placeholderTextColor={colors.placeholder}
-            secureTextEntry
-          />
-          {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleLogin}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>{submitting ? 'Please wait...' : 'Sign in'}</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.primaryButton, styles.primaryButtonFull]}
-            onPress={handleSignup}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>Sign up</Text>
-          </Pressable>
-          <View style={styles.sectionDivider} />
-          <Text style={styles.authSubhead}>Other sign-in options</Text>
-          <View style={styles.filterRow}>
-            <Pressable style={styles.secondaryButton} onPress={() => handlePending('Google OAuth')}>
-              <Text style={styles.secondaryButtonText}>Google OAuth</Text>
-            </Pressable>
-          </View>
+              <Pressable
+                style={[styles.primaryButton, styles.primaryButtonFull]}
+                onPress={handleSignup}
+                disabled={submitting}
+              >
+                <Text style={styles.primaryButtonText}>Sign up</Text>
+              </Pressable>
+            </>
+          )}
         </View>
         <View style={styles.authFooterLinks}>
           <Pressable onPress={() => navigation.navigate('AdminPortal')}>
@@ -9948,9 +10046,118 @@ const useStyles = () => {
           justifyContent: 'space-between',
           gap: space.sm,
         },
+        authBrandHeader: {
+          alignItems: 'center',
+          gap: 6,
+          paddingTop: space.sm,
+        },
+        authBrandRow: {
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          gap: 8,
+        },
+        authBrandText: {
+          ...type.display32,
+          fontWeight: '900',
+          letterSpacing: 1.2,
+          color: colors.text,
+        },
+        authBrandMeta: {
+          ...type.label12,
+          fontWeight: '700',
+          color: colors.textMuted,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
+        },
+        authBrandSubhead: {
+          ...type.body14,
+          color: colors.textMuted,
+        },
+        authCard: {
+          paddingVertical: space.lg,
+          paddingHorizontal: space.lg,
+          gap: space.lg,
+        },
         authSubhead: {
           ...type.body12,
           color: colors.textMuted,
+        },
+        authProviderStack: {
+          gap: space.sm,
+        },
+        authProviderButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          minHeight: 54,
+          borderRadius: 16,
+          paddingHorizontal: space.lg,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        authProviderButtonText: {
+          ...type.label16,
+          fontWeight: '700',
+        },
+        authProviderGoogle: {
+          backgroundColor: '#2B2F36',
+          borderColor: '#2B2F36',
+        },
+        authProviderGoogleText: {
+          color: '#EAEAF0',
+        },
+        authProviderFacebook: {
+          backgroundColor: '#4C6EF5',
+          borderColor: '#4C6EF5',
+        },
+        authProviderFacebookText: {
+          color: '#FFFFFF',
+        },
+        authProviderApple: {
+          backgroundColor: '#EAEAF0',
+          borderColor: '#EAEAF0',
+        },
+        authProviderAppleText: {
+          color: '#0B0B10',
+        },
+        authDividerRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.sm,
+        },
+        authDividerLine: {
+          flex: 1,
+          height: 1,
+          backgroundColor: colors.border,
+        },
+        authDividerText: {
+          ...type.label12,
+          fontWeight: '700',
+          color: colors.textMuted,
+          textTransform: 'uppercase',
+          letterSpacing: 0.8,
+        },
+        authChoiceRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: space.lg,
+        },
+        authChoiceButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.xs,
+        },
+        authChoiceText: {
+          ...type.label14,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        authTermsText: {
+          ...type.caption12,
+          color: colors.textSubtle,
+          textAlign: 'center',
         },
         authModeHeader: {
           flexDirection: 'row',
