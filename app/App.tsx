@@ -843,6 +843,16 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
+    if (!supabase || !userId) {
+      return;
+    }
+    const interval = setInterval(() => {
+      void loadProfile(userId);
+    }, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [userId]);
+
+  useEffect(() => {
     if (!supabase || !userId || !deviceId) {
       return;
     }
