@@ -761,6 +761,22 @@ If `supabase.cmd` says the CLI is missing:
   - `supabase secrets set SUPABASE_SERVICE_ROLE_KEY=...` (or reuse `ANALYTICS_SERVICE_ROLE_KEY`)
 - Notes: requires native push credentials and device tokens captured in `device_tokens`.
 
+## 7b) Auth reset / wipe test accounts (demo hygiene)
+
+If you need to remove all test accounts and login traces from the Supabase project:
+- Script: `app/scripts/wipe-auth-and-login-traces.mjs`
+- What it does:
+  - Creates a local backup snapshot under `backups/db/<timestamp>/`
+  - Deletes auth-related analytics events (if present)
+  - Deletes per-user rows in: `profiles`, `device_fingerprints`, `device_tokens`, `user_private`, `kyc_verification_requests`
+  - Deletes all auth users (hard delete when possible, soft-delete fallback)
+- Run:
+  - `cd c:\\Blip\\app`
+  - `node scripts/wipe-auth-and-login-traces.mjs`
+- Notes:
+  - Soft-deleted auth users remain visible in the Auth admin list but cannot sign in.
+  - Keep `supabase/.env.local` and `.env.secrets` out of git (they contain service role keys).
+
 ## 8) Security audit (npm)
 
 Last audit summary:
