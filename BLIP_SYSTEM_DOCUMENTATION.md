@@ -56,7 +56,6 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Google OAuth: not implemented.
 - Payments/billing: not implemented (billing screen is placeholder only).
 - Voice rooms use RTC audio transport with push-to-talk; requires custom dev build/native config (`react-native-webrtc`).
-- `expo-doctor` still reports `react-native-webrtc` as untested on New Architecture (warning only).
 - `expo-doctor` package-version check can crash on Node 24 (`expo install --check` exit code `3221226505`); use Node 20 LTS for cleaner diagnostics.
 - Business admin access requires a business account (owner/staff). Personal-only accounts are blocked from admin controls.
 - KYC verification: document uploads + admin review queue are implemented (private storage).
