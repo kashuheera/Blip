@@ -6031,11 +6031,12 @@ const AuthScreen = () => {
   const [authMode, setAuthMode] = useState<'personal' | 'business' | 'fleet'>('personal');
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [legalModal, setLegalModal] = useState<'terms' | 'privacy' | null>(null);
   const versionLabel = useMemo(() => {
     const raw = APP_VERSION.startsWith('v') ? APP_VERSION.slice(1) : APP_VERSION;
     const parts = raw.split('.');
     const majorMinor = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : raw;
-    return `beta v${majorMinor}`;
+    return `BETA version ${majorMinor}`;
   }, []);
 
   const handleLogin = async () => {
@@ -6123,11 +6124,18 @@ const AuthScreen = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.authBody}>
         <View style={styles.authBrandHeader}>
-          <View style={styles.authBrandRow}>
-            <Text style={styles.authBrandText}>BLIP</Text>
-            <Text style={styles.authBrandMeta}>{versionLabel}</Text>
+          <View style={styles.authBrandBlock}>
+            <Text
+              style={styles.authBrandText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+              maxFontSizeMultiplier={1.2}
+            >
+              BLIP
+            </Text>
+            <Text style={styles.authBrandMetaBelow}>{versionLabel}</Text>
           </View>
-          <Text style={styles.authBrandSubhead}>Log in or Sign Up</Text>
         </View>
         <View style={[styles.card, styles.authCard]}>
           {step === 'providers' ? (
@@ -6195,7 +6203,15 @@ const AuthScreen = () => {
                 </Pressable>
               </View>
               <Text style={styles.authTermsText}>
-                By signing up you agree to our Terms and Conditions and Privacy Policy
+                By signing up you agree to our{' '}
+                <Text style={styles.authTermsLink} onPress={() => setLegalModal('terms')}>
+                  Terms and Conditions
+                </Text>{' '}
+                and{' '}
+                <Text style={styles.authTermsLink} onPress={() => setLegalModal('privacy')}>
+                  Privacy Policy
+                </Text>
+                .
               </Text>
             </>
           ) : (
@@ -6266,6 +6282,33 @@ const AuthScreen = () => {
           </Pressable>
         </View>
       </View>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={legalModal !== null}
+        onRequestClose={() => setLegalModal(null)}
+      >
+        <View style={styles.legalModalContainer}>
+          <Pressable style={styles.legalModalOverlay} onPress={() => setLegalModal(null)} />
+          <View style={styles.legalModalCard}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.legalModalTitle}>
+                {legalModal === 'privacy' ? 'Privacy Policy' : 'Terms and Conditions'}
+              </Text>
+              <Pressable style={styles.iconButtonSm} onPress={() => setLegalModal(null)}>
+                <Ionicons name="close" size={ICON_SIZES.md} color={colors.text} />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.legalModalBody}>
+              <Text style={styles.cardBody}>
+                {legalModal === 'privacy'
+                  ? 'Privacy policy drafting is in progress. For the demo, assume: no user location or personal details are exposed to other users; businesses only see customer KYC details after checkout.'
+                  : 'Terms and conditions drafting is in progress. For the demo, assume: posts are ephemeral; abuse and fraud are prohibited; Blip may suspend accounts for safety.'}
+              </Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
       <StatusBar style="auto" />
     </SafeAreaView>
   );
@@ -10049,15 +10092,21 @@ const useStyles = () => {
         authBrandHeader: {
           alignItems: 'center',
           gap: 6,
-          paddingTop: space.sm,
+          paddingTop: space.xl,
         },
         authBrandRow: {
           flexDirection: 'row',
           alignItems: 'baseline',
           gap: 8,
         },
+        authBrandBlock: {
+          alignSelf: 'center',
+          alignItems: 'flex-start',
+        },
         authBrandText: {
           ...type.display32,
+          fontSize: (type.display32.fontSize ?? 32) * 3,
+          lineHeight: (type.display32.lineHeight ?? 36) * 3,
           fontWeight: '900',
           letterSpacing: 1.2,
           color: colors.text,
@@ -10068,6 +10117,15 @@ const useStyles = () => {
           color: colors.textMuted,
           textTransform: 'uppercase',
           letterSpacing: 0.6,
+        },
+        authBrandMetaBelow: {
+          ...type.label12,
+          alignSelf: 'flex-end',
+          fontWeight: '700',
+          color: colors.textMuted,
+          textTransform: 'uppercase',
+          letterSpacing: 0.9,
+          marginTop: -space.xs,
         },
         authBrandSubhead: {
           ...type.body14,
@@ -10159,6 +10217,11 @@ const useStyles = () => {
           color: colors.textSubtle,
           textAlign: 'center',
         },
+        authTermsLink: {
+          color: colors.brand,
+          fontWeight: '700',
+          textDecorationLine: 'underline',
+        },
         authModeHeader: {
           flexDirection: 'row',
           justifyContent: 'center',
@@ -10180,6 +10243,36 @@ const useStyles = () => {
           ...type.label12,
           fontWeight: '600',
           color: colors.textMuted,
+        },
+        legalModalContainer: {
+          flex: 1,
+          justifyContent: 'center',
+          paddingHorizontal: space.lg,
+        },
+        legalModalOverlay: {
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          backgroundColor: colors.overlay,
+        },
+        legalModalCard: {
+          backgroundColor: colors.surface,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: colors.border,
+          padding: space.lg,
+          gap: space.sm,
+          maxHeight: '75%',
+        },
+        legalModalTitle: {
+          ...type.title18,
+          fontWeight: '800',
+          color: colors.text,
+        },
+        legalModalBody: {
+          paddingBottom: space.sm,
         },
         sideSheetContainer: {
           flex: 1,

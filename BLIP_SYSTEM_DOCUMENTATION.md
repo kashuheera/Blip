@@ -29,7 +29,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Post engagement: likes (personal) + replies/comments (business-only).
 - Orders: pickup + delivery options + KYC-required user details (name/phone/address).
 - KYC status badge UI in profile (verified/pending/rejected).
-- Auth screen with Personal/Business/Fleet tabs + pending buttons for Magic link/OTP + Google OAuth.
+- Auth screen (provider-first): Personal/Business/Fleet tabs, provider buttons (pending), Continue with Email (password auth), Continue with Phone (coming soon), clickable Terms + Privacy modal.
 - Startup auth gate: logged-out users land on Auth first (session-gated navigator boot route).
 - Room chat with realtime updates + distance gating.
 - Business profile (menu, offers, Q&A chat) + chat join gating.
