@@ -1591,6 +1591,7 @@ const HomeScreen = () => {
     latitude: initialRegion.latitude,
     longitude: initialRegion.longitude,
   });
+  const [areaLabel, setAreaLabel] = useState<string>('Finding location...');
   const [spiderfy, setSpiderfy] = useState<{
     center: { latitude: number; longitude: number };
     pins: MapPin[];
@@ -1645,6 +1646,43 @@ const HomeScreen = () => {
       return true;
     });
   }, [activeTag, businessList, filterOpenNow, filterVerified, searchQuery]);
+
+  const headerBusiness = useMemo(
+    () =>
+      filteredBusinesses.find((biz) => biz.id === selectedBusinessId) ??
+      businessList.find((biz) => biz.id === selectedBusinessId) ??
+      null,
+    [filteredBusinesses, businessList, selectedBusinessId]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const resolveArea = async () => {
+      if (!currentLocation) {
+        setAreaLabel('Nearby');
+        return;
+      }
+      try {
+        const results = await Location.reverseGeocodeAsync({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+        });
+        if (cancelled) return;
+        const first = results[0];
+        const parts = [first?.district, first?.subregion, first?.city, first?.region].filter(Boolean) as string[];
+        const label = parts.length > 0 ? parts[0] : 'Nearby';
+        setAreaLabel(label);
+      } catch {
+        if (!cancelled) {
+          setAreaLabel('Nearby');
+        }
+      }
+    };
+    void resolveArea();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentLocation]);
 
   const businessPins = useMemo(
     () =>
@@ -1938,8 +1976,14 @@ const HomeScreen = () => {
             )}
           </Pressable>
           <View style={styles.locationPill}>
-            <Ionicons name="navigate-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
-            <Text style={styles.locationPillText}>You're in Lahore North</Text>
+            <Ionicons
+              name={headerBusiness ? 'storefront-outline' : 'navigate-outline'}
+              size={ICON_SIZES.xs}
+              color={colors.textMuted}
+            />
+            <Text style={styles.locationPillText}>
+              {headerBusiness ? headerBusiness.name : areaLabel || 'Nearby'}
+            </Text>
           </View>
           <Pressable style={styles.iconButton} onPress={() => setSearchOpen(true)}>
             <Ionicons name="search" size={ICON_SIZES.lg} color={colors.text} />
