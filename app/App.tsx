@@ -1597,7 +1597,6 @@ const HomeScreen = () => {
     pins: MapPin[];
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const [searchScope, setSearchScope] = useState<'rooms' | 'businesses' | 'posts'>('businesses');
   const [filterOpenNow, setFilterOpenNow] = useState(false);
   const [filterVerified, setFilterVerified] = useState(false);
@@ -1718,34 +1717,6 @@ const HomeScreen = () => {
     });
   }, [activeTag, rooms, searchQuery]);
 
-  const tagOptions = useMemo(() => {
-    if (searchScope === 'rooms') {
-      return Array.from(
-        new Set(
-          rooms
-            .map((room) => room.category)
-            .filter((entry): entry is string => Boolean(entry))
-        )
-      ).slice(0, 8);
-    }
-    if (searchScope === 'businesses') {
-      return Array.from(
-        new Set(
-          businessList.flatMap((business) => [
-            business.category,
-            ...(business.categories ?? []),
-          ])
-        )
-      ).slice(0, 8);
-    }
-    return [];
-  }, [businessList, rooms, searchScope]);
-
-  useEffect(() => {
-    if (activeTag && tagOptions.length > 0 && !tagOptions.includes(activeTag)) {
-      setActiveTag(null);
-    }
-  }, [activeTag, tagOptions]);
   const postSearchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return demoSearchPosts.filter((post) => {
@@ -1985,231 +1956,10 @@ const HomeScreen = () => {
               {headerBusiness ? headerBusiness.name : areaLabel || 'Nearby'}
             </Text>
           </View>
-          <Pressable style={styles.iconButton} onPress={() => setSearchOpen(true)}>
-            <Ionicons name="search" size={ICON_SIZES.lg} color={colors.text} />
+          <Pressable style={styles.iconButton} onPress={() => void handleRecenter()}>
+            <Ionicons name="locate" size={ICON_SIZES.lg} color={colors.text} />
           </Pressable>
         </View>
-        {searchOpen ? (
-          <View style={styles.searchOverlay}>
-          <View style={styles.searchOverlayHeader}>
-            <View style={styles.searchInputWrap}>
-              <Ionicons name="search" size={ICON_SIZES.md} color={colors.textMuted} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search rooms, businesses, posts"
-                  placeholderTextColor={colors.placeholder}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-              </View>
-              <Pressable
-                style={styles.iconButton}
-                onPress={() => {
-                  setSearchOpen(false);
-                  if (searchQuery.trim()) {
-                    void trackAnalyticsEvent(
-                      'search_query',
-                      {
-                        scope: searchScope,
-                        length: searchQuery.trim().length,
-                      },
-                      userId
-                    );
-                  }
-                }}
-              >
-                <Ionicons name="close" size={ICON_SIZES.lg} color={colors.text} />
-              </Pressable>
-            </View>
-            <View style={styles.filterRow}>
-              {['rooms', 'businesses', 'posts'].map((scope) => (
-                <Pressable
-                  key={scope}
-                  style={[
-                    styles.filterChip,
-                    searchScope === scope && styles.filterChipActive,
-                  ]}
-                  onPress={() => {
-                    setSearchScope(scope as 'rooms' | 'businesses' | 'posts');
-                    setSelectedBusinessId(null);
-                    setSelectedRoomId(null);
-                    setSpiderfy(null);
-                    void trackAnalyticsEvent(
-                      'filter_toggle',
-                      { filter: 'scope', value: scope },
-                      userId
-                    );
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      searchScope === scope && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {scope}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            {searchScope === 'businesses' ? (
-              <View style={styles.filterRow}>
-                <Pressable
-                  style={[
-                    styles.filterChip,
-                    filterOpenNow && styles.filterChipActive,
-                  ]}
-                  onPress={() => {
-                    const nextValue = !filterOpenNow;
-                    setFilterOpenNow(nextValue);
-                    void trackAnalyticsEvent(
-                      'filter_toggle',
-                      { filter: 'open_now', value: nextValue },
-                      userId
-                    );
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      filterOpenNow && styles.filterChipTextActive,
-                    ]}
-                  >
-                    Open now
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.filterChip,
-                    filterVerified && styles.filterChipActive,
-                  ]}
-                  onPress={() => {
-                    setFilterVerified((prev) => !prev);
-                    void trackAnalyticsEvent(
-                      'filter_toggle',
-                      { filter: 'verified', value: !filterVerified },
-                      userId
-                    );
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      filterVerified && styles.filterChipTextActive,
-                    ]}
-                  >
-                    Verified
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
-            {tagOptions.length > 0 ? (
-              <View style={styles.filterRow}>
-                {tagOptions.map((tag) => (
-                  <Pressable
-                    key={tag}
-                    style={[
-                      styles.filterChip,
-                      activeTag === tag && styles.filterChipActive,
-                    ]}
-                    onPress={() => {
-                      const nextTag = activeTag === tag ? null : tag;
-                      setActiveTag(nextTag);
-                      void trackAnalyticsEvent(
-                        'filter_toggle',
-                        { filter: 'tag', value: nextTag ?? 'none' },
-                        userId
-                      );
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.filterChipText,
-                        activeTag === tag && styles.filterChipTextActive,
-                      ]}
-                    >
-                      #{tag}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-            <View style={styles.searchResults}>
-              {searchScope === 'rooms' ? (
-                filteredRooms.length === 0 ? (
-                  <Text style={styles.metaText}>No rooms found.</Text>
-                ) : (
-                  filteredRooms.slice(0, 5).map((room) => (
-                    <Pressable
-                      key={room.id}
-                      style={styles.searchResultRow}
-                      onPress={() => {
-                        setSearchOpen(false);
-                        navigation.navigate('Room', { roomId: room.id });
-                      }}
-                    >
-                      <Ionicons name="chatbubbles-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
-                      <View style={styles.searchResultInfo}>
-                        <Text style={styles.cardTitle}>{room.title}</Text>
-                        <Text style={styles.metaText}>{room.category}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={ICON_SIZES.sm} color={colors.textMuted} />
-                    </Pressable>
-                  ))
-                )
-              ) : null}
-              {searchScope === 'businesses' ? (
-                filteredBusinesses.length === 0 ? (
-                  <Text style={styles.metaText}>No businesses found.</Text>
-                ) : (
-                  filteredBusinesses.slice(0, 5).map((business) => (
-                    <Pressable
-                      key={business.id}
-                      style={styles.searchResultRow}
-                      onPress={() => {
-                        setSearchOpen(false);
-                        navigation.navigate('Business', { businessId: business.id });
-                      }}
-                    >
-                      <Ionicons name="storefront-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
-                      <View style={styles.searchResultInfo}>
-                        <Text style={styles.cardTitle}>{business.name}</Text>
-                        <Text style={styles.metaText}>{business.category}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={ICON_SIZES.sm} color={colors.textMuted} />
-                    </Pressable>
-                  ))
-                )
-              ) : null}
-              {searchScope === 'posts' ? (
-                <View style={styles.searchPostWrap}>
-                  {postSearchResults.length === 0 ? (
-                    <Text style={styles.metaText}>No posts match yet.</Text>
-                  ) : (
-                    postSearchResults.slice(0, 4).map((post) => (
-                      <View key={post.id} style={styles.searchResultRow}>
-                        <Ionicons name="newspaper-outline" size={ICON_SIZES.sm} color={colors.textMuted} />
-                        <View style={styles.searchResultInfo}>
-                          <Text style={styles.cardTitle}>@{post.authorHandle}</Text>
-                          <Text style={styles.metaText}>{post.body}</Text>
-                        </View>
-                      </View>
-                    ))
-                  )}
-                  <Pressable
-                    style={styles.primaryButton}
-                    onPress={() => {
-                      setSearchOpen(false);
-                      navigation.navigate('Feed', { search: searchQuery });
-                    }}
-                  >
-                    <Text style={styles.primaryButtonText}>Open feed results</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
-          </View>
-        ) : null}
         <View style={styles.mapShell}>
           {Platform.OS === 'web' ? (
             <View style={styles.webPlaceholder}>
@@ -2451,6 +2201,27 @@ const HomeScreen = () => {
               })}
             </MapView>
           )}
+          <View style={styles.mapSearchBar}>
+            <View style={styles.mapSearchInner}>
+              <Ionicons name="search" size={ICON_SIZES.md} color={colors.textMuted} />
+              <TextInput
+                style={styles.mapSearchInput}
+                placeholder="Search nearby"
+                placeholderTextColor={colors.placeholder}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onSubmitEditing={() => {
+                  if (searchQuery.trim()) {
+                    void trackAnalyticsEvent(
+                      'search_query',
+                      { scope: searchScope, length: searchQuery.trim().length },
+                      userId
+                    );
+                  }
+                }}
+              />
+            </View>
+          </View>
           {selectedBusiness || selectedRoom ? (
             <View style={styles.mapBottomSheet}>
               {selectedBusiness ? (
@@ -2532,9 +2303,6 @@ const HomeScreen = () => {
               ) : null}
             </View>
           ) : null}
-          <Pressable style={styles.mapRecenterButton} onPress={() => void handleRecenter()}>
-            <Ionicons name="locate" size={ICON_SIZES.lg} color={colors.text} />
-          </Pressable>
         </View>
         <View style={styles.mapFabBar}>
           <Pressable style={styles.fabButton} onPress={() => navigation.navigate('Create')}>
@@ -9205,14 +8973,22 @@ const useStyles = () => {
         },
         mapRoot: {
           flex: 1,
-          paddingBottom: 70,
+          position: 'relative',
         },
         mapHeader: {
+          position: 'absolute',
+          top: space.md,
+          left: space.lg,
+          right: space.lg,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingHorizontal: space.lg,
-          paddingTop: space.xs,
+          paddingHorizontal: space.sm,
+          paddingVertical: space.xs,
+          borderRadius: 18,
+          backgroundColor: withOpacity(colors.surface, 0.32),
+          borderWidth: 1,
+          borderColor: withOpacity(colors.border, 0.35),
           zIndex: 5,
         },
         avatarButton: {
@@ -9257,9 +9033,9 @@ const useStyles = () => {
           paddingHorizontal: space.sm,
           paddingVertical: space.xs,
           borderRadius: 999,
-          backgroundColor: colors.surface,
+          backgroundColor: withOpacity(colors.surface, 0.5),
           borderWidth: 1,
-          borderColor: colors.border,
+          borderColor: withOpacity(colors.border, 0.38),
         },
         locationPillText: {
           ...type.body12,
@@ -9352,17 +9128,37 @@ const useStyles = () => {
         },
         mapShell: {
           flex: 1,
-          marginHorizontal: space.lg,
-          marginTop: space.md,
-          marginBottom: 90,
-          borderRadius: 24,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surfaceMuted,
+          margin: 0,
+          borderRadius: 0,
+          borderWidth: 0,
+          backgroundColor: 'transparent',
           overflow: 'hidden',
         },
         map: {
           flex: 1,
+        },
+        mapSearchBar: {
+          position: 'absolute',
+          left: space.lg,
+          right: space.lg,
+          bottom: 110,
+          zIndex: 6,
+        },
+        mapSearchInner: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.sm,
+          paddingHorizontal: space.md,
+          paddingVertical: space.sm,
+          borderRadius: 18,
+          backgroundColor: withOpacity(colors.surface, 0.26),
+          borderWidth: 1,
+          borderColor: withOpacity(colors.border, 0.4),
+        },
+        mapSearchInput: {
+          flex: 1,
+          ...type.body14,
+          color: colors.text,
         },
         mapLabel: {
           ...type.body16,
