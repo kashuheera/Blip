@@ -7,9 +7,8 @@
 - Map-first Home (map + clustering + spiderfy + recenter)
 - Map search overlay with scope (rooms/businesses/posts)
 - Search filters (open now, verified, tags)
-- Feed screen (tabs, search, tags) + post creation
-- Feed actions (share) + user profile drilldown + distance badge (UI)
-- Post engagement: likes (personal accounts) + replies (business accounts)
+- Feed UI (Instagram x Reddit hybrid): search + tabs + tag chips + story strip + hybrid post cards (category chip + distance/time meta + action row + long-press menu)
+- Feed engagement: likes (personal accounts) + replies (business accounts) + share
 - Room chat (realtime) + distance gating
 - Business profile (hero, menu, offers, Q&A chat)
 - Business chat join gating (blocked for shadowbanned/u2u-locked)
@@ -28,7 +27,7 @@
 - Customer loyalty / coupon codes
 - Onboarding flow (privacy + interests)
 - Help/support + bug reporting
-- Stories (publish image + caption, 24h expiry, viewer modal)
+- Stories (publish image + caption, 24h expiry, viewer modal + composer modal)
 - Voice rooms (full RTC audio transport + push-to-talk + create/join/leave + participant counts)
 - Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders)
 - Business replies inbox (business-only, recent post replies + thread jump)

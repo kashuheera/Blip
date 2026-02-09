@@ -1231,10 +1231,10 @@ const getPostDistanceLabel = (
   return formatDistanceLabel(meters);
 };
 
-const formatRelativeTime = (value?: string | null) => {
-  if (!value) {
-    return 'now';
-  }
+const formatRelativeTime = (value?: string | null) => { 
+  if (!value) { 
+    return 'now'; 
+  } 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return 'now';
@@ -1251,14 +1251,40 @@ const formatRelativeTime = (value?: string | null) => {
   if (hours < 24) {
     return `${hours}h`;
   }
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-};
-
-const getFuzzedLocation = async () => {
-  try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
+  const days = Math.floor(hours / 24); 
+  return `${days}d`; 
+}; 
+ 
+const splitPostBody = (body: string) => { 
+  const trimmed = body.trim(); 
+  if (!trimmed) { 
+    return { title: 'Untitled post', preview: '' }; 
+  } 
+  const newlineIndex = trimmed.indexOf('\n'); 
+  if (newlineIndex > 0 && newlineIndex < 80) { 
+    const title = trimmed.slice(0, newlineIndex).trim(); 
+    const preview = trimmed.slice(newlineIndex + 1).trim(); 
+    return { title: title || 'Untitled post', preview }; 
+  } 
+  const candidate = trimmed.slice(0, 140); 
+  const firstSentence = candidate.match(/^[^.!?]{20,140}[.!?]/); 
+  if (firstSentence && firstSentence[0]) { 
+    const title = firstSentence[0].trim(); 
+    const preview = trimmed.slice(firstSentence[0].length).trim(); 
+    return { title, preview }; 
+  } 
+  if (trimmed.length > 140) { 
+    const title = `${trimmed.slice(0, 92).trimEnd()}…`; 
+    const preview = trimmed.slice(92).trim(); 
+    return { title, preview }; 
+  } 
+  return { title: trimmed, preview: '' }; 
+}; 
+ 
+const getFuzzedLocation = async () => { 
+  try { 
+    const { status } = await Location.requestForegroundPermissionsAsync(); 
+    if (status !== 'granted') { 
       return null;
     }
     const result = await Location.getCurrentPositionAsync({
@@ -2417,29 +2443,30 @@ const HomeScreen = () => {
     </SafeAreaView>
   );
 };
-type FeedProps = NativeStackScreenProps<RootStackParamList, 'Feed'>;
-
-const FeedScreen = ({ route }: FeedProps) => {
-  const styles = useStyles();
-  const { colors } = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { userId, profile } = useAuth();
-  const isBusinessAccount = profile?.accountType === 'business';
-  const [posts, setPosts] = useState<PostEntry[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [storiesNotice, setStoriesNotice] = useState<string | null>(null);
-  const [storiesLoading, setStoriesLoading] = useState(false);
-  const [stories, setStories] = useState<StoryEntry[]>([]);
-  const [storyMediaUrl, setStoryMediaUrl] = useState<string | null>(null);
-  const [storyCaption, setStoryCaption] = useState('');
-  const [storyUploading, setStoryUploading] = useState(false);
-  const [storySubmitting, setStorySubmitting] = useState(false);
-  const [activeStory, setActiveStory] = useState<StoryEntry | null>(null);
-  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
-  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
-  const [activeTab, setActiveTab] = useState<'trending' | 'forYou' | 'newest'>('trending');
+type FeedProps = NativeStackScreenProps<RootStackParamList, 'Feed'>; 
+ 
+const FeedScreen = ({ route }: FeedProps) => { 
+  const styles = useStyles(); 
+  const { colors, resolvedMode } = useTheme(); 
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>(); 
+  const { userId, profile } = useAuth(); 
+  const isBusinessAccount = profile?.accountType === 'business'; 
+  const [posts, setPosts] = useState<PostEntry[]>([]); 
+  const [loading, setLoading] = useState(false); 
+  const [notice, setNotice] = useState<string | null>(null); 
+  const [storiesNotice, setStoriesNotice] = useState<string | null>(null); 
+  const [storiesLoading, setStoriesLoading] = useState(false); 
+  const [stories, setStories] = useState<StoryEntry[]>([]); 
+  const [storyMediaUrl, setStoryMediaUrl] = useState<string | null>(null); 
+  const [storyCaption, setStoryCaption] = useState(''); 
+  const [storyUploading, setStoryUploading] = useState(false); 
+  const [storySubmitting, setStorySubmitting] = useState(false); 
+  const [storyComposerOpen, setStoryComposerOpen] = useState(false); 
+  const [activeStory, setActiveStory] = useState<StoryEntry | null>(null); 
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({}); 
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({}); 
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({}); 
+  const [activeTab, setActiveTab] = useState<'trending' | 'forYou' | 'newest'>('trending'); 
   const [searchValue, setSearchValue] = useState(route.params?.search ?? '');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -2732,11 +2759,11 @@ const FeedScreen = ({ route }: FeedProps) => {
     setStoryUploading(false);
   };
 
-  const handlePostStory = async () => {
-    if (!supabase) {
-      setStoriesNotice('Supabase is not configured.');
-      return;
-    }
+  const handlePostStory = async () => { 
+    if (!supabase) { 
+      setStoriesNotice('Supabase is not configured.'); 
+      return; 
+    } 
     if (!userId) {
       setStoriesNotice('Sign in to publish a story.');
       return;
@@ -2761,204 +2788,321 @@ const FeedScreen = ({ route }: FeedProps) => {
       caption: storyCaption.trim(),
       media_url: storyMediaUrl,
     });
-    if (error) {
-      setStoriesNotice('Unable to publish story.');
-      setStorySubmitting(false);
-      return;
-    }
-    setStoryCaption('');
-    setStoryMediaUrl(null);
-    setStoriesNotice('Story published.');
-    setStorySubmitting(false);
-    void trackAnalyticsEvent('story_create', { has_caption: Boolean(storyCaption.trim()) }, userId);
-    void loadStories();
-  };
-
-  const feedHeader = (
-    <View style={styles.feedHeader}>
-      <View style={styles.card}>
-        <SectionTitle icon="newspaper-outline" label="Discovery feed" />
-        <TextInput
-          style={styles.input}
-          placeholder="Search posts"
-          placeholderTextColor={colors.placeholder}
-          value={searchValue}
-          onChangeText={setSearchValue}
-        />
-        <View style={styles.feedTabs}>
-          {[
-            { key: 'trending', label: 'Trending' },
-            { key: 'forYou', label: 'For you' },
-            { key: 'newest', label: 'Newest' },
-          ].map((entry) => (
-            <Pressable
-              key={entry.key}
-              style={[styles.tabPill, activeTab === entry.key && styles.tabPillActive]}
-              onPress={() => {
-                setActiveTab(entry.key as 'trending' | 'forYou' | 'newest');
-                void trackAnalyticsEvent('filter_toggle', { filter: 'feed_tab', value: entry.key }, userId);
-              }}
-            >
-              <Text style={[styles.tabPillText, activeTab === entry.key && styles.tabPillTextActive]}>
-                {entry.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <View style={styles.storyRow}>
-          {tags.map((tag) => (
-            <Pressable
-              key={tag}
-              style={[styles.filterChip, activeTag === tag && styles.filterChipActive]}
-              onPress={() => {
-                const nextTag = activeTag === tag ? null : tag;
-                setActiveTag(nextTag);
-                void trackAnalyticsEvent(
-                  'filter_toggle',
-                  { filter: 'feed_tag', value: nextTag ?? 'none' },
-                  userId
-                );
-              }}
-            >
-              <Text style={[styles.filterChipText, activeTag === tag && styles.filterChipTextActive]}>
-                #{tag}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <SectionTitle icon="sparkles-outline" label="Stories" />
-        <TextInput
-          style={styles.input}
-          placeholder="Story caption (optional)"
-          placeholderTextColor={colors.placeholder}
-          value={storyCaption}
-          onChangeText={setStoryCaption}
-          maxLength={120}
-        />
-        {storyMediaUrl ? <Image source={{ uri: storyMediaUrl }} style={styles.storyPreviewImage} /> : null}
-        <View style={styles.storyComposerRow}>
-          <Pressable style={styles.secondaryButton} onPress={() => void handleAttachStoryMedia()}>
-            <Text style={styles.secondaryButtonText}>
-              {storyUploading ? 'Uploading...' : storyMediaUrl ? 'Change image' : 'Add image'}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() => void handlePostStory()}
-            disabled={storySubmitting || !storyMediaUrl}
-          >
-            <Text style={styles.primaryButtonText}>
-              {storySubmitting ? 'Posting...' : 'Post story'}
-            </Text>
-          </Pressable>
-        </View>
-        {storiesLoading ? (
-          <View style={styles.storyRow}>
-            {Array.from({ length: 4 }).map((_, index) => (
-              <View key={`story-skeleton-${index}`} style={styles.storyPill}>
-                <Text style={styles.storyPillText}>Loading...</Text>
-              </View>
-            ))}
-          </View>
-        ) : stories.length === 0 ? (
-          <Text style={styles.metaText}>No active stories yet.</Text>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.storyCarouselRow}
-          >
-            {stories.map((story) => (
-              <Pressable key={story.id} style={styles.storyCard} onPress={() => setActiveStory(story)}>
-                <Image source={{ uri: story.mediaUrl }} style={styles.storyThumb} />
-                <Text style={styles.storyAuthorText} numberOfLines={1}>
-                  @{story.authorHandle}
-                </Text>
-                <Text style={styles.storyTimeText}>{formatRelativeTime(story.createdAt)}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
-        {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null}
-        {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-      </View>
-    </View>
-  );
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader />
-      <FlatList
-        contentContainerStyle={styles.listContent}
-        data={filteredPosts}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={feedHeader}
-        renderItem={({ item }) => (
-          <View style={styles.postCard}>
-            <Pressable
-              style={styles.postHeader}
-              onPress={() => navigation.navigate('UserProfile', { handle: item.authorHandle })}
-            >
-              <View style={styles.postAvatar}>
-                <Text style={styles.postAvatarText}>{item.authorHandle.slice(0, 2).toUpperCase()}</Text>
-              </View>
-              <View style={styles.postHeaderInfo}>
-                <Text style={styles.cardTitle}>@{item.authorHandle}</Text>
-                <Text style={styles.metaText}>Level 3 | XP 120</Text>
-              </View>
-              <View style={styles.postBadge}>
-                <Text style={styles.postBadgeText}>{getPostDistanceLabel(item, currentLocation)}</Text>
-              </View>
-            </Pressable>
-            <Text style={styles.cardBody}>{item.body}</Text>
-            {item.mediaUrl ? (
-              <Image source={{ uri: item.mediaUrl }} style={styles.feedMediaImage} />
-            ) : null}
-            <View style={styles.postContext}>
-              <Ionicons name="location-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
-              <Text style={styles.metaText}>Room / Business context</Text>
-            </View>
-            <View style={styles.postActions}>
-              <Pressable style={styles.postActionButton} onPress={() => void handleLike(item.id)}>
-                <Ionicons
-                  name={likedPosts[item.id] ? 'heart' : 'heart-outline'}
-                  size={ICON_SIZES.sm}
-                  color={likedPosts[item.id] ? colors.brand : colors.text}
-                />
-                <Text style={styles.postActionText}>
-                  Like{reactionCounts[item.id] ? ` ${reactionCounts[item.id]}` : ''}
-                </Text>
-              </Pressable>
-              <Pressable style={styles.postActionButton} onPress={() => handleShare(item)}>
-                <Ionicons name="share-social-outline" size={ICON_SIZES.sm} color={colors.text} />
-                <Text style={styles.postActionText}>Share</Text>
-              </Pressable>
-              <Pressable style={styles.postActionButton} onPress={() => handleReply(item)}>
-                <Ionicons name="chatbubble-ellipses-outline" size={ICON_SIZES.sm} color={colors.text} />
-                <Text style={styles.postActionText}>
-                  Reply{commentCounts[item.id] ? ` ${commentCounts[item.id]}` : ''}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
-        ListEmptyComponent={
-          loading ? (
-            <View style={styles.skeletonStack}>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <SkeletonCard key={`feed-skel-${index}`} />
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.listEmpty}>No posts yet.</Text>
-          )
-        }
-      />
-      <Modal
-        transparent
-        animationType="fade"
-        visible={Boolean(activeStory)}
-        onRequestClose={() => setActiveStory(null)}
+    if (error) { 
+      setStoriesNotice('Unable to publish story.'); 
+      setStorySubmitting(false); 
+      return; 
+    } 
+    setStoryCaption(''); 
+    setStoryMediaUrl(null); 
+    setStoriesNotice('Story published.'); 
+    setStorySubmitting(false); 
+    setStoryComposerOpen(false); 
+    void trackAnalyticsEvent('story_create', { has_caption: Boolean(storyCaption.trim()) }, userId); 
+    void loadStories(); 
+  }; 
+ 
+  const feedHeader = ( 
+    <View style={styles.feedHeader}> 
+      <View style={styles.feedSearchBar}> 
+        <Ionicons name="search-outline" size={ICON_SIZES.md} color={colors.textSubtle} /> 
+        <TextInput 
+          style={styles.feedSearchInput} 
+          placeholder="Search posts" 
+          placeholderTextColor={colors.placeholder} 
+          value={searchValue} 
+          onChangeText={setSearchValue} 
+        /> 
+        {searchValue.trim().length > 0 ? ( 
+          <Pressable style={styles.feedSearchClear} onPress={() => setSearchValue('')}> 
+            <Ionicons name="close" size={ICON_SIZES.md} color={colors.textMuted} /> 
+          </Pressable> 
+        ) : null} 
+      </View> 
+      <View style={styles.feedTabs}> 
+        {[ 
+          { key: 'trending', label: 'Trending', icon: 'flame-outline' as const }, 
+          { key: 'forYou', label: 'For you', icon: 'sparkles-outline' as const }, 
+          { key: 'newest', label: 'Newest', icon: 'time-outline' as const }, 
+        ].map((entry) => ( 
+          <Pressable 
+            key={entry.key} 
+            style={[styles.tabPill, activeTab === entry.key && styles.tabPillActive]} 
+            onPress={() => { 
+              setActiveTab(entry.key as 'trending' | 'forYou' | 'newest'); 
+              void trackAnalyticsEvent('filter_toggle', { filter: 'feed_tab', value: entry.key }, userId); 
+            }} 
+          > 
+            <View style={styles.feedTabLabelRow}> 
+              <Ionicons 
+                name={entry.icon} 
+                size={ICON_SIZES.xs} 
+                color={activeTab === entry.key ? colors.brandText : colors.text} 
+              /> 
+              <Text style={[styles.tabPillText, activeTab === entry.key && styles.tabPillTextActive]}> 
+                {entry.label} 
+              </Text> 
+            </View> 
+          </Pressable> 
+        ))} 
+      </View> 
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        contentContainerStyle={styles.feedTagRow} 
+      > 
+        {tags.map((tag) => ( 
+          <Pressable 
+            key={tag} 
+            style={[styles.filterChip, activeTag === tag && styles.filterChipActive]} 
+            onPress={() => { 
+              const nextTag = activeTag === tag ? null : tag; 
+              setActiveTag(nextTag); 
+              void trackAnalyticsEvent( 
+                'filter_toggle', 
+                { filter: 'feed_tag', value: nextTag ?? 'none' }, 
+                userId 
+              ); 
+            }} 
+          > 
+            <Text style={[styles.filterChipText, activeTag === tag && styles.filterChipTextActive]}> 
+              #{tag} 
+            </Text> 
+          </Pressable> 
+        ))} 
+      </ScrollView> 
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        contentContainerStyle={styles.storyStrip} 
+      > 
+        <Pressable style={styles.storyCircle} onPress={() => setStoryComposerOpen(true)}> 
+          <View style={styles.storyRing}> 
+            <View style={styles.storyAddInner}> 
+              <Ionicons name="add" size={ICON_SIZES.lg} color={colors.reward} /> 
+            </View> 
+          </View> 
+          <Text style={styles.storyCircleLabel} numberOfLines={1}> 
+            Your story 
+          </Text> 
+        </Pressable> 
+        {storiesLoading ? ( 
+          Array.from({ length: 5 }).map((_, index) => ( 
+            <View key={`story-skel-${index}`} style={styles.storyCircle}> 
+              <View style={styles.storyRing}> 
+                <View style={[styles.storyCircleImage, { backgroundColor: colors.surfaceMuted }]} /> 
+              </View> 
+              <View style={[styles.storyLabelSkeleton, { backgroundColor: colors.surfaceMuted }]} /> 
+            </View> 
+          )) 
+        ) : stories.length === 0 ? ( 
+          <View style={styles.storyEmptyPill}> 
+            <Text style={styles.metaText}>No stories yet.</Text> 
+          </View> 
+        ) : ( 
+          stories.map((story) => ( 
+            <Pressable key={story.id} style={styles.storyCircle} onPress={() => setActiveStory(story)}> 
+              <View style={styles.storyRing}> 
+                <Image source={{ uri: story.mediaUrl }} style={styles.storyCircleImage} /> 
+              </View> 
+              <Text style={styles.storyCircleLabel} numberOfLines={1}> 
+                @{story.authorHandle} 
+              </Text> 
+            </Pressable> 
+          )) 
+        )} 
+      </ScrollView> 
+      {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null} 
+      {notice ? <Text style={styles.metaText}>{notice}</Text> : null} 
+    </View> 
+  ); 
+ 
+  return ( 
+    <SafeAreaView style={styles.container}> 
+      <AppHeader /> 
+      <FlatList 
+        contentContainerStyle={styles.listContent} 
+        data={filteredPosts} 
+        keyExtractor={(item) => item.id} 
+        ListHeaderComponent={feedHeader} 
+        renderItem={({ item }) => { 
+          const { title, preview } = splitPostBody(item.body); 
+          return ( 
+            <Pressable 
+              style={styles.postCard} 
+              onPress={() => handleReply(item)} 
+              onLongPress={() => { 
+                Alert.alert('Post options', undefined, [ 
+                  { text: 'Share', onPress: () => void handleShare(item) }, 
+                  { text: 'Report', onPress: () => setNotice('Report is coming soon.') }, 
+                  { text: 'Cancel', style: 'cancel' }, 
+                ]); 
+              }} 
+            > 
+              <View style={styles.postTopRow}> 
+                {(() => { 
+                  const key = normalizeCategory(item.body) ?? 'services'; 
+                  const category = key ? getCategoryColors(key, resolvedMode) : getCategoryColors(null, resolvedMode); 
+                  const labelMap: Record<string, string> = { 
+                    coffee: 'Coffee', 
+                    restaurant: 'Restaurant', 
+                    streetFood: 'Street food', 
+                    dessert: 'Dessert', 
+                    grocery: 'Grocery', 
+                    beauty: 'Beauty', 
+                    health: 'Health', 
+                    services: 'Local', 
+                  }; 
+                  return ( 
+                    <View 
+                      style={[ 
+                        styles.categoryChip, 
+                        { backgroundColor: category.bg, borderColor: withOpacity(category.fg, 0.5) }, 
+                      ]} 
+                    > 
+                      <Text style={[styles.categoryChipText, { color: category.fg }]}> 
+                        {labelMap[key] ?? 'Local'} 
+                      </Text> 
+                    </View> 
+                  ); 
+                })()} 
+                <Text style={styles.postMetaText}> 
+                  {getPostDistanceLabel(item, currentLocation)} {'\u2022'} {formatRelativeTime(item.createdAt)} 
+                </Text> 
+              </View> 
+              <View style={styles.postHeaderRow}> 
+                <Pressable 
+                  style={styles.postAuthorRow} 
+                  onPress={() => navigation.navigate('UserProfile', { handle: item.authorHandle })} 
+                > 
+                  <View style={styles.postAvatar}> 
+                    <Text style={styles.postAvatarText}>{item.authorHandle.slice(0, 2).toUpperCase()}</Text> 
+                  </View> 
+                  <Text style={styles.postAuthorHandle} numberOfLines={1}> 
+                    @{item.authorHandle} 
+                  </Text> 
+                </Pressable> 
+                <Pressable 
+                  style={styles.iconButtonSm} 
+                  onPress={() => { 
+                    Alert.alert('Post options', undefined, [ 
+                      { text: 'Share', onPress: () => void handleShare(item) }, 
+                      { text: 'Report', onPress: () => setNotice('Report is coming soon.') }, 
+                      { text: 'Cancel', style: 'cancel' }, 
+                    ]); 
+                  }} 
+                > 
+                  <Ionicons name="ellipsis-horizontal" size={ICON_SIZES.md} color={colors.textMuted} /> 
+                </Pressable> 
+              </View> 
+              <Text style={styles.postTitleText} numberOfLines={2}> 
+                {title} 
+              </Text> 
+              {item.mediaUrl ? ( 
+                <Image source={{ uri: item.mediaUrl }} style={styles.feedMediaImage} /> 
+              ) : null} 
+              {preview ? ( 
+                <Text style={styles.postPreviewText} numberOfLines={3}> 
+                  {preview} 
+                </Text> 
+              ) : null} 
+              <View style={styles.postActionsRow}> 
+                <View style={styles.postActionsLeft}> 
+                  <Pressable 
+                    style={({ pressed }) => [styles.postIconButton, pressed && styles.postIconButtonPressed]} 
+                    onPress={() => void handleLike(item.id)} 
+                  > 
+                    <Ionicons 
+                      name={likedPosts[item.id] ? 'heart' : 'heart-outline'} 
+                      size={ICON_SIZES.md} 
+                      color={likedPosts[item.id] ? colors.brand : colors.text} 
+                    /> 
+                    <Text style={styles.postIconCountText}> 
+                      {reactionCounts[item.id] ? String(reactionCounts[item.id]) : ''} 
+                    </Text> 
+                  </Pressable> 
+                  <Pressable 
+                    style={({ pressed }) => [styles.postIconButton, pressed && styles.postIconButtonPressed]} 
+                    onPress={() => handleReply(item)} 
+                  > 
+                    <Ionicons name="chatbubble-outline" size={ICON_SIZES.md} color={colors.text} /> 
+                    <Text style={styles.postIconCountText}> 
+                      {commentCounts[item.id] ? String(commentCounts[item.id]) : ''} 
+                    </Text> 
+                  </Pressable> 
+                  <Pressable 
+                    style={({ pressed }) => [styles.postIconButton, pressed && styles.postIconButtonPressed]} 
+                    onPress={() => void handleShare(item)} 
+                  > 
+                    <Ionicons name="paper-plane-outline" size={ICON_SIZES.md} color={colors.text} /> 
+                  </Pressable> 
+                </View> 
+                <Text style={styles.postMetaText}>Tap for thread</Text> 
+              </View> 
+            </Pressable> 
+          ); 
+        }} 
+        ListEmptyComponent={ 
+          loading ? ( 
+            <View style={styles.skeletonStack}> 
+              {Array.from({ length: 3 }).map((_, index) => ( 
+                <SkeletonCard key={`feed-skel-${index}`} /> 
+              ))} 
+            </View> 
+          ) : ( 
+            <Text style={styles.listEmpty}>No posts yet.</Text> 
+          ) 
+        } 
+      /> 
+      <Modal 
+        transparent 
+        animationType="fade" 
+        visible={storyComposerOpen} 
+        onRequestClose={() => setStoryComposerOpen(false)} 
+      > 
+        <View style={styles.storyViewerContainer}> 
+          <Pressable style={styles.storyViewerBackdrop} onPress={() => setStoryComposerOpen(false)} /> 
+          <View style={styles.storyComposerCard}> 
+            <View style={styles.rowBetween}> 
+              <Text style={styles.cardTitle}>New story</Text> 
+              <Pressable style={styles.iconButton} onPress={() => setStoryComposerOpen(false)}> 
+                <Ionicons name="close" size={ICON_SIZES.lg} color={colors.text} /> 
+              </Pressable> 
+            </View> 
+            <TextInput 
+              style={styles.input} 
+              placeholder="Caption (optional)" 
+              placeholderTextColor={colors.placeholder} 
+              value={storyCaption} 
+              onChangeText={setStoryCaption} 
+              maxLength={120} 
+            /> 
+            {storyMediaUrl ? <Image source={{ uri: storyMediaUrl }} style={styles.storyPreviewImage} /> : null} 
+            <View style={styles.storyComposerRow}> 
+              <Pressable style={styles.secondaryButton} onPress={() => void handleAttachStoryMedia()}> 
+                <Text style={styles.secondaryButtonText}> 
+                  {storyUploading ? 'Uploading...' : storyMediaUrl ? 'Change image' : 'Add image'} 
+                </Text> 
+              </Pressable> 
+              <Pressable 
+                style={styles.primaryButton} 
+                onPress={() => void handlePostStory()} 
+                disabled={storySubmitting || !storyMediaUrl} 
+              > 
+                <Text style={styles.primaryButtonText}> 
+                  {storySubmitting ? 'Posting...' : 'Post'} 
+                </Text> 
+              </Pressable> 
+            </View> 
+            {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null} 
+          </View> 
+        </View> 
+      </Modal> 
+      <Modal 
+        transparent 
+        animationType="fade" 
+        visible={Boolean(activeStory)} 
+        onRequestClose={() => setActiveStory(null)} 
       >
         <View style={styles.storyViewerContainer}>
           <Pressable style={styles.storyViewerBackdrop} onPress={() => setActiveStory(null)} />
@@ -2981,11 +3125,11 @@ const FeedScreen = ({ route }: FeedProps) => {
           </View>
         </View>
       </Modal>
-      <BottomNav />
-      <StatusBar style="auto" />
-    </SafeAreaView>
-  );
-};
+      <BottomNav /> 
+      <StatusBar style="auto" /> 
+    </SafeAreaView> 
+  ); 
+}; 
 
 type PostRepliesProps = NativeStackScreenProps<RootStackParamList, 'PostReplies'>;
 
@@ -10125,16 +10269,54 @@ const useStyles = () => {
         tabPillTextActive: {
           color: colors.brandText,
         },
-        feedHeader: {
-          gap: space.sm,
-        },
-        feedTabs: {
-          flexDirection: 'row',
-          gap: space.xs,
-        },
-        messagesHeader: {
-          gap: space.sm,
-        },
+        feedHeader: { 
+          gap: space.sm, 
+        }, 
+        feedSearchBar: { 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          gap: space.sm, 
+          borderRadius: 999, 
+          borderWidth: 1, 
+          borderColor: withOpacity(colors.border, resolvedMode === 'dark' ? 0.8 : 1), 
+          backgroundColor: withOpacity(colors.surfaceMuted, resolvedMode === 'dark' ? 0.7 : 0.9), 
+          paddingHorizontal: space.md, 
+          paddingVertical: space.sm, 
+        }, 
+        feedSearchInput: { 
+          flex: 1, 
+          minWidth: 0, 
+          paddingVertical: 0, 
+          ...type.body14, 
+          color: colors.text, 
+        }, 
+        feedSearchClear: { 
+          width: 32, 
+          height: 32, 
+          borderRadius: 16, 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          backgroundColor: withOpacity(colors.surface, 0.65), 
+          borderWidth: 1, 
+          borderColor: withOpacity(colors.border, 0.8), 
+        }, 
+        feedTabs: { 
+          flexDirection: 'row', 
+          gap: space.xs, 
+        }, 
+        feedTabLabelRow: { 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          gap: 6, 
+        }, 
+        feedTagRow: { 
+          flexDirection: 'row', 
+          gap: 8, 
+          paddingVertical: 2, 
+        }, 
+        messagesHeader: { 
+          gap: space.sm, 
+        }, 
         tabBar: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -10559,19 +10741,74 @@ const useStyles = () => {
           padding: space.md,
           gap: 4,
         },
-        postCard: {
-          borderRadius: 18,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surface,
-          padding: space.md,
-          gap: space.md,
-        },
-        postHeader: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-        },
+        postCard: { 
+          borderRadius: 20, 
+          borderWidth: 1, 
+          borderColor: withOpacity(colors.border, resolvedMode === 'dark' ? 0.9 : 1), 
+          backgroundColor: colors.surface, 
+          padding: space.lg, 
+          gap: space.sm, 
+          shadowColor: colors.overlay, 
+          shadowOpacity: 0.08, 
+          shadowRadius: 12, 
+          shadowOffset: { width: 0, height: 8 }, 
+          elevation: 2, 
+        }, 
+        postTopRow: { 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          gap: space.sm, 
+        }, 
+        postMetaText: { 
+          ...type.body12, 
+          color: colors.textSubtle, 
+        }, 
+        categoryChip: { 
+          paddingHorizontal: 10, 
+          paddingVertical: 6, 
+          borderRadius: 999, 
+          borderWidth: 1, 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+        }, 
+        categoryChipText: { 
+          ...type.label12, 
+          fontWeight: '800', 
+        }, 
+        postHeaderRow: { 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          gap: space.sm, 
+        }, 
+        postAuthorRow: { 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          gap: 10, 
+          flex: 1, 
+          minWidth: 0, 
+        }, 
+        postAuthorHandle: { 
+          ...type.label14, 
+          fontWeight: '700', 
+          color: colors.text, 
+          flex: 1, 
+        }, 
+        postTitleText: { 
+          ...type.title18, 
+          fontWeight: '800', 
+          color: colors.text, 
+        }, 
+        postPreviewText: { 
+          ...type.body14, 
+          color: colors.textMuted, 
+        }, 
+        postHeader: { 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          gap: 10, 
+        }, 
         postAvatar: {
           width: 36,
           height: 36,
@@ -10587,10 +10824,10 @@ const useStyles = () => {
           fontWeight: '700',
           color: colors.text,
         },
-        postHeaderInfo: {
-          flex: 1,
-          gap: 2,
-        },
+        postHeaderInfo: { 
+          flex: 1, 
+          gap: 2, 
+        }, 
         postBadge: {
           paddingHorizontal: 8,
           paddingVertical: 4,
@@ -10607,20 +10844,50 @@ const useStyles = () => {
           alignItems: 'center',
           gap: 6,
         },
-        feedMediaImage: {
-          marginTop: 10,
-          width: '100%',
-          height: 180,
-          borderRadius: 14,
-        },
-        postActions: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: 10,
-        },
-        postMediaPreview: {
-          gap: 8,
-        },
+        feedMediaImage: { 
+          marginTop: 6, 
+          width: '100%', 
+          height: 180, 
+          borderRadius: 16, 
+          borderWidth: 1, 
+          borderColor: colors.border, 
+        }, 
+        postActions: { 
+          flexDirection: 'row', 
+          flexWrap: 'wrap', 
+          gap: 10, 
+        }, 
+        postActionsRow: { 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          gap: space.md, 
+          marginTop: 4, 
+        }, 
+        postActionsLeft: { 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          gap: 8, 
+        }, 
+        postIconButton: { 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          gap: 6, 
+          paddingHorizontal: 10, 
+          paddingVertical: 8, 
+          borderRadius: 999, 
+        }, 
+        postIconButtonPressed: { 
+          backgroundColor: withOpacity(colors.surfaceMuted, 0.75), 
+        }, 
+        postIconCountText: { 
+          ...type.label12, 
+          fontWeight: '700', 
+          color: colors.textMuted, 
+        }, 
+        postMediaPreview: { 
+          gap: 8, 
+        }, 
         postActionButton: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -11125,15 +11392,70 @@ const useStyles = () => {
           fontWeight: '600',
           color: colors.text,
         },
-        storyRow: {
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: 8,
-        },
-        storyCarouselRow: {
-          flexDirection: 'row',
-          gap: 8,
-        },
+        storyRow: { 
+          flexDirection: 'row', 
+          flexWrap: 'wrap', 
+          gap: 8, 
+        }, 
+        storyStrip: { 
+          flexDirection: 'row', 
+          gap: space.sm, 
+          paddingVertical: 4, 
+        }, 
+        storyCircle: { 
+          width: 74, 
+          alignItems: 'center', 
+          gap: 6, 
+        }, 
+        storyRing: { 
+          width: 58, 
+          height: 58, 
+          borderRadius: 29, 
+          borderWidth: 2, 
+          borderColor: withOpacity(colors.brand, 0.6), 
+          padding: 2, 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          backgroundColor: withOpacity(colors.surface, 0.25), 
+        }, 
+        storyAddInner: { 
+          width: '100%', 
+          height: '100%', 
+          borderRadius: 999, 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          backgroundColor: withOpacity(colors.surfaceMuted, 0.7), 
+          borderWidth: 1, 
+          borderColor: withOpacity(colors.border, 0.8), 
+        }, 
+        storyCircleImage: { 
+          width: '100%', 
+          height: '100%', 
+          borderRadius: 999, 
+        }, 
+        storyCircleLabel: { 
+          ...type.caption12, 
+          color: colors.textSubtle, 
+          textAlign: 'center', 
+        }, 
+        storyLabelSkeleton: { 
+          height: 10, 
+          width: 50, 
+          borderRadius: 6, 
+        }, 
+        storyEmptyPill: { 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          paddingHorizontal: space.md, 
+          borderRadius: 999, 
+          borderWidth: 1, 
+          borderColor: withOpacity(colors.border, 0.8), 
+          backgroundColor: withOpacity(colors.surfaceMuted, 0.6), 
+        }, 
+        storyCarouselRow: { 
+          flexDirection: 'row', 
+          gap: 8, 
+        }, 
         storyComposerRow: {
           flexDirection: 'row',
           gap: space.md,
@@ -11190,20 +11512,28 @@ const useStyles = () => {
           left: 0,
           backgroundColor: colors.overlay,
         },
-        storyViewerCard: {
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surface,
-          overflow: 'hidden',
-          padding: space.sm,
-          gap: space.sm,
-        },
-        storyViewerImage: {
-          width: '100%',
-          height: 260,
-          borderRadius: 12,
-        },
+        storyViewerCard: { 
+          borderRadius: 16, 
+          borderWidth: 1, 
+          borderColor: colors.border, 
+          backgroundColor: colors.surface, 
+          overflow: 'hidden', 
+          padding: space.sm, 
+          gap: space.sm, 
+        }, 
+        storyComposerCard: { 
+          borderRadius: 18, 
+          borderWidth: 1, 
+          borderColor: colors.border, 
+          backgroundColor: colors.surface, 
+          padding: space.md, 
+          gap: space.md, 
+        }, 
+        storyViewerImage: { 
+          width: '100%', 
+          height: 260, 
+          borderRadius: 12, 
+        }, 
         storyViewerMeta: {
           gap: 4,
         },

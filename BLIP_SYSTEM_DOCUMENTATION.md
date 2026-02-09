@@ -25,11 +25,11 @@ This document is a “single source of truth” for what BLIP currently does, ho
 
 ### Works (implemented + expected to function)
 - Build smoke baseline: `npx tsc --noEmit`, `npx expo-doctor`, and `npx expo export --platform android` all pass.
-- Map-first home with clustering + spiderfy + recenter.
-- Map search overlay with scope (rooms/businesses/posts) and text match.
-- Feed screen (tabs + search + tags) + create post.
-- Stories (image + caption, 24h expiry) with viewer modal in Feed.
-- Feed actions updated: like + share + reply (business-only) + user profile drilldown + distance badge (coarse location).
+- Map-first home with clustering + spiderfy + recenter. 
+- Map search overlay with scope (rooms/businesses/posts) and text match. 
+- Feed UI (Instagram x Reddit hybrid): tabs + search + tag chips + story strip + hybrid post cards (category chip + distance/time meta + action row + long-press menu). 
+- Stories (image + caption, 24h expiry) with viewer modal + composer modal in Feed. 
+- Feed engagement: like (personal) + share + replies/comments (business-only) + user profile drilldown + distance badge (coarse location). 
 - Post engagement: likes (personal) + replies/comments (business-only).
 - Orders: pickup + delivery options + KYC-required user details (name/phone/address).
 - KYC status shown in Profile (quick row meta) + full KYC workflow lives in Account.
@@ -716,9 +716,9 @@ Rollout requirement:
 
 ### Feed is empty
 Expected if:
-- No posts exist for the current `area_key` (rounded location bucket).
+- No posts exist in the `posts` table (Feed currently loads latest posts without `area_key` filtering).
 Debug:
-- In Supabase, check `posts.area_key` values and whether the user’s `area_key` matches.
+- In Supabase, check `posts` contains rows and that RLS allows `select` for your session.
 
 ### “Slow down…” / “Too many…”
 Cause:
