@@ -20,6 +20,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 ## 2) Quick "works vs broken" summary (today)
 
 ### Works (implemented + expected to function)
+- Build smoke baseline: `npx tsc --noEmit` passes and `npx expo export --platform android` succeeds.
 - Map-first home with clustering + spiderfy + recenter.
 - Map search overlay with scope (rooms/businesses/posts) and text match.
 - Feed screen (tabs + search + tags) + create post.
@@ -55,6 +56,8 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Google OAuth: not implemented.
 - Payments/billing: not implemented (billing screen is placeholder only).
 - Voice rooms use RTC audio transport with push-to-talk; requires custom dev build/native config (`react-native-webrtc`).
+- `expo-doctor` still reports `react-native-webrtc` as untested on New Architecture (warning only).
+- `expo-doctor` package-version check can crash on Node 24 (`expo install --check` exit code `3221226505`); use Node 20 LTS for cleaner diagnostics.
 - Business admin access requires a business account (owner/staff). Personal-only accounts are blocked from admin controls.
 - KYC verification: document uploads + admin review queue are implemented (private storage).
 - Push notifications delivery: requires FCM/APNS keys + redeploy `push-send`.
@@ -67,7 +70,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 ## 3) How to run the app (local dev)
 
 ### Prereqs
-- Node.js (LTS recommended)
+- Node.js 20 LTS (recommended; Node 24 can break `expo-doctor` package checks)
 - Expo tooling (`npx expo` works; the repo uses `expo start`)
 
 ### App env vars
@@ -761,12 +764,11 @@ If `supabase.cmd` says the CLI is missing:
 ## 8) Security audit (npm)
 
 Last audit summary:
-- Command: `npm.cmd audit` (2026-01-22)
-- Result: 0 vulnerabilities (info/low/moderate/high/critical)
-- Dependency counts: total 839
-- Remediation applied: restored `supabase` dev dependency to `^2.72.8` and pinned `tar` via `overrides`.
-- Change made: added `overrides.tar = 7.5.6` in `app/package.json`.
-- Removed: none.
+- Command: `npm.cmd audit --audit-level=high` (2026-02-09)
+- Result: 5 high vulnerabilities
+- Affected packages: `@isaacs/brace-expansion`, `tar` (transitive via Expo CLI + Supabase CLI package)
+- Current mitigation in repo: `overrides.tar = 7.5.6`
+- Next remediation: bump `tar` override to `>= 7.5.7` and rerun audit, then revalidate app smoke tests.
 
 ## 9) Feature gaps (must-have + parity wishlist)
 

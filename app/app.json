@@ -39,7 +39,8 @@
     "plugins": [
       "expo-location",
       "expo-notifications",
-      "@config-plugins/react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      "expo-font"
     ]
   }
 }
