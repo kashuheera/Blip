@@ -32,9 +32,8 @@
 - Voice rooms (full RTC audio transport + push-to-talk + create/join/leave + participant counts)
 - Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders)
 - Business replies inbox (business-only, recent post replies + thread jump)
-- Seeded Mahmood Pharmacy (Askari 11) business + demo catalog/offer/coupon (Supabase migration)
-- Mahmood Pharmacy custom map pin icon (mini-logo override for demo)
 - Fixed business fetch/admin selects to use real columns (`hero_image_url`, `pin_icon_url`) and repaired PL/pgSQL rate-limit functions (owner_id ambiguity)
+- Business listings start empty (seed data cleared); create businesses + menu items + offers via Business Admin Portal
 - UI color system applied (brand/reward/categories + map styling)
 - Figma tokens pipeline (colors + spacing + typography via design/tokens.json + sync script + app/theme/tokens.ts)
 - Typography/spacing normalization pass in `App.tsx` (shared text presets + tokenized icon sizes/padding)

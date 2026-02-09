@@ -58,7 +58,6 @@ const BLIP_MARK_IMAGE = require('./assets/blip-mark.png');
 
 const HANDLE_ROTATION_MINUTES = 5;
 const HANDLE_REUSE_WINDOW_DAYS = 90;
-const MAHMOOD_PHARMACY_BUSINESS_ID = '2a2dfb6f-0b53-4ad2-a7d1-7e5c01902f6c';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -267,6 +266,7 @@ type MenuItemEntry = {
   id: string;
   businessId: string;
   name: string;
+  description?: string | null;
   priceCents: number | null;
   available: boolean;
 };
@@ -559,75 +559,7 @@ const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const demoBusinesses: Business[] = [
-  {
-    id: 'b1',
-    name: 'Cafe Grill',
-    category: 'restaurant',
-    description: 'Comfort classics and grilled paninis near Askari 11.',
-    rating: 4.8,
-    featured: 'Grilled Panini',
-    verified: true,
-    categories: ['Cafe', 'Breakfast'],
-    amenities: ['Wifi', 'Pickup'],
-    hours: '8:00 AM - 10:00 PM',
-    latitude: 31.4512,
-    longitude: 74.4343,
-    openNow: true,
-    saved: true,
-  },
-  {
-    id: 'b2',
-    name: 'Fresh Mart',
-    category: 'grocery',
-    description: 'Everyday grocery runs with fast pickup.',
-    rating: 4.6,
-    featured: 'Family Produce Box',
-    verified: false,
-    categories: ['Grocery', 'Market'],
-    amenities: ['Pickup'],
-    hours: '9:00 AM - 11:00 PM',
-    latitude: 31.4489,
-    longitude: 74.4365,
-    openNow: true,
-  },
-  {
-    id: 'b3',
-    name: 'Spice Route',
-    category: 'restaurant',
-    description: 'Late-night bowls and biryani favorites.',
-    rating: 4.7,
-    featured: 'Fire Chicken Biryani',
-    verified: true,
-    categories: ['Biryani', 'Late night'],
-    amenities: ['Delivery', 'Pickup'],
-    hours: '6:00 PM - 2:00 AM',
-    latitude: 31.4522,
-    longitude: 74.4339,
-    openNow: false,
-  },
-  {
-    id: 'b4',
-    name: 'Mahmood Pharmacy',
-    category: 'grocery',
-    description: 'Askari 11 pharmacy for prescriptions, OTC essentials, and quick pickup.',
-    rating: 4.8,
-    featured: 'Pain relief essentials',
-    verified: false,
-    categories: ['Pharmacy', 'Health', 'Askari 11'],
-    amenities: ['Delivery', 'Pickup'],
-    hours: '24/7',
-    phone: '+92 42 0000 0000',
-    city: 'Lahore',
-    latitude: 31.4525218,
-    longitude: 74.4331413,
-    openNow: true,
-    imageUrl:
-      'https://images.unsplash.com/photo-1580281658628-bd1b1f1e5d0b?auto=format&fit=crop&w=800&q=80',
-    logoUrl:
-      'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f48a.png',
-  },
-];
+const demoBusinesses: Business[] = [];
 
 const demoRooms: Room[] = [
   {
@@ -698,9 +630,7 @@ const BusinessProvider = ({ children }: { children: React.ReactNode }) => {
       const nextBusinesses = data
         .map((row) => buildBusinessFromRow(row))
         .filter((entry): entry is Business => Boolean(entry));
-      if (nextBusinesses.length > 0) {
-        setBusinesses(nextBusinesses);
-      }
+      setBusinesses(nextBusinesses);
     };
     void loadBusinesses();
     return () => {
@@ -1430,22 +1360,6 @@ const PulseRing = ({ color, size }: { color: string; size: number }) => {
         transform: [{ scale }],
       }}
     />
-  );
-};
-
-const MahmoodPharmacyMiniIcon = () => {
-  const styles = useStyles();
-  return (
-    <View style={styles.mahmoodPinIcon}>
-      <View style={styles.mahmoodPinIconInner}>
-        <View style={styles.mahmoodPinIconLeft}>
-          <Text style={styles.mahmoodPinIconLeftText}>M</Text>
-        </View>
-        <View style={styles.mahmoodPinIconRight}>
-          <Text style={styles.mahmoodPinIconRightText}>P</Text>
-        </View>
-      </View>
-    </View>
   );
 };
 
@@ -2210,7 +2124,6 @@ const HomeScreen = () => {
                   const business = businessById.get(item.businessId);
                   const logoUrl = business?.logoUrl ?? business?.imageUrl ?? null;
                   const categoryColors = getCategoryColors(item.category ?? null, resolvedMode);
-                  const isMahmood = item.businessId === MAHMOOD_PHARMACY_BUSINESS_ID;
                   return (
                     <Marker
                       key={item.id}
@@ -2230,9 +2143,7 @@ const HomeScreen = () => {
                             { backgroundColor: categoryColors.bg, borderColor: categoryColors.fg },
                           ]}
                         >
-                          {isMahmood ? (
-                            <MahmoodPharmacyMiniIcon />
-                          ) : logoUrl ? (
+                          {logoUrl ? (
                             <Image source={{ uri: logoUrl }} style={styles.businessPinImage} />
                           ) : (
                             <Ionicons
@@ -2322,7 +2233,6 @@ const HomeScreen = () => {
                   const business = businessById.get(pin.businessId);
                   const logoUrl = business?.logoUrl ?? business?.imageUrl ?? null;
                   const categoryColors = getCategoryColors(pin.category ?? null, resolvedMode);
-                  const isMahmood = pin.businessId === MAHMOOD_PHARMACY_BUSINESS_ID;
                   return (
                     <Marker
                       key={pin.id}
@@ -2342,9 +2252,7 @@ const HomeScreen = () => {
                             { backgroundColor: categoryColors.bg, borderColor: categoryColors.fg },
                           ]}
                         >
-                          {isMahmood ? (
-                            <MahmoodPharmacyMiniIcon />
-                          ) : logoUrl ? (
+                          {logoUrl ? (
                             <Image source={{ uri: logoUrl }} style={styles.businessPinImage} />
                           ) : (
                             <Ionicons
@@ -3952,11 +3860,7 @@ const MessagesScreen = () => {
               Every business has a chatroom for customers. Preview before joining.
             </Text>
             {businessList.length === 0 ? (
-              <View style={styles.skeletonStack}>
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <SkeletonRowItem key={`biz-skel-${index}`} />
-                ))}
-              </View>
+              <Text style={styles.metaText}>No businesses yet.</Text>
             ) : (
               businessList
                 .filter((business) =>
@@ -7600,6 +7504,23 @@ const BusinessAdminScreen = () => {
   const [coupons, setCoupons] = useState<BusinessCouponEntry[]>([]);
   const [replyInbox, setReplyInbox] = useState<BusinessReplyItem[]>([]);
   const [replyLoading, setReplyLoading] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createCategory, setCreateCategory] = useState<'restaurant' | 'grocery'>('restaurant');
+  const [createCity, setCreateCity] = useState('Lahore');
+  const [createPhone, setCreatePhone] = useState('');
+  const [createHours, setCreateHours] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [createLat, setCreateLat] = useState('');
+  const [createLng, setCreateLng] = useState('');
+  const [creatingBusiness, setCreatingBusiness] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemDescription, setNewItemDescription] = useState('');
+  const [newItemPrice, setNewItemPrice] = useState('');
+  const [newItemAvailable, setNewItemAvailable] = useState(true);
+  const [addingMenuItem, setAddingMenuItem] = useState(false);
+  const [newOfferTitle, setNewOfferTitle] = useState('');
+  const [newOfferDetails, setNewOfferDetails] = useState('');
+  const [addingOffer, setAddingOffer] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponDetails, setCouponDetails] = useState('');
   const [couponActive, setCouponActive] = useState(true);
@@ -7639,6 +7560,7 @@ const BusinessAdminScreen = () => {
         setNotice('Business account required.');
         return;
       }
+      setHasBusinessAccess(true);
       setLoading(true);
       setNotice(null);
       const { data: ownedRows, error: businessError } = await supabase
@@ -7688,13 +7610,21 @@ const BusinessAdminScreen = () => {
         })
         .filter((row) => row.id.length > 0);
       setOwnedBusinesses(businesses);
-      setHasBusinessAccess(businesses.length > 0);
       if (!selectedBusinessId && businesses.length > 0) {
         setSelectedBusinessId(businesses[0].id);
       }
+      if (businesses.length === 0) {
+        setSelectedBusinessId(null);
+      }
       const businessIds = businesses.map((row) => row.id);
       if (businessIds.length === 0) {
-        setNotice('Business access required. Sign in with a business account.');
+        setStaff([]);
+        setMenuItems([]);
+        setOffers([]);
+        setOrders([]);
+        setAuditLog([]);
+        setExceptions([]);
+        setCoupons([]);
         setLoading(false);
         return;
       }
@@ -7706,7 +7636,7 @@ const BusinessAdminScreen = () => {
           .in('business_id', businessIds),
         supabase
           .from('menu_items')
-          .select('id, business_id, name, price_cents, available')
+          .select('id, business_id, name, description, price_cents, available')
           .in('business_id', businessIds),
         supabase
           .from('business_offers')
@@ -7768,6 +7698,7 @@ const BusinessAdminScreen = () => {
           id: String(row.id ?? ''),
           businessId: String(row.business_id ?? ''),
           name: row.name ?? 'Item',
+          description: row.description ?? null,
           priceCents: typeof row.price_cents === 'number' ? row.price_cents : null,
           available: row.available !== false,
         }))
@@ -7939,6 +7870,214 @@ const BusinessAdminScreen = () => {
     }
   };
 
+  const handleUseBusinessLocation = async () => {
+    setNotice(null);
+    const permission = await Location.requestForegroundPermissionsAsync();
+    if (permission.status !== 'granted') {
+      setNotice('Location permission denied.');
+      return;
+    }
+    const position = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    const latitude = position.coords?.latitude;
+    const longitude = position.coords?.longitude;
+    if (typeof latitude === 'number' && typeof longitude === 'number') {
+      setCreateLat(latitude.toFixed(7));
+      setCreateLng(longitude.toFixed(7));
+      setNotice('Location captured.');
+    } else {
+      setNotice('Unable to read location.');
+    }
+  };
+
+  const handleCreateBusiness = async () => {
+    if (!supabase) {
+      setNotice('Supabase not configured.');
+      return;
+    }
+    if (!userId) {
+      setNotice('Sign in to create a business.');
+      return;
+    }
+    if (!createName.trim()) {
+      setNotice('Enter a business name.');
+      return;
+    }
+    setCreatingBusiness(true);
+    setNotice(null);
+    const parsedLat = Number(createLat);
+    const parsedLng = Number(createLng);
+    const latitude = Number.isFinite(parsedLat) ? parsedLat : null;
+    const longitude = Number.isFinite(parsedLng) ? parsedLng : null;
+    const { data, error } = await supabase
+      .from('businesses')
+      .insert({
+        owner_id: userId,
+        name: createName.trim(),
+        category: createCategory === 'grocery' ? 'Grocery' : 'Restaurant',
+        city: createCity.trim() ? createCity.trim() : null,
+        phone: createPhone.trim() ? createPhone.trim() : null,
+        hours: createHours.trim() ? createHours.trim() : null,
+        description: createDescription.trim() ? createDescription.trim() : null,
+        latitude,
+        longitude,
+        verified: false,
+        verification_status: 'unverified',
+      })
+      .select('id, name, hero_image_url, pin_icon_url')
+      .maybeSingle();
+
+    if (error || !data?.id) {
+      setNotice('Unable to create business.');
+      setCreatingBusiness(false);
+      return;
+    }
+
+    const nextOwned: OwnedBusinessEntry = {
+      id: String(data.id),
+      name: data.name ?? createName.trim(),
+      imageUrl: data.hero_image_url ?? null,
+      logoUrl: data.pin_icon_url ?? null,
+    };
+    setOwnedBusinesses((prev) => [nextOwned, ...prev]);
+    setSelectedBusinessId(nextOwned.id);
+
+    const { data: businessRows } = await supabase
+      .from('businesses')
+      .select(
+        'id, name, category, categories, amenities, hours, phone, city, flags, latitude, longitude, verified, verification_status, description, hero_image_url, featured_item_name, featured_item_price_cents, pin_icon_url'
+      )
+      .limit(200);
+    if (Array.isArray(businessRows)) {
+      setBusinesses(
+        businessRows
+          .map((row) => buildBusinessFromRow(row))
+          .filter((entry): entry is Business => Boolean(entry))
+      );
+    }
+
+    setCreateName('');
+    setCreatePhone('');
+    setCreateHours('');
+    setCreateDescription('');
+    setCreateLat('');
+    setCreateLng('');
+    setCreatingBusiness(false);
+    setNotice('Business created.');
+    void trackAnalyticsEvent('business_create', { category: createCategory, city: createCity.trim() || null }, userId);
+  };
+
+  const handleAddMenuItem = async () => {
+    if (!supabase || !activeBusiness) {
+      setNotice('Select a business first.');
+      return;
+    }
+    if (!newItemName.trim()) {
+      setNotice('Enter a menu item name.');
+      return;
+    }
+    let priceCents: number | null = null;
+    if (newItemPrice.trim()) {
+      const parsed = Number(newItemPrice);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        setNotice('Enter a valid price.');
+        return;
+      }
+      priceCents = Math.round(parsed * 100);
+    }
+    setAddingMenuItem(true);
+    setNotice(null);
+    const { error } = await supabase.from('menu_items').insert({
+      business_id: activeBusiness.id,
+      name: newItemName.trim(),
+      description: newItemDescription.trim() ? newItemDescription.trim() : null,
+      price_cents: priceCents,
+      available: newItemAvailable,
+    });
+    if (error) {
+      setNotice('Unable to add menu item.');
+      setAddingMenuItem(false);
+      return;
+    }
+    const { data } = await supabase
+      .from('menu_items')
+      .select('id, business_id, name, description, price_cents, available')
+      .eq('business_id', activeBusiness.id)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (Array.isArray(data)) {
+      setMenuItems(
+        data.map((row) => ({
+          id: String(row.id ?? ''),
+          businessId: String(row.business_id ?? ''),
+          name: row.name ?? 'Item',
+          description: row.description ?? null,
+          priceCents: typeof row.price_cents === 'number' ? row.price_cents : null,
+          available: row.available !== false,
+        }))
+      );
+    }
+    setNewItemName('');
+    setNewItemDescription('');
+    setNewItemPrice('');
+    setNewItemAvailable(true);
+    setAddingMenuItem(false);
+    setNotice('Menu item added.');
+    if (userId) {
+      void trackAnalyticsEvent('menu_item_add', { business_id: activeBusiness.id }, userId);
+    }
+  };
+
+  const handleAddOffer = async () => {
+    if (!supabase || !activeBusiness) {
+      setNotice('Select a business first.');
+      return;
+    }
+    if (!newOfferTitle.trim()) {
+      setNotice('Enter an offer title.');
+      return;
+    }
+    setAddingOffer(true);
+    setNotice(null);
+    const { error } = await supabase.from('business_offers').insert({
+      business_id: activeBusiness.id,
+      title: newOfferTitle.trim(),
+      details: newOfferDetails.trim() ? newOfferDetails.trim() : '',
+      starts_at: new Date().toISOString(),
+      ends_at: null,
+    });
+    if (error) {
+      setNotice('Unable to add offer.');
+      setAddingOffer(false);
+      return;
+    }
+    const { data } = await supabase
+      .from('business_offers')
+      .select('id, business_id, title, details, created_at')
+      .eq('business_id', activeBusiness.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (Array.isArray(data)) {
+      setOffers(
+        data.map((row) => ({
+          id: String(row.id ?? ''),
+          businessId: String(row.business_id ?? ''),
+          title: row.title ?? 'Offer',
+          details: row.details ?? '',
+          createdAt: row.created_at ?? '',
+        }))
+      );
+    }
+    setNewOfferTitle('');
+    setNewOfferDetails('');
+    setAddingOffer(false);
+    setNotice('Offer added.');
+    if (userId) {
+      void trackAnalyticsEvent('offer_add', { business_id: activeBusiness.id }, userId);
+    }
+  };
+
   const handleAddException = async () => {
     if (!supabase || !activeBusiness) {
       setNotice('Select a business first.');
@@ -8053,7 +8192,7 @@ const BusinessAdminScreen = () => {
             </Pressable>
           </View>
         ) : null}
-        {hasBusinessAccess ? (
+        {hasBusinessAccess && ownedBusinesses.length > 0 ? (
           <View style={styles.card}>
             <SectionTitle icon="storefront-outline" label="Business selection" />
             <View style={styles.filterRow}>
@@ -8077,6 +8216,105 @@ const BusinessAdminScreen = () => {
                 </Pressable>
               ))}
             </View>
+          </View>
+        ) : null}
+        {hasBusinessAccess && ownedBusinesses.length === 0 ? (
+          <View style={styles.card}>
+            <SectionTitle icon="add-circle-outline" label="Create your first business" />
+            <Text style={styles.cardBody}>
+              Add a listing, then upload a hero image and logo. Customers will discover you on the map and in
+              Business Chats.
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={createName}
+              onChangeText={setCreateName}
+              placeholder="Business name"
+              placeholderTextColor={colors.placeholder}
+            />
+            <View style={styles.filterRow}>
+              <Pressable
+                style={[styles.filterChip, createCategory === 'restaurant' && styles.filterChipActive]}
+                onPress={() => setCreateCategory('restaurant')}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    createCategory === 'restaurant' && styles.filterChipTextActive,
+                  ]}
+                >
+                  Restaurant
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.filterChip, createCategory === 'grocery' && styles.filterChipActive]}
+                onPress={() => setCreateCategory('grocery')}
+              >
+                <Text
+                  style={[styles.filterChipText, createCategory === 'grocery' && styles.filterChipTextActive]}
+                >
+                  Grocery
+                </Text>
+              </Pressable>
+            </View>
+            <TextInput
+              style={styles.input}
+              value={createCity}
+              onChangeText={setCreateCity}
+              placeholder="City (e.g., Lahore)"
+              placeholderTextColor={colors.placeholder}
+            />
+            <TextInput
+              style={styles.input}
+              value={createPhone}
+              onChangeText={setCreatePhone}
+              placeholder="Phone (optional)"
+              placeholderTextColor={colors.placeholder}
+              keyboardType="phone-pad"
+            />
+            <TextInput
+              style={styles.input}
+              value={createHours}
+              onChangeText={setCreateHours}
+              placeholder="Hours (optional)"
+              placeholderTextColor={colors.placeholder}
+            />
+            <TextInput
+              style={[styles.input, styles.multilineInput]}
+              value={createDescription}
+              onChangeText={setCreateDescription}
+              placeholder="Description (optional)"
+              placeholderTextColor={colors.placeholder}
+              multiline
+            />
+            <TextInput
+              style={styles.input}
+              value={createLat}
+              onChangeText={setCreateLat}
+              placeholder="Latitude (optional)"
+              placeholderTextColor={colors.placeholder}
+              keyboardType="numeric"
+            />
+            <TextInput
+              style={styles.input}
+              value={createLng}
+              onChangeText={setCreateLng}
+              placeholder="Longitude (optional)"
+              placeholderTextColor={colors.placeholder}
+              keyboardType="numeric"
+            />
+            <Pressable style={styles.secondaryButton} onPress={() => void handleUseBusinessLocation()}>
+              <Text style={styles.secondaryButtonText}>Use current location</Text>
+            </Pressable>
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() => void handleCreateBusiness()}
+              disabled={creatingBusiness}
+            >
+              <Text style={styles.primaryButtonText}>
+                {creatingBusiness ? 'Creating...' : 'Create business'}
+              </Text>
+            </Pressable>
           </View>
         ) : null}
         {hasBusinessAccess && activeBusiness ? (
@@ -8286,95 +8524,162 @@ const BusinessAdminScreen = () => {
             )}
           </View>
         ) : null}
-        {hasBusinessAccess && ownedBusinesses.length === 0 ? (
+        {hasBusinessAccess && activeBusiness ? (
           <View style={styles.card}>
-            <Text style={styles.metaText}>No businesses linked to this account.</Text>
+            <SectionTitle icon="people-outline" label="Staff & permissions" />
+            {staff.length === 0 ? (
+              <Text style={styles.metaText}>No staff assigned yet.</Text>
+            ) : (
+              staff.map((member) => (
+                <View key={member.id} style={styles.listRow}>
+                  <View style={styles.listRowInfo}>
+                    <Text style={styles.cardTitle}>{member.role}</Text>
+                    <Text style={styles.metaText}>{member.permissions.join(', ') || 'All'}</Text>
+                  </View>
+                  <Text style={styles.metaText}>{member.createdAt}</Text>
+                </View>
+              ))
+            )}
           </View>
         ) : null}
-        <View style={styles.card}>
-          <SectionTitle icon="people-outline" label="Staff & permissions" />
-          {staff.length === 0 ? (
-            <Text style={styles.metaText}>No staff assigned yet.</Text>
-          ) : (
-            staff.map((member) => (
-              <View key={member.id} style={styles.listRow}>
-                <View style={styles.listRowInfo}>
-                  <Text style={styles.cardTitle}>{member.role}</Text>
-                  <Text style={styles.metaText}>{member.permissions.join(', ') || 'All'}</Text>
+        {hasBusinessAccess && activeBusiness ? (
+          <View style={styles.card}>
+            <SectionTitle icon="restaurant-outline" label="Menu items" />
+            <Text style={styles.cardBody}>Add the products you want customers to order.</Text>
+            <TextInput
+              style={styles.input}
+              value={newItemName}
+              onChangeText={setNewItemName}
+              placeholder="Item name"
+              placeholderTextColor={colors.placeholder}
+            />
+            <TextInput
+              style={[styles.input, styles.multilineInput]}
+              value={newItemDescription}
+              onChangeText={setNewItemDescription}
+              placeholder="Description (optional)"
+              placeholderTextColor={colors.placeholder}
+              multiline
+            />
+            <TextInput
+              style={styles.input}
+              value={newItemPrice}
+              onChangeText={setNewItemPrice}
+              placeholder="Price (PKR)"
+              placeholderTextColor={colors.placeholder}
+              keyboardType="numeric"
+            />
+            <View style={styles.rowBetween}>
+              <Text style={styles.metaText}>Available</Text>
+              <Switch
+                value={newItemAvailable}
+                onValueChange={setNewItemAvailable}
+                trackColor={{ false: colors.border, true: colors.brand }}
+                thumbColor={colors.surface}
+              />
+            </View>
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() => void handleAddMenuItem()}
+              disabled={addingMenuItem}
+            >
+              <Text style={styles.primaryButtonText}>
+                {addingMenuItem ? 'Adding...' : 'Add menu item'}
+              </Text>
+            </Pressable>
+            {menuItems.length === 0 ? (
+              <Text style={styles.metaText}>No menu items yet.</Text>
+            ) : (
+              menuItems.map((item) => (
+                <View key={item.id} style={styles.listRow}>
+                  <View style={styles.listRowInfo}>
+                    <Text style={styles.cardTitle}>{item.name}</Text>
+                    {item.description ? <Text style={styles.metaText}>{item.description}</Text> : null}
+                    <Text style={styles.metaText}>
+                      {item.priceCents ? `Rs ${(item.priceCents / 100).toFixed(0)}` : 'Price TBD'}
+                    </Text>
+                  </View>
+                  <Text style={styles.metaText}>{item.available ? 'Available' : 'Hidden'}</Text>
                 </View>
-                <Text style={styles.metaText}>{member.createdAt}</Text>
-              </View>
-            ))
-          )}
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="restaurant-outline" label="Menu items" />
-          {menuItems.length === 0 ? (
-            <Text style={styles.metaText}>No menu items yet.</Text>
-          ) : (
-            menuItems.map((item) => (
-              <View key={item.id} style={styles.listRow}>
-                <View style={styles.listRowInfo}>
-                  <Text style={styles.cardTitle}>{item.name}</Text>
-                  <Text style={styles.metaText}>
-                    {item.priceCents ? `Rs ${(item.priceCents / 100).toFixed(0)}` : 'Price TBD'}
-                  </Text>
+              ))
+            )}
+          </View>
+        ) : null}
+        {hasBusinessAccess && activeBusiness ? (
+          <View style={styles.card}>
+            <SectionTitle icon="pricetag-outline" label="Offers" />
+            <Text style={styles.cardBody}>Highlight deals and announcements for customers.</Text>
+            <TextInput
+              style={styles.input}
+              value={newOfferTitle}
+              onChangeText={setNewOfferTitle}
+              placeholder="Offer title"
+              placeholderTextColor={colors.placeholder}
+            />
+            <TextInput
+              style={[styles.input, styles.multilineInput]}
+              value={newOfferDetails}
+              onChangeText={setNewOfferDetails}
+              placeholder="Details (optional)"
+              placeholderTextColor={colors.placeholder}
+              multiline
+            />
+            <Pressable style={styles.primaryButton} onPress={() => void handleAddOffer()} disabled={addingOffer}>
+              <Text style={styles.primaryButtonText}>{addingOffer ? 'Adding...' : 'Add offer'}</Text>
+            </Pressable>
+            {offers.length === 0 ? (
+              <Text style={styles.metaText}>No offers yet.</Text>
+            ) : (
+              offers.map((offer) => (
+                <View key={offer.id} style={styles.listRow}>
+                  <View style={styles.listRowInfo}>
+                    <Text style={styles.cardTitle}>{offer.title}</Text>
+                    <Text style={styles.metaText}>{offer.details}</Text>
+                  </View>
+                  <Text style={styles.metaText}>{offer.createdAt}</Text>
                 </View>
-                <Text style={styles.metaText}>{item.available ? 'Available' : 'Hidden'}</Text>
-              </View>
-            ))
-          )}
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="pricetag-outline" label="Offers" />
-          {offers.length === 0 ? (
-            <Text style={styles.metaText}>No offers yet.</Text>
-          ) : (
-            offers.map((offer) => (
-              <View key={offer.id} style={styles.listRow}>
-                <View style={styles.listRowInfo}>
-                  <Text style={styles.cardTitle}>{offer.title}</Text>
-                  <Text style={styles.metaText}>{offer.details}</Text>
+              ))
+            )}
+          </View>
+        ) : null}
+        {hasBusinessAccess && activeBusiness ? (
+          <View style={styles.card}>
+            <SectionTitle icon="receipt-outline" label="Orders" />
+            {orders.length === 0 ? (
+              <Text style={styles.metaText}>No orders yet.</Text>
+            ) : (
+              orders.map((order) => (
+                <View key={order.id} style={styles.listRow}>
+                  <View style={styles.listRowInfo}>
+                    <Text style={styles.cardTitle}>{order.businessName}</Text>
+                    <Text style={styles.metaText}>{order.notes ?? 'No notes'}</Text>
+                  </View>
+                  <Text style={styles.metaText}>{order.status}</Text>
                 </View>
-                <Text style={styles.metaText}>{offer.createdAt}</Text>
-              </View>
-            ))
-          )}
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="receipt-outline" label="Orders" />
-          {orders.length === 0 ? (
-            <Text style={styles.metaText}>No orders yet.</Text>
-          ) : (
-            orders.map((order) => (
-              <View key={order.id} style={styles.listRow}>
-                <View style={styles.listRowInfo}>
-                  <Text style={styles.cardTitle}>{order.businessName}</Text>
-                  <Text style={styles.metaText}>{order.notes ?? 'No notes'}</Text>
+              ))
+            )}
+          </View>
+        ) : null}
+        {hasBusinessAccess && activeBusiness ? (
+          <View style={styles.card}>
+            <SectionTitle icon="pulse-outline" label="Audit log" />
+            {auditLog.length === 0 ? (
+              <Text style={styles.metaText}>No audit events yet.</Text>
+            ) : (
+              auditLog.map((entry) => (
+                <View key={entry.id} style={styles.listRow}>
+                  <View style={styles.listRowInfo}>
+                    <Text style={styles.cardTitle}>{entry.action}</Text>
+                    <Text style={styles.metaText}>
+                      {entry.entityType ?? 'entity'} {entry.entityId ?? ''}
+                    </Text>
+                  </View>
+                  <Text style={styles.metaText}>{entry.createdAt}</Text>
                 </View>
-                <Text style={styles.metaText}>{order.status}</Text>
-              </View>
-            ))
-          )}
-        </View>
-        <View style={styles.card}>
-          <SectionTitle icon="pulse-outline" label="Audit log" />
-          {auditLog.length === 0 ? (
-            <Text style={styles.metaText}>No audit events yet.</Text>
-          ) : (
-            auditLog.map((entry) => (
-              <View key={entry.id} style={styles.listRow}>
-                <View style={styles.listRowInfo}>
-                  <Text style={styles.cardTitle}>{entry.action}</Text>
-                  <Text style={styles.metaText}>
-                    {entry.entityType ?? 'entity'} {entry.entityId ?? ''}
-                  </Text>
-                </View>
-                <Text style={styles.metaText}>{entry.createdAt}</Text>
-              </View>
-            ))
-          )}
-        </View>
+              ))
+            )}
+          </View>
+        ) : null}
       </ScrollView>
       <BottomNav />
       <StatusBar style="auto" />
@@ -9778,43 +10083,6 @@ const useStyles = () => {
           width: '100%',
           height: '100%',
           resizeMode: 'cover',
-        },
-        mahmoodPinIcon: {
-          width: '100%',
-          height: '100%',
-          backgroundColor: '#0B6B1E',
-        },
-        mahmoodPinIconInner: {
-          flex: 1,
-          flexDirection: 'row',
-          padding: 2,
-          gap: 2,
-        },
-        mahmoodPinIconLeft: {
-          flex: 1,
-          backgroundColor: '#FFFFFF',
-          borderRadius: 6,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        mahmoodPinIconLeftText: {
-          ...type.label12,
-          fontWeight: '900',
-          color: '#0B6B1E',
-          letterSpacing: 0.5,
-        },
-        mahmoodPinIconRight: {
-          flex: 1,
-          backgroundColor: '#1E2A7A',
-          borderRadius: 6,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        mahmoodPinIconRightText: {
-          ...type.label12,
-          fontWeight: '900',
-          color: '#0B6B1E',
-          letterSpacing: 0.5,
         },
         userPin: {
           width: 26,
