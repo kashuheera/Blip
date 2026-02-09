@@ -4,6 +4,10 @@ This document is a “single source of truth” for what BLIP currently does, ho
 
 ## 1) Repo layout (what to open first)
 - `app/App.tsx`: The entire Expo / React Native app (all screens, state, Supabase calls, UI).
+- `app/app.json`: Expo config (app icon/splash/adaptive icon paths, permissions, new-arch flag).
+- `app/assets/blip-mark.png`: BLIP logo mark (used on Auth screen + app header + app icons).
+- `app/assets/blip-auth-bg.jpg`: Auth background image.
+- `app/assets/icon.png`, `app/assets/adaptive-icon.png`, `app/assets/splash-icon.png`, `app/assets/favicon.png`: App icon + splash assets.
 - `app/theme/tokens.ts`: Theme + category tokens used by the app (generated from Figma export).
 - `app/theme/typography.ts`: Shared typography presets, icon sizes, and spacing aliases for UI consistency.
 - `design/tokens.json`: Figma Tokens Studio export (source of truth for colors).
