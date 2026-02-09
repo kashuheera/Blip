@@ -30,6 +30,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Orders: pickup + delivery options + KYC-required user details (name/phone/address).
 - KYC status badge UI in profile (verified/pending/rejected).
 - Auth screen with Personal/Business/Fleet tabs + pending buttons for Magic link/OTP + Google OAuth.
+- Startup auth gate: logged-out users land on Auth first (session-gated navigator boot route).
 - Room chat with realtime updates + distance gating.
 - Business profile (menu, offers, Q&A chat) + chat join gating.
 - Business reviews (storage + UI) with ratings + text.
@@ -240,6 +241,7 @@ The sections below map “product features” to concrete implementation artifac
 - Current implementation (testing): email + password.
   - Client: `AuthScreen` in `app/App.tsx` uses `supabase.auth.signInWithPassword` and `supabase.auth.signUp`.
   - Session handling: `AuthProvider` uses `supabase.auth.getSession()` + `onAuthStateChange`.
+  - Startup gating: `AppNavigator` boots to `Auth` when no session and to `Home` when a session exists.
 - Must-have before rollout (deferred): magic link + email OTP + proper domain redirects/deep links.
   - Why: Supabase email links currently contain `127.0.0.1` redirects which do not work on mobile email clients.
 - Common failure modes:

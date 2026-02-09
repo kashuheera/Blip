@@ -3,6 +3,7 @@
 ## Completed
 - A1 Account creation & login (email + password) (temporary for testing)
 - Auth UI tabs (personal/business/fleet) + pending login options (magic link/OAuth UI only)
+- Startup auth gate: app boots to Auth when logged out (login/signup required before entering app screens)
 - Map-first Home (map + clustering + spiderfy + recenter)
 - Map search overlay with scope (rooms/businesses/posts)
 - Search filters (open now, verified, tags)

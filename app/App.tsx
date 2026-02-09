@@ -1,6 +1,7 @@
 ﻿import 'react-native-url-polyfill/auto';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   FlatList,
   Image,
@@ -863,9 +864,11 @@ const AppHeader = () => {
   return (
     <View style={styles.appBar}>
       <View style={styles.appBarLeft}>
-        <Pressable style={styles.appBarIconButton} onPress={() => setMenuOpen(true)}>
-          <Ionicons name="menu" size={ICON_SIZES.xl} color={colors.text} />
-        </Pressable>
+        {userId ? (
+          <Pressable style={styles.appBarIconButton} onPress={() => setMenuOpen(true)}>
+            <Ionicons name="menu" size={ICON_SIZES.xl} color={colors.text} />
+          </Pressable>
+        ) : null}
         <View style={styles.appBarBrand}>
           <Text style={styles.appBarBrandText}>BLIP</Text>
           <View style={styles.betaPill}>
@@ -877,14 +880,23 @@ const AppHeader = () => {
         </View>
       </View>
       <View style={styles.appBarRight}>
-        <Pressable style={styles.appBarIconButton} onPress={() => navigation.navigate('BugReport')}>
-          <Ionicons name="bug-outline" size={ICON_SIZES.lg} color={colors.text} />
-        </Pressable>
-        <Pressable style={styles.appBarIconButton} onPress={() => navigation.navigate('Orders')}>
-          <Ionicons name="cart-outline" size={ICON_SIZES.lg} color={colors.text} />
-        </Pressable>
+        {userId ? (
+          <>
+            <Pressable style={styles.appBarIconButton} onPress={() => navigation.navigate('BugReport')}>
+              <Ionicons name="bug-outline" size={ICON_SIZES.lg} color={colors.text} />
+            </Pressable>
+            <Pressable style={styles.appBarIconButton} onPress={() => navigation.navigate('Orders')}>
+              <Ionicons name="cart-outline" size={ICON_SIZES.lg} color={colors.text} />
+            </Pressable>
+          </>
+        ) : null}
       </View>
-      <Modal transparent animationType="fade" visible={menuOpen} onRequestClose={() => setMenuOpen(false)}>
+      <Modal
+        transparent
+        animationType="fade"
+        visible={Boolean(menuOpen && userId)}
+        onRequestClose={() => setMenuOpen(false)}
+      >
         <View style={styles.sideSheetContainer}>
           <Pressable style={styles.sideSheetOverlay} onPress={() => setMenuOpen(false)} />
           <View style={styles.sideSheet}>
@@ -8842,37 +8854,63 @@ const DemoScreen = () => {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+const AppNavigator = () => {
+  const styles = useStyles();
+  const { colors } = useTheme();
+  const { userId, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.authGateLoading}>
+          <ActivityIndicator size="small" color={colors.brand} />
+          <Text style={styles.metaText}>Checking session...</Text>
+        </View>
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        key={userId ? 'auth-on' : 'auth-off'}
+        initialRouteName={userId ? 'Home' : 'Auth'}
+        screenOptions={{ headerShown: false }}
+      >
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Feed" component={FeedScreen} />
+        <Stack.Screen name="PostReplies" component={PostRepliesScreen} />
+        <Stack.Screen name="BusinessReplies" component={BusinessRepliesScreen} />
+        <Stack.Screen name="Create" component={CreateScreen} />
+        <Stack.Screen name="Messages" component={MessagesScreen} />
+        <Stack.Screen name="VoiceRoom" component={VoiceRoomScreen} />
+        <Stack.Screen name="DirectChat" component={DirectChatScreen} />
+        <Stack.Screen name="Orders" component={OrdersScreen} />
+        <Stack.Screen name="Billing" component={BillingScreen} />
+        <Stack.Screen name="Room" component={RoomScreen} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+        <Stack.Screen name="Auth" component={AuthScreen} />
+        <Stack.Screen name="Business" component={BusinessScreen} />
+        <Stack.Screen name="BusinessAdmin" component={BusinessAdminScreen} />
+        <Stack.Screen name="AdminPortal" component={AdminPortalScreen} />
+        <Stack.Screen name="Moderation" component={ModerationScreen} />
+        <Stack.Screen name="Help" component={HelpScreen} />
+        <Stack.Screen name="BugReport" component={BugReportScreen} />
+        <Stack.Screen name="Demo" component={DemoScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
 export default function App() {
   return (
     <ThemeProvider>
       <BusinessProvider>
         <AuthProvider>
-          <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="Home" component={HomeScreen} />
-              <Stack.Screen name="Feed" component={FeedScreen} />
-              <Stack.Screen name="PostReplies" component={PostRepliesScreen} />
-              <Stack.Screen name="BusinessReplies" component={BusinessRepliesScreen} />
-              <Stack.Screen name="Create" component={CreateScreen} />
-              <Stack.Screen name="Messages" component={MessagesScreen} />
-              <Stack.Screen name="VoiceRoom" component={VoiceRoomScreen} />
-              <Stack.Screen name="DirectChat" component={DirectChatScreen} />
-              <Stack.Screen name="Orders" component={OrdersScreen} />
-              <Stack.Screen name="Billing" component={BillingScreen} />
-              <Stack.Screen name="Room" component={RoomScreen} />
-              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-              <Stack.Screen name="Profile" component={ProfileScreen} />
-              <Stack.Screen name="UserProfile" component={UserProfileScreen} />
-              <Stack.Screen name="Auth" component={AuthScreen} />
-              <Stack.Screen name="Business" component={BusinessScreen} />
-              <Stack.Screen name="BusinessAdmin" component={BusinessAdminScreen} />
-              <Stack.Screen name="AdminPortal" component={AdminPortalScreen} />
-              <Stack.Screen name="Moderation" component={ModerationScreen} />
-              <Stack.Screen name="Help" component={HelpScreen} />
-              <Stack.Screen name="BugReport" component={BugReportScreen} />
-              <Stack.Screen name="Demo" component={DemoScreen} />
-            </Stack.Navigator>
-          </NavigationContainer>
+          <AppNavigator />
         </AuthProvider>
       </BusinessProvider>
     </ThemeProvider>
@@ -8889,6 +8927,12 @@ const useStyles = () => {
         container: {
           flex: 1,
           backgroundColor: colors.background,
+        },
+        authGateLoading: {
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: space.sm,
         },
         appBar: {
           flexDirection: 'row',
