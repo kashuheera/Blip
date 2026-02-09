@@ -137,6 +137,8 @@ From `c:\Blip\app`:
 - Business audit actor handle: `supabase/migrations/20260122154500_add_business_audit_actor_handle.sql`
 - Feature flags (Blip Admin Portal): `supabase/migrations/20260122160000_add_feature_flags.sql`
 - Business city lookup: `supabase/migrations/20260123113000_add_business_city.sql`
+- Seed: Mahmood Pharmacy (Askari 11): `supabase/migrations/20260210002500_seed_mahmood_pharmacy.sql`
+- Fix: business offer/menu rate-limit functions (owner_id ambiguity): `supabase/migrations/20260210002600_fix_business_rate_limit_owner_id_ambiguity.sql`
 
 ### Core tables (and what they power)
 - `profiles`: user profile + moderation flags + XP/level/chat-points state + `avatar_url`, `interests`.
