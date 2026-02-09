@@ -50,10 +50,14 @@ import type {
   ThemeMode,
 } from './theme/tokens';
 import { ICON_SIZES, SPACE_SCALE, TYPE_PRESETS } from './theme/typography';
+import { generateHandleCandidate } from './lib/handles';
 
 const APP_VERSION = Constants.expoConfig?.version ?? 'dev';
 const AUTH_BG_IMAGE = require('./assets/blip-auth-bg.jpg');
 const BLIP_MARK_IMAGE = require('./assets/blip-mark.png');
+
+const HANDLE_ROTATION_MINUTES = 5;
+const HANDLE_REUSE_WINDOW_DAYS = 90;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -692,6 +696,89 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const rotateHandleIfNeeded = async ({
+    nextUserId,
+    birthYear,
+    currentHandle,
+    handleUpdatedAt,
+  }: {
+    nextUserId: string;
+    birthYear: number | null;
+    currentHandle: string | null;
+    handleUpdatedAt: string | null;
+  }): Promise<string | null> => {
+    if (!supabase || !nextUserId) {
+      return currentHandle;
+    }
+
+    const now = Date.now();
+    const rotationWindowMs = HANDLE_ROTATION_MINUTES * 60 * 1000;
+    const updatedAtMs = handleUpdatedAt ? Date.parse(handleUpdatedAt) : NaN;
+    const needsRotation =
+      !currentHandle ||
+      !handleUpdatedAt ||
+      !Number.isFinite(updatedAtMs) ||
+      now - updatedAtMs >= rotationWindowMs;
+
+    if (!needsRotation) {
+      return currentHandle;
+    }
+
+    const bucket = Math.floor(now / rotationWindowMs);
+    const cutoffIso = new Date(now - HANDLE_REUSE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const nowIso = new Date(now).toISOString();
+
+    const recentHandles = new Set<string>();
+    const { data: historyRows } = await supabase
+      .from('handle_history')
+      .select('handle, created_at')
+      .eq('user_id', nextUserId)
+      .gte('created_at', cutoffIso)
+      .limit(500);
+    (historyRows ?? []).forEach((row) => {
+      if (typeof row?.handle === 'string' && row.handle.trim()) {
+        recentHandles.add(row.handle.trim().toLowerCase());
+      }
+    });
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const candidate = generateHandleCandidate({
+        userId: nextUserId,
+        birthYear,
+        bucket,
+        attempt,
+      });
+      if (!candidate) {
+        continue;
+      }
+      if (candidate === currentHandle?.toLowerCase()) {
+        continue;
+      }
+      if (recentHandles.has(candidate.toLowerCase())) {
+        continue;
+      }
+
+      const { error: upsertError } = await supabase
+        .from('profiles')
+        .upsert(
+          {
+            id: nextUserId,
+            current_handle: candidate,
+            handle_updated_at: nowIso,
+          },
+          { onConflict: 'id' }
+        );
+
+      if (!upsertError) {
+        await supabase.from('handle_history').insert({ user_id: nextUserId, handle: candidate });
+      }
+
+      return candidate;
+    }
+
+    return currentHandle;
+  };
+
   const loadProfile = async (nextUserId: string | null): Promise<ProfileSummary | null> => {
     if (!supabase || !nextUserId) {
       setProfile(null);
@@ -699,15 +786,19 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     const { data, error } = await supabase
       .from('profiles')
-      .select('current_handle, is_admin, shadowbanned, u2u_locked, xp, level, account_type')
+      .select('current_handle, handle_updated_at, birth_year, is_admin, shadowbanned, u2u_locked, xp, level, account_type')
       .eq('id', nextUserId)
       .maybeSingle();
     if (error) {
       setProfile(null);
       return null;
     }
+    const birthYear = typeof data?.birth_year === 'number' ? data.birth_year : null;
+    const handleUpdatedAt = typeof data?.handle_updated_at === 'string' ? data.handle_updated_at : null;
+    let handle = typeof data?.current_handle === 'string' ? data.current_handle : null;
+    handle = await rotateHandleIfNeeded({ nextUserId, birthYear, currentHandle: handle, handleUpdatedAt });
     const nextProfile: ProfileSummary = {
-      handle: data?.current_handle ?? null,
+      handle,
       isAdmin: Boolean(data?.is_admin),
       shadowbanned: Boolean(data?.shadowbanned),
       u2uLocked: Boolean(data?.u2u_locked),
@@ -835,8 +926,7 @@ const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (data.user?.id) {
       await supabase
         .from('profiles')
-        .update({ account_type: accountType })
-        .eq('id', data.user.id);
+        .upsert({ id: data.user.id, account_type: accountType }, { onConflict: 'id' });
     }
     const nextProfile = await loadProfile(data.user?.id ?? null);
     void trackAnalyticsEvent('auth_sign_up', { method: 'password' }, data.user?.id ?? null);
