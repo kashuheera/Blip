@@ -9125,9 +9125,11 @@ const useStyles = () => {
         },
         mapSearchBar: {
           position: 'absolute',
-          left: space.lg,
-          right: space.lg,
-          bottom: 110,
+          left: 0,
+          right: 0,
+          bottom: 82,
+          paddingHorizontal: space.lg,
+          alignItems: 'center',
           zIndex: 6,
         },
         mapSearchInner: {
@@ -9140,6 +9142,8 @@ const useStyles = () => {
           backgroundColor: withOpacity(colors.surface, 0.26),
           borderWidth: 1,
           borderColor: withOpacity(colors.border, 0.4),
+          width: '100%',
+          maxWidth: 420,
         },
         mapSearchInput: {
           flex: 1,
