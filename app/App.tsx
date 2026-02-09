@@ -9174,7 +9174,7 @@ const useStyles = () => {
           position: 'absolute',
           left: 0,
           right: 0,
-          bottom: 82,
+          bottom: space.xs,
           paddingHorizontal: space.lg,
           alignItems: 'center',
           zIndex: 6,
@@ -9252,7 +9252,8 @@ const useStyles = () => {
           position: 'absolute',
           left: space.sm,
           right: space.sm,
-          bottom: space.sm,
+          // Keep the card above the bottom search bar.
+          bottom: space.xxxl + space.xl + space.sm,
           borderRadius: 22,
           borderWidth: 1,
           borderColor: colors.border,
