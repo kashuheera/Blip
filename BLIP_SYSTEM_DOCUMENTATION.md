@@ -23,7 +23,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Map-first home with clustering + spiderfy + recenter.
 - Map search overlay with scope (rooms/businesses/posts) and text match.
 - Feed screen (tabs + search + tags) + create post.
-- Stories placeholder card in Feed (UI only).
+- Stories (image + caption, 24h expiry) with viewer modal in Feed.
 - Feed actions updated: like + share + reply (business-only) + user profile drilldown + distance badge (coarse location).
 - Post engagement: likes (personal) + replies/comments (business-only).
 - Orders: pickup + delivery options + KYC-required user details (name/phone/address).
@@ -34,7 +34,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Business reviews (storage + UI) with ratings + text.
 - Orders flow (menu -> cart -> order + order_items).
 - Messages (business list + direct threads + direct chat).
-- Voice rooms placeholder card in Messages (UI only).
+- Voice rooms with live presence (create/join/leave + participant counts).
 - Profile (identity switch, level/xp, reputation/trust labels, device ID display).
 - Billing placeholder screen (provider planned: Safepay; no payments yet).
 - Push notifications plumbing (device token capture + test push).
@@ -54,7 +54,7 @@ This document is a “single source of truth” for what BLIP currently does, ho
 - Magic link / email OTP auth: deferred. Must-have before rollout with proper domain redirects/deep links (mobile cannot follow `127.0.0.1` links).
 - Google OAuth: not implemented.
 - Payments/billing: not implemented (billing screen is placeholder only).
-- Stories + voice rooms: UI placeholders only (no functional media/voice backend).
+- Voice transport in rooms is beta/placeholder (presence is live, full RTC audio transport still pending).
 - Business admin access requires a business account (owner/staff). Personal-only accounts are blocked from admin controls.
 - KYC verification: document uploads + admin review queue are implemented (private storage).
 - Push notifications delivery: requires FCM/APNS keys + redeploy `push-send`.
@@ -120,6 +120,7 @@ From `c:\Blip\app`:
 - Business coupons: `supabase/migrations/20260129105000_add_business_coupons.sql`
 - Account types + KYC + delivery + post location: `supabase/migrations/20260131093000_account_type_kyc_delivery_posts.sql`
 - KYC verification workflow + storage: `supabase/migrations/20260208083000_add_kyc_verification_workflow.sql`
+- Stories + voice rooms (presence-first): `supabase/migrations/20260209094000_add_stories_and_voice_rooms.sql`
 - Business verification workflow: `supabase/migrations/20260120091000_add_business_verification_workflow.sql`
 - Analytics events: `supabase/migrations/20260120093000_add_analytics_events.sql`
 - Safety + push + reputation + room roles: `supabase/migrations/20260122090000_add_safety_push_reputation.sql`
@@ -158,6 +159,9 @@ From `c:\Blip\app`:
 - `post_reactions`: reactions on feed posts (one per user).
 - `post_reposts`: reposts of feed posts.
 - `post_bookmarks`: saved posts per user.
+- `stories`: ephemeral story posts (image + caption + 24h expiry).
+- `voice_rooms`: voice room metadata (title/topic/status/city/start time).
+- `voice_room_participants`: live presence rows for join/leave counts.
 - `analytics_events`: event log for funnel analytics (admin-only access).
 - `follows`: follow relationships (stores follower + followed handles).
 - `place_lists`: user-defined saved-place lists (favorites + collections).
@@ -172,6 +176,7 @@ From `c:\Blip\app`:
 - `bug_reports`: in-app bug reports submitted by anyone (admin-visible).
 - `appeal_requests`: appeals submitted by locked users (owner + admin-visible).
 - Storage bucket: `chat-media` (public) for room/business/DM media uploads.
+- Storage bucket: `story-media` (public) for story images.
 
 ### DB functions (RPC) used by the app
 - `compute_level(xp int) -> int`
@@ -296,14 +301,21 @@ The sections below map “product features” to concrete implementation artifac
   - `handleSelectEntity` animates to the pin and opens the in-map sheet (no navigation).
 
 #### B5 – Local feed posts + engagement
-- What it does: shows a local posts feed and lets users react, comment, repost, and save.
+- What it does: shows a local posts feed and lets users like/share/reply.
 - Client:
-  - `DiscoverScreen` loads posts and renders engagement actions.
-  - `PostCommentsScreen` loads and posts comments.
-  - `ProfileScreen` shows a saved posts list from bookmarks.
+  - `FeedScreen` loads posts and renders engagement actions.
+  - `PostRepliesScreen` loads and posts business replies.
 - DB:
-  - `post_reactions`, `post_comments`, `post_reposts`, `post_bookmarks` tables with RLS.
+  - `post_reactions` and `post_comments` are actively used.
   - Engagement counts are computed client-side from per-post rows.
+
+#### B5b – Stories (ephemeral)
+- What it does: users can publish image stories with optional caption and 24-hour expiry.
+- Client:
+  - `FeedScreen` uploads story media, inserts story rows, and renders a story viewer modal.
+- DB:
+  - `stories` table with `expires_at` for TTL behavior.
+  - `story-media` storage bucket for story images.
 
 #### B6 ? Search + filters (rooms/businesses/posts)
 - What it does: searches map entities and posts; filters map results by text + tags.
@@ -383,6 +395,15 @@ The sections below map “product features” to concrete implementation artifac
   - Uses both client-side throttling and DB triggers.
 - DB:
   - `room_messages` is public-readable; inserts rate-limited.
+
+#### C10 — Voice rooms (presence-first)
+- What it does: supports discover/create/join/leave voice rooms with live participant counts.
+- Client:
+  - `MessagesScreen` loads voice rooms, creates new rooms, and toggles participant presence.
+- DB:
+  - `voice_rooms` stores room metadata and status.
+  - `voice_room_participants` stores live listener/host rows.
+  - Full RTC audio transport remains a later layer.
   - Media uploads are stored in `media_type`, `media_url`, `media_meta`.
 
 #### C6 — Direct messaging presence (online/typing/read receipts)
@@ -771,10 +792,10 @@ This section lists missing features (not implemented yet) so you can track rollo
   - Needed to implement: web location permissions + alternate UX for map/geo + responsive layouts.
 
 ### Social features missing (vs Reddit/IG/Snap/BeReal/Discord)
-- Creator-style features: stories/ephemeral post format, highlights, pinned posts (UI placeholder in Feed only).
+- Creator-style features still missing: story highlights and pinned stories/posts.
 
 ### Messaging & community missing (vs Discord/Snap/Bumble)
-- Voice rooms / voice channels (Discord-style) (UI placeholder in Messages only).
+- Voice rooms are presence-live (create/join/leave + counts), but full RTC audio transport is still pending.
 
 ### Local + map experience missing (vs Google Maps/Snap Map)
 - None currently tracked; core map polish and business metadata are implemented.

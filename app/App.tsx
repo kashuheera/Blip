@@ -191,6 +191,27 @@ type PostEntry = {
   longitude?: number | null;
 };
 
+type StoryEntry = {
+  id: string;
+  userId: string | null;
+  authorHandle: string;
+  caption: string;
+  mediaUrl: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
+type VoiceRoomEntry = {
+  id: string;
+  title: string;
+  topic: string | null;
+  city: string | null;
+  status: 'live' | 'scheduled' | 'ended';
+  startedAt: string;
+  participantCount: number;
+  joined: boolean;
+};
+
 type OrderEntry = {
   id: string;
   businessId: string | null;
@@ -1068,6 +1089,30 @@ const getPostDistanceLabel = (
     longitude: post.longitude,
   });
   return formatDistanceLabel(meters);
+};
+
+const formatRelativeTime = (value?: string | null) => {
+  if (!value) {
+    return 'now';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'now';
+  }
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 60 * 1000) {
+    return 'now';
+  }
+  const minutes = Math.floor(diffMs / (60 * 1000));
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h`;
+  }
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
 };
 
 const getFuzzedLocation = async () => {
@@ -2444,6 +2489,13 @@ const FeedScreen = ({ route }: FeedProps) => {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [storiesNotice, setStoriesNotice] = useState<string | null>(null);
+  const [storiesLoading, setStoriesLoading] = useState(false);
+  const [stories, setStories] = useState<StoryEntry[]>([]);
+  const [storyMediaUrl, setStoryMediaUrl] = useState<string | null>(null);
+  const [storyCaption, setStoryCaption] = useState('');
+  const [storyUploading, setStoryUploading] = useState(false);
+  const [storySubmitting, setStorySubmitting] = useState(false);
+  const [activeStory, setActiveStory] = useState<StoryEntry | null>(null);
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
@@ -2452,7 +2504,6 @@ const FeedScreen = ({ route }: FeedProps) => {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const tags = ['food', 'events', 'jobs', 'deals', 'study'];
-  const storyLabels = ['Food finds', 'Events', 'Deals', 'Study'];
 
   const loadPosts = async () => {
     if (!supabase) {
@@ -2528,6 +2579,49 @@ const FeedScreen = ({ route }: FeedProps) => {
     setLoading(false);
   };
 
+  const loadStories = async () => {
+    if (!supabase) {
+      setStories([
+        {
+          id: 'story-demo-1',
+          userId: null,
+          authorHandle: 'lahorelocal',
+          caption: 'Fresh lunch deals around Askari 11.',
+          mediaUrl:
+            'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80',
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        },
+      ]);
+      return;
+    }
+    setStoriesLoading(true);
+    const { data, error } = await supabase
+      .from('stories')
+      .select('id, user_id, author_handle, caption, media_url, created_at, expires_at')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(40);
+    if (error) {
+      setStoriesNotice('Unable to load stories right now.');
+      setStoriesLoading(false);
+      return;
+    }
+    const nextStories = (data ?? [])
+      .map((row) => ({
+        id: String(row.id ?? ''),
+        userId: row.user_id ? String(row.user_id) : null,
+        authorHandle: row.author_handle ?? 'blip',
+        caption: row.caption ?? '',
+        mediaUrl: row.media_url ?? '',
+        createdAt: row.created_at ?? '',
+        expiresAt: row.expires_at ?? '',
+      }))
+      .filter((entry) => entry.id.length > 0 && entry.mediaUrl.length > 0);
+    setStories(nextStories);
+    setStoriesLoading(false);
+  };
+
   useEffect(() => {
     let isMounted = true;
     void loadPosts();
@@ -2541,6 +2635,28 @@ const FeedScreen = ({ route }: FeedProps) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
         if (isMounted) {
           void loadPosts();
+        }
+      })
+      .subscribe();
+    return () => {
+      isMounted = false;
+      channel.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    void loadStories();
+    if (!supabase) {
+      return () => {
+        isMounted = false;
+      };
+    }
+    const channel = supabase
+      .channel('feed-stories')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, () => {
+        if (isMounted) {
+          void loadStories();
         }
       })
       .subscribe();
@@ -2657,6 +2773,67 @@ const FeedScreen = ({ route }: FeedProps) => {
     navigation.navigate('PostReplies', { postId: post.id, authorHandle: post.authorHandle });
   };
 
+  const handleAttachStoryMedia = async () => {
+    if (!userId) {
+      setStoriesNotice('Sign in to publish a story.');
+      return;
+    }
+    setStoryUploading(true);
+    setStoriesNotice(null);
+    const upload = await pickAndUploadImage('story-media', `stories/${userId}`);
+    if (!upload.url) {
+      setStoriesNotice(
+        upload.error === 'permission' ? 'Photo permission denied for stories.' : 'Story upload canceled.'
+      );
+      setStoryUploading(false);
+      return;
+    }
+    setStoryMediaUrl(upload.url);
+    setStoryUploading(false);
+  };
+
+  const handlePostStory = async () => {
+    if (!supabase) {
+      setStoriesNotice('Supabase is not configured.');
+      return;
+    }
+    if (!userId) {
+      setStoriesNotice('Sign in to publish a story.');
+      return;
+    }
+    if (!storyMediaUrl) {
+      setStoriesNotice('Attach story media first.');
+      return;
+    }
+    const moderation = await runModerationCheck({
+      content_type: 'story',
+      text: storyCaption.trim(),
+      image_url: storyMediaUrl,
+    });
+    if (!moderation.allowed) {
+      setStoriesNotice('Story blocked by safety checks.');
+      return;
+    }
+    setStorySubmitting(true);
+    const { error } = await supabase.from('stories').insert({
+      user_id: userId,
+      author_handle: profile?.handle ?? 'blip',
+      caption: storyCaption.trim(),
+      media_url: storyMediaUrl,
+    });
+    if (error) {
+      setStoriesNotice('Unable to publish story.');
+      setStorySubmitting(false);
+      return;
+    }
+    setStoryCaption('');
+    setStoryMediaUrl(null);
+    setStoriesNotice('Story published.');
+    setStorySubmitting(false);
+    void trackAnalyticsEvent('story_create', { has_caption: Boolean(storyCaption.trim()) }, userId);
+    void loadStories();
+  };
+
   const feedHeader = (
     <View style={styles.feedHeader}>
       <View style={styles.card}>
@@ -2709,17 +2886,59 @@ const FeedScreen = ({ route }: FeedProps) => {
             </Pressable>
           ))}
         </View>
-        <View style={styles.storyRow}>
-          {storyLabels.map((label) => (
-            <Pressable
-              key={label}
-              style={styles.storyPill}
-              onPress={() => setStoriesNotice('Stories setup pending. Coming soon.')}
-            >
-              <Text style={styles.storyPillText}>{label}</Text>
-            </Pressable>
-          ))}
+        <SectionTitle icon="sparkles-outline" label="Stories" />
+        <TextInput
+          style={styles.input}
+          placeholder="Story caption (optional)"
+          placeholderTextColor={colors.placeholder}
+          value={storyCaption}
+          onChangeText={setStoryCaption}
+          maxLength={120}
+        />
+        {storyMediaUrl ? <Image source={{ uri: storyMediaUrl }} style={styles.storyPreviewImage} /> : null}
+        <View style={styles.storyComposerRow}>
+          <Pressable style={styles.secondaryButton} onPress={() => void handleAttachStoryMedia()}>
+            <Text style={styles.secondaryButtonText}>
+              {storyUploading ? 'Uploading...' : storyMediaUrl ? 'Change image' : 'Add image'}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={styles.primaryButton}
+            onPress={() => void handlePostStory()}
+            disabled={storySubmitting || !storyMediaUrl}
+          >
+            <Text style={styles.primaryButtonText}>
+              {storySubmitting ? 'Posting...' : 'Post story'}
+            </Text>
+          </Pressable>
         </View>
+        {storiesLoading ? (
+          <View style={styles.storyRow}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View key={`story-skeleton-${index}`} style={styles.storyPill}>
+                <Text style={styles.storyPillText}>Loading...</Text>
+              </View>
+            ))}
+          </View>
+        ) : stories.length === 0 ? (
+          <Text style={styles.metaText}>No active stories yet.</Text>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.storyCarouselRow}
+          >
+            {stories.map((story) => (
+              <Pressable key={story.id} style={styles.storyCard} onPress={() => setActiveStory(story)}>
+                <Image source={{ uri: story.mediaUrl }} style={styles.storyThumb} />
+                <Text style={styles.storyAuthorText} numberOfLines={1}>
+                  @{story.authorHandle}
+                </Text>
+                <Text style={styles.storyTimeText}>{formatRelativeTime(story.createdAt)}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
         {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null}
         {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
       </View>
@@ -2795,6 +3014,33 @@ const FeedScreen = ({ route }: FeedProps) => {
           )
         }
       />
+      <Modal
+        transparent
+        animationType="fade"
+        visible={Boolean(activeStory)}
+        onRequestClose={() => setActiveStory(null)}
+      >
+        <View style={styles.storyViewerContainer}>
+          <Pressable style={styles.storyViewerBackdrop} onPress={() => setActiveStory(null)} />
+          <View style={styles.storyViewerCard}>
+            {activeStory ? (
+              <>
+                <Image source={{ uri: activeStory.mediaUrl }} style={styles.storyViewerImage} />
+                <View style={styles.storyViewerMeta}>
+                  <Text style={styles.cardTitle}>@{activeStory.authorHandle}</Text>
+                  <Text style={styles.metaText}>
+                    Posted {formatRelativeTime(activeStory.createdAt)} ago
+                  </Text>
+                  {activeStory.caption ? <Text style={styles.cardBody}>{activeStory.caption}</Text> : null}
+                </View>
+                <Pressable style={styles.secondaryButton} onPress={() => setActiveStory(null)}>
+                  <Text style={styles.secondaryButtonText}>Close</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
       <BottomNav />
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -3235,10 +3481,82 @@ const MessagesScreen = () => {
   const [messagesTab, setMessagesTab] = useState<'business' | 'direct'>('business');
   const [searchValue, setSearchValue] = useState('');
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const [voiceRooms, setVoiceRooms] = useState<VoiceRoomEntry[]>([]);
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voiceTitle, setVoiceTitle] = useState('');
+  const [voiceTopic, setVoiceTopic] = useState('');
+  const [voiceCreating, setVoiceCreating] = useState(false);
   const [directThreads, setDirectThreads] = useState<
     { id: string; handle: string; lastMessage: string; time: string }[]
   >([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
+
+  const refreshVoiceRooms = async () => {
+    if (!supabase) {
+      setVoiceRooms([
+        {
+          id: 'voice-demo-1',
+          title: 'Lahore Food Talk',
+          topic: 'Late-night food picks in Askari 11',
+          city: 'Lahore',
+          status: 'live',
+          startedAt: new Date().toISOString(),
+          participantCount: 12,
+          joined: false,
+        },
+      ]);
+      return;
+    }
+    setVoiceLoading(true);
+    const { data: roomRows, error } = await supabase
+      .from('voice_rooms')
+      .select('id, title, topic, city, status, started_at')
+      .neq('status', 'ended')
+      .order('started_at', { ascending: false })
+      .limit(30);
+    if (error) {
+      setVoiceNotice('Unable to load voice rooms right now.');
+      setVoiceLoading(false);
+      return;
+    }
+    const roomIds = (roomRows ?? [])
+      .map((row) => String(row.id ?? ''))
+      .filter((id) => id.length > 0);
+    const participantCountMap = new Map<string, number>();
+    const joinedMap = new Set<string>();
+    if (roomIds.length > 0) {
+      const { data: participantRows } = await supabase
+        .from('voice_room_participants')
+        .select('room_id, user_id')
+        .in('room_id', roomIds);
+      (participantRows ?? []).forEach((row) => {
+        const roomId = row.room_id ? String(row.room_id) : '';
+        if (!roomId) {
+          return;
+        }
+        participantCountMap.set(roomId, (participantCountMap.get(roomId) ?? 0) + 1);
+        if (userId && row.user_id === userId) {
+          joinedMap.add(roomId);
+        }
+      });
+    }
+    const nextRooms: VoiceRoomEntry[] = (roomRows ?? []).map((row) => {
+      const roomId = String(row.id ?? '');
+      const status = row.status === 'scheduled' || row.status === 'ended' ? row.status : 'live';
+      return {
+        id: roomId,
+        title: row.title ?? 'Voice room',
+        topic: row.topic ?? null,
+        city: row.city ?? null,
+        status,
+        startedAt: row.started_at ?? '',
+        participantCount: participantCountMap.get(roomId) ?? 0,
+        joined: joinedMap.has(roomId),
+      };
+    });
+    setVoiceRooms(nextRooms);
+    setVoiceLoading(false);
+  };
 
   const refreshThreads = async () => {
     if (!supabase || !userId) {
@@ -3344,9 +3662,125 @@ const MessagesScreen = () => {
       channel?.unsubscribe();
     };
   }, [userId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    void refreshVoiceRooms();
+    if (!supabase) {
+      return () => {
+        isMounted = false;
+      };
+    }
+    const channel = supabase
+      .channel('voice-room-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'voice_rooms' }, () => {
+        if (isMounted) {
+          void refreshVoiceRooms();
+        }
+      })
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'voice_room_participants' },
+        () => {
+          if (isMounted) {
+            void refreshVoiceRooms();
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      isMounted = false;
+      channel.unsubscribe();
+    };
+  }, [userId]);
+
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'messages' }, userId);
   }, [userId]);
+
+  const handleToggleVoiceRoom = async (room: VoiceRoomEntry) => {
+    if (!supabase || !userId) {
+      setVoiceNotice('Sign in to join voice rooms.');
+      return;
+    }
+    if (room.joined) {
+      const { error } = await supabase
+        .from('voice_room_participants')
+        .delete()
+        .eq('room_id', room.id)
+        .eq('user_id', userId);
+      if (error) {
+        setVoiceNotice('Unable to leave the room.');
+        return;
+      }
+      setVoiceNotice('Left voice room.');
+      void trackAnalyticsEvent('voice_room_leave', { room_id: room.id }, userId);
+    } else {
+      const { error } = await supabase.from('voice_room_participants').upsert(
+        {
+          room_id: room.id,
+          user_id: userId,
+          role: 'listener',
+        },
+        { onConflict: 'room_id,user_id' }
+      );
+      if (error) {
+        setVoiceNotice('Unable to join voice room.');
+        return;
+      }
+      setVoiceNotice('Joined as listener. Live audio transport is in beta.');
+      void trackAnalyticsEvent('voice_room_join', { room_id: room.id }, userId);
+    }
+    void refreshVoiceRooms();
+  };
+
+  const handleCreateVoiceRoom = async () => {
+    if (!supabase || !userId) {
+      setVoiceNotice('Sign in to create a voice room.');
+      return;
+    }
+    if (!voiceTitle.trim()) {
+      setVoiceNotice('Add a room title first.');
+      return;
+    }
+    setVoiceCreating(true);
+    const location = await getFuzzedLocation();
+    const { error, data } = await supabase
+      .from('voice_rooms')
+      .insert({
+        title: voiceTitle.trim(),
+        topic: voiceTopic.trim() || null,
+        status: 'live',
+        city: 'Lahore',
+        latitude: location?.latitude ?? null,
+        longitude: location?.longitude ?? null,
+        created_by: userId,
+      })
+      .select('id')
+      .maybeSingle();
+    if (error) {
+      setVoiceNotice('Unable to create voice room.');
+      setVoiceCreating(false);
+      return;
+    }
+    if (data?.id) {
+      await supabase.from('voice_room_participants').upsert(
+        {
+          room_id: data.id,
+          user_id: userId,
+          role: 'host',
+        },
+        { onConflict: 'room_id,user_id' }
+      );
+    }
+    setVoiceTitle('');
+    setVoiceTopic('');
+    setVoiceNotice('Voice room is live.');
+    setVoiceCreating(false);
+    void trackAnalyticsEvent('voice_room_create', { has_topic: Boolean(voiceTopic.trim()) }, userId);
+    void refreshVoiceRooms();
+  };
+
   const isBusinessAccount = profile?.accountType === 'business';
   if (isBusinessAccount) {
     return (
@@ -3407,17 +3841,69 @@ const MessagesScreen = () => {
           </View>
         </View>
         <View style={styles.card}>
-          <SectionTitle icon="mic-outline" label="Voice rooms (coming soon)" />
+          <SectionTitle icon="mic-outline" label="Voice rooms" />
           <Text style={styles.cardBody}>
-            Drop-in audio rooms for your neighborhood and favorite spots.
+            Drop-in neighborhood audio channels. Join/leave presence is live; audio transport is beta.
           </Text>
+          <View style={styles.columnStack}>
+            <TextInput
+              style={styles.input}
+              placeholder="Room title"
+              placeholderTextColor={colors.placeholder}
+              value={voiceTitle}
+              onChangeText={setVoiceTitle}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Topic (optional)"
+              placeholderTextColor={colors.placeholder}
+              value={voiceTopic}
+              onChangeText={setVoiceTopic}
+            />
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() => void handleCreateVoiceRoom()}
+              disabled={voiceCreating}
+            >
+              <Text style={styles.primaryButtonText}>
+                {voiceCreating ? 'Creating...' : 'Create voice room'}
+              </Text>
+            </Pressable>
+          </View>
           {voiceNotice ? <Text style={styles.metaText}>{voiceNotice}</Text> : null}
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => setVoiceNotice('Voice rooms are coming soon.')}
-          >
-            <Text style={styles.secondaryButtonText}>Notify me</Text>
-          </Pressable>
+          {voiceLoading ? (
+            <View style={styles.skeletonStack}>
+              {Array.from({ length: 3 }).map((_, index) => (
+                <SkeletonRowItem key={`voice-skel-${index}`} />
+              ))}
+            </View>
+          ) : voiceRooms.length === 0 ? (
+            <Text style={styles.metaText}>No active voice rooms yet.</Text>
+          ) : (
+            voiceRooms
+              .filter((room) =>
+                searchValue
+                  ? `${room.title} ${room.topic ?? ''}`.toLowerCase().includes(searchValue.toLowerCase())
+                  : true
+              )
+              .map((room) => (
+                <View key={room.id} style={styles.voiceRoomRow}>
+                  <View style={styles.listRowInfo}>
+                    <Text style={styles.cardTitle}>{room.title}</Text>
+                    <Text style={styles.metaText}>
+                      {room.topic ? `${room.topic} • ` : ''}
+                      {room.participantCount} listening • {room.city ?? 'Local'}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={[styles.secondaryButton, styles.voiceJoinButton]}
+                    onPress={() => void handleToggleVoiceRoom(room)}
+                  >
+                    <Text style={styles.secondaryButtonText}>{room.joined ? 'Leave' : 'Join'}</Text>
+                  </Pressable>
+                </View>
+              ))
+          )}
         </View>
         {messagesTab === 'business' ? (
           <View style={styles.card}>
@@ -8993,6 +9479,21 @@ const useStyles = () => {
           flexWrap: 'wrap',
           gap: 8,
         },
+        storyCarouselRow: {
+          flexDirection: 'row',
+          gap: 8,
+        },
+        storyComposerRow: {
+          flexDirection: 'row',
+          gap: space.md,
+        },
+        storyPreviewImage: {
+          width: '100%',
+          height: 160,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
         storyPill: {
           paddingHorizontal: 10,
           paddingVertical: 6,
@@ -9002,6 +9503,73 @@ const useStyles = () => {
         storyPillText: {
           ...type.body12,
           color: colors.text,
+        },
+        storyCard: {
+          width: 96,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.surfaceMuted,
+          padding: space.xs,
+          gap: 4,
+        },
+        storyThumb: {
+          width: '100%',
+          height: 84,
+          borderRadius: 10,
+        },
+        storyAuthorText: {
+          ...type.label12,
+          color: colors.text,
+        },
+        storyTimeText: {
+          ...type.caption12,
+          color: colors.textMuted,
+        },
+        storyViewerContainer: {
+          flex: 1,
+          justifyContent: 'center',
+          padding: space.lg,
+        },
+        storyViewerBackdrop: {
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          backgroundColor: colors.overlay,
+        },
+        storyViewerCard: {
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.surface,
+          overflow: 'hidden',
+          padding: space.sm,
+          gap: space.sm,
+        },
+        storyViewerImage: {
+          width: '100%',
+          height: 260,
+          borderRadius: 12,
+        },
+        storyViewerMeta: {
+          gap: 4,
+        },
+        voiceRoomRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: space.sm,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          padding: space.sm,
+          backgroundColor: colors.surfaceMuted,
+        },
+        voiceJoinButton: {
+          flex: 0,
+          minWidth: 88,
         },
       }),
     [colors]

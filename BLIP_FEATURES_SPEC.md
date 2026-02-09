@@ -25,7 +25,7 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - AI safety: use Moderation API for text + media checks (edge function).
 - Push notifications: native FCM/APNs via edge function + device tokens.
 
-## Implementation snapshot (2026-01-29)
+## Implementation snapshot (2026-02-09)
 - Implemented: map-first Home with clustering + spiderfy + recenter; search overlay with scope; Feed + Create Post.
 - Implemented: Room chat with distance gating; Business profile (menu/offers/Q&A); Reviews storage + UI.
 - Implemented: Orders cart flow + `order_items`; Messages (business list + direct threads + direct chat).
@@ -36,8 +36,9 @@ This spec is a direct conversion of the provided catalog. Anything not already p
 - Implemented: Post engagement (likes + business-only replies) + coarse distance labels.
 - Implemented: Push plumbing (device tokens + test push), but delivery requires FCM/APNS keys.
 - Admin: Business Admin Portal + Blip Admin Portal in-app screens.
-- Implemented: UI placeholders for Stories (Feed) + Voice rooms (Messages).
-- Not implemented yet: magic link/OTP, Google OAuth, payments (provider planned: Safepay), stories/highlights/pinned, voice rooms.
+- Implemented: Stories (image + caption + 24h expiry) in Feed + viewer modal.
+- Implemented: Voice rooms presence (create/join/leave + participant counts) in Messages.
+- Not implemented yet: magic link/OTP, Google OAuth, payments (provider planned: Safepay), story highlights/pinned posts, full RTC voice transport.
 
 ## Scope Tags
 - MVP: required for the first release
@@ -655,10 +656,10 @@ BLIP is a map-first, location-based, pseudonymous social layer + local business 
 - Web support parity (location disabled on web; mobile-first only).
 
 ## Social features missing (vs Reddit/IG/Snap/BeReal/Discord)
-- Creator-style features: stories/ephemeral posts, highlights, pinned posts.
+- Creator-style features still missing: highlights and pinned posts.
 
 ## Messaging & community missing (vs Discord/Snap/Bumble)
-- Voice rooms / voice channels (Discord-style).
+- Full RTC voice rooms / channels (current implementation is presence-first without full audio transport).
 
 ## Local + map experience missing (vs Google Maps/Snap Map)
 - None currently tracked; map polish and business metadata are implemented.

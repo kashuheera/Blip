@@ -27,8 +27,8 @@
 - Customer loyalty / coupon codes
 - Onboarding flow (privacy + interests)
 - Help/support + bug reporting
-- Feed stories placeholder (UI only, coming soon)
-- Voice rooms placeholder (UI only, coming soon)
+- Stories (publish image + caption, 24h expiry, viewer modal)
+- Voice rooms (create room + join/leave presence + participant counts)
 - Business Admin Portal (staff roles/permissions, staff lookup, audit log, menus/offers/orders)
 - Business replies inbox (business-only, recent post replies + thread jump)
 - UI color system applied (brand/reward/categories + map styling)
@@ -45,7 +45,6 @@
 
 ## In-Progress
 - Push notifications: set FCM/APNS keys + redeploy `push-send`
-- Apply KYC verification migration (db push failed: Supabase tenant/user not found)
 
 ## Pending
 - MUST-HAVE before rollout: magic link + email OTP deep-link auth (explicitly deferred)
@@ -58,5 +57,5 @@
 - F3 Paid invites (disabled; no invite system)
 
 ## Upcoming
-- Social: creator-style features (stories/ephemeral posts, highlights, pinned posts) (UI placeholder only)
-- Messaging: voice rooms / voice channels (Discord-style) (UI placeholder only)
+- Social: story highlights + pinned stories/posts
+- Messaging: live voice transport (WebRTC/Agora-style audio channels)
