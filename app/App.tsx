@@ -401,6 +401,8 @@ type AppealEntry = {
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_KEY ?? '';
+const SUPPORT_EMAIL = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? '';
+const GITHUB_ISSUES_URL = process.env.EXPO_PUBLIC_GITHUB_ISSUES_URL ?? '';
 const supabase =
   SUPABASE_URL && SUPABASE_KEY
     ? createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -8662,6 +8664,33 @@ const HelpScreen = () => {
   const styles = useStyles();
   const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const handleEmailSupport = async () => {
+    if (!SUPPORT_EMAIL.trim()) {
+      Alert.alert('Not configured', 'Support email is not configured yet.');
+      return;
+    }
+    const subject = encodeURIComponent('BLIP support');
+    const body = encodeURIComponent(`App version: ${APP_VERSION}\nPlatform: ${Platform.OS}\n\nHow can we help?\n`);
+    try {
+      await Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`);
+    } catch {
+      Alert.alert('Unable to open email', 'No email app is available on this device.');
+    }
+  };
+
+  const handleOpenIssues = async () => {
+    if (!GITHUB_ISSUES_URL.trim()) {
+      Alert.alert('Not configured', 'GitHub issues URL is not configured yet.');
+      return;
+    }
+    try {
+      await Linking.openURL(GITHUB_ISSUES_URL);
+    } catch {
+      Alert.alert('Unable to open', 'Could not open the issues page.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
@@ -8698,11 +8727,11 @@ const HelpScreen = () => {
           <SectionTitle icon="mail-outline" label="Contact support" />
           <Text style={styles.cardBody}>Need help? Reach our team.</Text>
           <View style={styles.rowBetween}>
-            <Pressable style={styles.secondaryButton}>
+            <Pressable style={styles.secondaryButton} onPress={() => void handleEmailSupport()}>
               <Text style={styles.secondaryButtonText}>Email support</Text>
             </Pressable>
-            <Pressable style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Live chat</Text>
+            <Pressable style={styles.secondaryButton} onPress={() => void handleOpenIssues()}>
+              <Text style={styles.secondaryButtonText}>Report issue</Text>
             </Pressable>
           </View>
         </View>
@@ -8728,6 +8757,21 @@ const BugReportScreen = () => {
   const [details, setDetails] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleOpenIssues = async () => {
+    if (!GITHUB_ISSUES_URL.trim()) {
+      Alert.alert('Not configured', 'GitHub issues URL is not configured yet.');
+      return;
+    }
+    const url = title.trim()
+      ? `${GITHUB_ISSUES_URL}/new?title=${encodeURIComponent(title.trim())}`
+      : GITHUB_ISSUES_URL;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Unable to open', 'Could not open the issues page.');
+    }
+  };
 
   const handleSubmit = async () => {
     if (!supabase) {
@@ -8780,6 +8824,9 @@ const BugReportScreen = () => {
         {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
         <Pressable style={styles.primaryButton} onPress={() => void handleSubmit()} disabled={submitting}>
           <Text style={styles.primaryButtonText}>{submitting ? 'Sending...' : 'Submit'}</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => void handleOpenIssues()}>
+          <Text style={styles.secondaryButtonText}>Open GitHub issues</Text>
         </Pressable>
       </View>
       <StatusBar style="auto" />
