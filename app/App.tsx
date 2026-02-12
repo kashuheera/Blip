@@ -6467,6 +6467,10 @@ const AuthScreen = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [legalModal, setLegalModal] = useState<'terms' | 'privacy' | null>(null);
+  const [adminPassVisible, setAdminPassVisible] = useState(false);
+  const [adminPassValue, setAdminPassValue] = useState('');
+  const [adminPassSubmitting, setAdminPassSubmitting] = useState(false);
+  const adminPasskey = process.env.EXPO_PUBLIC_ADMIN_PASSKEY ?? 'blip-admin';
   const versionLabel = useMemo(() => {
     const raw = APP_VERSION.startsWith('v') ? APP_VERSION.slice(1) : APP_VERSION;
     const parts = raw.split('.');
@@ -6558,6 +6562,29 @@ const AuthScreen = () => {
   const handleBackToProviders = () => {
     setNotice(null);
     setStep('providers');
+  };
+
+  const handleAdminAttempt = () => {
+    setNotice(null);
+    setAdminPassVisible(true);
+    setAdminPassValue('');
+  };
+
+  const handleAdminSubmit = () => {
+    if (!adminPassValue.trim()) {
+      setNotice('Enter the admin passkey.');
+      return;
+    }
+    setAdminPassSubmitting(true);
+    const isValid = adminPassValue.trim() === adminPasskey;
+    setAdminPassSubmitting(false);
+    if (!isValid) {
+      setNotice('Invalid admin passkey.');
+      return;
+    }
+    setAdminPassVisible(false);
+    setAdminPassValue('');
+    navigation.navigate('AdminPortal');
   };
 
   return (
@@ -6719,11 +6746,8 @@ const AuthScreen = () => {
               )}
             </View>
             <View style={styles.authFooterLinks}>
-              <Pressable onPress={() => navigation.navigate('AdminPortal')}>
+              <Pressable onPress={handleAdminAttempt}>
                 <Text style={styles.linkText}>Admin</Text>
-              </Pressable>
-              <Pressable onPress={() => navigation.navigate('Demo')}>
-                <Text style={styles.linkText}>Demo</Text>
               </Pressable>
             </View>
           </View>
@@ -6751,6 +6775,42 @@ const AuthScreen = () => {
                       : 'Terms and conditions drafting is in progress. For the demo, assume: posts are ephemeral; abuse and fraud are prohibited; Blip may suspend accounts for safety.'}
                   </Text>
                 </ScrollView>
+              </View>
+            </View>
+          </Modal>
+          <Modal
+            transparent
+            animationType="fade"
+            visible={adminPassVisible}
+            onRequestClose={() => setAdminPassVisible(false)}
+          >
+            <View style={styles.modalBackdrop}>
+              <View style={styles.modalCard}>
+                <SectionTitle icon="key-outline" label="Admin access" />
+                <Text style={styles.metaText}>Enter admin passkey to open the portal.</Text>
+                <TextInput
+                  style={styles.input}
+                  value={adminPassValue}
+                  onChangeText={setAdminPassValue}
+                  placeholder="Passkey"
+                  placeholderTextColor={colors.placeholder}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+                <View style={styles.modalButtons}>
+                  <Pressable style={styles.secondaryButton} onPress={() => setAdminPassVisible(false)}>
+                    <Text style={styles.secondaryButtonText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.primaryButton}
+                    disabled={adminPassSubmitting}
+                    onPress={handleAdminSubmit}
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      {adminPassSubmitting ? 'Checking...' : 'Enter'}
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
           </Modal>
