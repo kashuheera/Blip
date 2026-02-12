@@ -5016,26 +5016,16 @@ const OrdersScreen = () => {
   const [orders, setOrders] = useState<OrderEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [complaintOrderId, setComplaintOrderId] = useState<string | null>(null);
+  const [complaintText, setComplaintText] = useState('');
+  const [complaintSubmitting, setComplaintSubmitting] = useState(false);
   const [orderNotes, setOrderNotes] = useState('');
   const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]); 
   const [menuLoading, setMenuLoading] = useState(false); 
   const [cartItems, setCartItems] = useState<CartItemEntry[]>([]); 
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup'); 
   const [deliveryAddress, setDeliveryAddress] = useState(''); 
-  const [userPrivate, setUserPrivate] = useState<{
-    fullName: string;
-    phone: string;
-    address: string;
-    cnic: string;
-    status: string;
-  } | null>(null);
   const [userPrivateById, setUserPrivateById] = useState<Record<string, { name: string; phone: string; address: string }>>({});
-  const [lastReceipt, setLastReceipt] = useState<{ 
-    orderId: string; 
-    businessName: string; 
-    items: CartItemEntry[]; 
-    totalCents: number; 
-  } | null>(null); 
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
     businessList[0]?.id ?? null
   );
@@ -5044,40 +5034,6 @@ const OrdersScreen = () => {
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'orders' }, userId);
   }, [userId]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadPrivate = async () => {
-      if (!supabase || !userId || isBusinessAccount) {
-        return;
-      }
-      const { data } = await supabase
-        .from('user_private')
-        .select('full_name, phone, address, cnic, kyc_status')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (!isMounted) {
-        return;
-      }
-      if (data) {
-        const nextPrivate = {
-          fullName: data.full_name ?? '',
-          phone: data.phone ?? '',
-          address: data.address ?? '',
-          cnic: data.cnic ?? '',
-          status: data.kyc_status ?? 'pending',
-        };
-        setUserPrivate(nextPrivate);
-        if (nextPrivate.address && !deliveryAddress) {
-          setDeliveryAddress(nextPrivate.address);
-        }
-      }
-    };
-    void loadPrivate();
-    return () => {
-      isMounted = false;
-    };
-  }, [userId, isBusinessAccount, deliveryAddress]);
 
   const businessIndex = useMemo(() => {
     const map = new Map<string, string>();
@@ -5333,128 +5289,50 @@ const OrdersScreen = () => {
     };
   }, [userId]);
 
-  const handleCreateOrder = async () => {
-    if (!supabase) {
-      setNotice('Supabase not configured.');
-      return;
-    }
-    if (isBusinessAccount) {
-      setNotice('Business accounts cannot place orders.');
-      return;
-    }
-    if (!userId) {
-      setNotice('Sign in to place orders.');
-      return;
-    }
-    if (!userPrivate || !userPrivate.fullName || !userPrivate.phone || !userPrivate.address) {
-      setNotice('Complete your KYC details (name, phone, address) to place orders.');
-      return;
-    }
-    if (!selectedBusinessId) {
-      setNotice('Select a business first.');
-      return;
-    }
-    if (cartItems.length === 0) {
-      setNotice('Add at least one item.');
-      return;
-    }
-    if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
-      setNotice('Add a delivery address.');
-      return;
-    }
-    setNotice(null);
-    const { data, error } = await supabase
-      .from('orders')
-      .insert({
-        business_id: selectedBusinessId,
-        user_id: userId,
-        status: 'requested',
-        notes: orderNotes.trim() ? orderNotes.trim() : null,
-        delivery_method: deliveryMethod,
-        delivery_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
-      })
-      .select('id')
-      .maybeSingle();
-    if (error || !data?.id) {
-      setNotice('Unable to create order.');
-    } else {
-      const orderId = String(data.id);
-      await supabase.from('order_items').insert(
-        cartItems.map((item) => ({
-          order_id: orderId,
-          menu_item_id: item.id,
-          quantity: item.quantity,
-          price_cents: item.priceCents,
-        }))
-      );
-      setOrderNotes(''); 
-      setLastReceipt({ 
-        orderId, 
-        businessName: selectedBusinessId 
-          ? businessIndex.get(selectedBusinessId) ?? 'Business' 
-          : 'Business', 
-        items: cartItems, 
-        totalCents: cartTotalCents, 
-      }); 
-      setCartItems([]); 
-      setNotice('Order requested.'); 
-      void trackAnalyticsEvent('order_place', { business_id: selectedBusinessId }, userId); 
-      if (selectedBusinessId) { 
-        const { data: ownerRow } = await supabase 
-          .from('businesses') 
-          .select('owner_id')
-          .eq('id', selectedBusinessId)
-          .maybeSingle();
-        const ownerId = ownerRow?.owner_id ?? null;
-        const recipients = [userId, ownerId].filter(
-          (entry): entry is string => typeof entry === 'string' && entry.length > 0
-        );
-        if (recipients.length > 0) {
-          await supabase.functions.invoke('push-send', {
-            body: {
-              user_ids: recipients,
-              title: 'BLIP',
-              body: 'New order received.',
-              data: { type: 'order', order_id: orderId },
-            },
-          });
-        }
-      }
-      void refreshOrders();
-    }
-  };
+  const isActiveOrder = (status: string | null | undefined) =>
+    status !== 'completed' && status !== 'cancelled';
 
-  const sendReceiptEmail = async () => { 
-    if (!lastReceipt) { 
-      setNotice('Submit an order first to email the receipt.'); 
-      return; 
-    } 
-    const subject = `Blip order receipt #${lastReceipt.orderId.slice(0, 6)}`; 
-    const lines = [ 
-      `Business: ${lastReceipt.businessName}`, 
-      `Method: ${deliveryMethod === 'delivery' ? 'Delivery' : 'Pickup'}`, 
-      ...lastReceipt.items.map((item) => { 
-        const total = ((item.priceCents ?? 0) * item.quantity) / 100; 
-        return `${item.name} x${item.quantity} — Rs ${total.toFixed(0)}`; 
-      }), 
-      `Total: Rs ${(lastReceipt.totalCents / 100).toFixed(0)}`, 
-      orderNotes ? `Notes: ${orderNotes}` : null, 
-    ].filter(Boolean); 
-    const body = encodeURIComponent(lines.join('\n')); 
-    const to = SUPPORT_EMAIL || ''; 
-    const mailtoUrl = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${body}`; 
-    try { 
-      const supported = await Linking.canOpenURL(mailtoUrl); 
-      if (!supported) { 
-        setNotice('Email client not available.'); 
-        return; 
-      } 
-      await Linking.openURL(mailtoUrl); 
-      setNotice('Opened email composer.'); 
-    } catch { 
-      setNotice('Unable to open email composer.'); 
-    } 
-  }; 
+  const sortedOrders = useMemo(
+    () =>
+      orders
+        .slice()
+        .sort((a, b) => {
+          const aActive = isActiveOrder(a.status);
+          const bActive = isActiveOrder(b.status);
+          if (aActive !== bActive) {
+            return aActive ? -1 : 1;
+          }
+          return (b.createdAt ?? '').localeCompare(a.createdAt ?? '');
+        }),
+    [orders]
+  );
+
+  const submitComplaint = async () => {
+    if (!supabase || !userId || !complaintOrderId) {
+      setNotice('Sign in to file a complaint.');
+      return;
+    }
+    if (complaintText.trim().length < 6) {
+      setNotice('Please add a short description of the issue.');
+      return;
+    }
+    setComplaintSubmitting(true);
+    const { error } = await supabase.from('reports').insert({
+      reporter_id: userId,
+      target_type: 'order',
+      target_id: complaintOrderId,
+      reason: complaintText.trim(),
+      status: 'open',
+    });
+    setComplaintSubmitting(false);
+    if (error) {
+      setNotice('Unable to submit complaint right now.');
+      return;
+    }
+    setComplaintText('');
+    setComplaintOrderId(null);
+    setNotice('Complaint submitted. Our team will review it.');
+  };
   const orderHeader = isBusinessAccount ? (
     <View style={styles.card}>
       <SectionTitle icon="briefcase-outline" label="Business orders" />
@@ -5464,21 +5342,20 @@ const OrdersScreen = () => {
     </View>
   ) : (
     <View style={styles.card}>
-      <SectionTitle icon="receipt-outline" label="Order flow" />
-      <Text style={styles.cardBody}>Pickup or delivery handled by the business.</Text>
-      {!userId ? <Text style={styles.metaText}>Sign in to place an order.</Text> : null}
+      <SectionTitle icon="receipt-outline" label="Your orders" />
+      <Text style={styles.cardBody}>Read-only: view active & past orders. Ordering is disabled here.</Text>
+      {!userId ? <Text style={styles.metaText}>Sign in to see your orders.</Text> : null}
       {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-      {!userPrivate || !userPrivate.fullName || !userPrivate.phone || !userPrivate.address ? (
-        <Text style={styles.metaText}>Complete your KYC details (name, phone, address).</Text>
-      ) : (
-        <Text style={styles.metaText}>KYC status: {userPrivate.status}</Text>
-      )}
-      <View style={styles.stepRow}>
-        <View style={styles.stepBadge}>
-          <Text style={styles.stepBadgeText}>1</Text>
-        </View>
-        <Text style={styles.metaText}>Select business</Text>
-      </View>
+      <Text style={styles.metaText}>Draft carts stay local per business for now.</Text>
+    </View> 
+  ); 
+
+  const draftCartCard = isBusinessAccount ? null : (
+    <View style={styles.card}>
+      <SectionTitle icon="cart-outline" label="Draft carts (per business)" />
+      <Text style={styles.metaText}>
+        Add items to draft carts. Checkout is disabled in this build; drafts stay on-device.
+      </Text>
       <View style={styles.filterRow}>
         {businessList.map((business) => (
           <Pressable
@@ -5499,12 +5376,6 @@ const OrdersScreen = () => {
             </Text>
           </Pressable>
         ))}
-      </View>
-      <View style={styles.stepRow}>
-        <View style={styles.stepBadge}>
-          <Text style={styles.stepBadgeText}>2</Text>
-        </View>
-        <Text style={styles.metaText}>Choose pickup or delivery</Text>
       </View>
       <View style={styles.filterRow}>
         {(['pickup', 'delivery'] as const).map((method) => (
@@ -5532,16 +5403,10 @@ const OrdersScreen = () => {
           style={styles.input}
           value={deliveryAddress}
           onChangeText={setDeliveryAddress}
-          placeholder="Delivery address"
+          placeholder="Delivery address (draft)"
           placeholderTextColor={colors.placeholder}
         />
       ) : null}
-      <View style={styles.stepRow}>
-        <View style={styles.stepBadge}>
-          <Text style={styles.stepBadgeText}>3</Text>
-        </View>
-        <Text style={styles.metaText}>Add items (menu tab)</Text>
-      </View>
       {menuLoading ? <Text style={styles.metaText}>Loading menu...</Text> : null}
       {menuItems.length === 0 ? (
         <Text style={styles.metaText}>No menu items yet.</Text>
@@ -5569,72 +5434,44 @@ const OrdersScreen = () => {
           );
         })
       )}
-      <View style={styles.stepRow}>
-        <View style={styles.stepBadge}>
-          <Text style={styles.stepBadgeText}>4</Text>
-        </View>
-        <Text style={styles.metaText}>Add order notes</Text>
-      </View>
       <View style={styles.cartSummary}>
-        <Text style={styles.cardTitle}>Cart total</Text>
+        <Text style={styles.cardTitle}>Draft total</Text>
         <Text style={styles.cardTitle}>Rs {(cartTotalCents / 100).toFixed(0)}</Text>
       </View>
       <TextInput
         style={styles.input}
         value={orderNotes}
         onChangeText={setOrderNotes}
-        placeholder="Order notes (optional)"
+        placeholder="Draft notes (saved locally)"
         placeholderTextColor={colors.placeholder}
       />
-      <Pressable style={styles.primaryButton} onPress={() => void handleCreateOrder()}>
-        <Text style={styles.primaryButtonText}>Submit order</Text>
-      </Pressable>
-      {lastReceipt ? (
-        <View style={styles.receiptCard}>
-          <Text style={styles.cardTitle}>Receipt</Text>
-          <Text style={styles.metaText}>Order #{lastReceipt.orderId.slice(0, 6)}</Text>
-          <Text style={styles.metaText}>{lastReceipt.businessName}</Text>
-          <Text style={styles.metaText}>
-            Method: {deliveryMethod === 'delivery' ? 'Delivery' : 'Pickup'}
-          </Text>
-          {lastReceipt.items.map((item) => (
-            <View key={item.id} style={styles.rowBetween}>
-              <Text style={styles.metaText}>{item.name}</Text>
-              <Text style={styles.metaText}>
-                x{item.quantity} â€¢ Rs{' '}
-                {item.priceCents ? ((item.priceCents * item.quantity) / 100).toFixed(0) : '0'}
-              </Text>
-            </View>
-          ))}
-          <View style={styles.rowBetween}>
-            <Text style={styles.cardTitle}>Total</Text>
-            <Text style={styles.cardTitle}>Rs {(lastReceipt.totalCents / 100).toFixed(0)}</Text>
-          </View>
-        </View>
-      ) : null} 
-      <Pressable 
-        style={styles.secondaryButton} 
-        onPress={() => void sendReceiptEmail()} 
-      > 
-        <Text style={styles.secondaryButtonText}>Email receipt</Text> 
-      </Pressable> 
-      <Text style={styles.metaText}>SMS receipts coming soon.</Text> 
-    </View> 
-  ); 
+      <Text style={styles.metaText}>Checkout disabled. Businesses will handle fulfillment when enabled.</Text>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <AppHeader />
       <FlatList
         contentContainerStyle={styles.listContent}
-        data={orders}
+        data={sortedOrders}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={orderHeader}
+        ListHeaderComponent={() => (
+          <View style={styles.listHeaderStack}>
+            {orderHeader}
+            {draftCartCard}
+          </View>
+        )}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.rowBetween}>
               <Text style={styles.cardTitle}>{item.businessName}</Text>
-              <Text style={styles.badge}>{item.status}</Text>
+              <View style={styles.statusPillRow}>
+                <Text style={styles.badge}>{item.status}</Text>
+                <Text style={styles.metaText}>
+                  {isActiveOrder(item.status) ? 'Active' : 'Past'}
+                </Text>
+              </View>
             </View>
             {item.deliveryMethod ? (
               <View style={styles.metaRow}>
@@ -5665,12 +5502,62 @@ const OrdersScreen = () => {
               <Ionicons name="time-outline" size={ICON_SIZES.xs} color={colors.textMuted} />
               <Text style={styles.metaText}>{item.createdAt || 'Recently'}</Text>
             </View>
+            {!isBusinessAccount ? (
+              <View style={styles.cardActionRow}>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    setComplaintOrderId(item.id);
+                    setComplaintText('');
+                  }}
+                >
+                  <Text style={styles.secondaryButtonText}>Complain</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         )}
         ListEmptyComponent={
           loading ? null : <Text style={styles.listEmpty}>No orders yet.</Text>
         }
       />
+      <Modal
+        visible={!!complaintOrderId}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setComplaintOrderId(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <SectionTitle icon="alert-circle-outline" label="Order complaint" />
+            <Text style={styles.metaText}>
+              Describe the issue for order #{complaintOrderId?.slice(0, 6) ?? ''}
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={complaintText}
+              onChangeText={setComplaintText}
+              placeholder="Issue details"
+              placeholderTextColor={colors.placeholder}
+              multiline
+            />
+            <View style={styles.modalButtons}>
+              <Pressable style={styles.secondaryButton} onPress={() => setComplaintOrderId(null)}>
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={styles.primaryButton}
+                disabled={complaintSubmitting}
+                onPress={() => void submitComplaint()}
+              >
+                <Text style={styles.primaryButtonText}>
+                  {complaintSubmitting ? 'Submitting…' : 'Submit'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <BottomNav />
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -10651,6 +10538,9 @@ const useStyles = () => {
           padding: space.lg,
           gap: space.sm,
         },
+        listHeaderStack: {
+          gap: space.sm,
+        },
         scrollContent: {
           padding: space.lg,
           gap: space.sm,
@@ -10686,6 +10576,38 @@ const useStyles = () => {
         listRowInfo: {
           flex: 1,
           gap: 4,
+        },
+        statusPillRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.xs,
+        },
+        cardActionRow: {
+          marginTop: space.sm,
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+        },
+        modalBackdrop: {
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.55)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: space.lg,
+        },
+        modalCard: {
+          width: '100%',
+          maxWidth: 440,
+          borderRadius: space.lg,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.surface,
+          padding: space.lg,
+          gap: space.sm,
+        },
+        modalButtons: {
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+          gap: space.sm,
         },
         profileHero: {
           borderRadius: 22,
