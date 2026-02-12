@@ -69,19 +69,19 @@ Notifications.setNotificationHandler({
   }),
 });
 
-type RootStackParamList = {
-  Home: undefined;
-  Feed: { search?: string } | undefined;
-  PostReplies: { postId: string; authorHandle: string } | undefined;
-  BusinessReplies: undefined;
-  Create: undefined;
-  Messages: undefined;
-  VoiceRoom: { roomId: string; title: string } | undefined;
-  DirectChat: { threadId: string; title: string } | undefined;
-  Orders: undefined;
-  Profile: undefined;
-  Account: undefined;
-  UserProfile: { handle: string } | undefined;
+type RootStackParamList = { 
+  Home: undefined; 
+  Feed: { search?: string } | undefined; 
+  PostReplies: { postId: string; authorHandle: string } | undefined; 
+  BusinessReplies: undefined; 
+  Create: undefined; 
+  Messages: undefined; 
+  VoiceRoom: { roomId: string; title: string } | undefined; 
+  DirectChat: { threadId: string; title: string } | undefined; 
+  Orders: undefined; 
+  Profile: undefined; 
+  Account: undefined; 
+  UserProfile: { handle: string } | undefined; 
   Auth: undefined;
   Business: { businessId?: string; tab?: 'menu' | 'qa' | 'reviews' | 'offers' } | undefined;
   Room: { roomId?: string } | undefined;
@@ -196,6 +196,7 @@ type ProfileSummary = {
 type PostEntry = {
   id: string;
   authorHandle: string;
+  userId?: string | null;
   body: string;
   createdAt: string;
   mediaUrl?: string | null;
@@ -1150,11 +1151,11 @@ const SkeletonRowItem = ({ lines = 2 }: { lines?: number }) => {
   );
 };
 
-const BottomNav = () => {
-  const styles = useStyles();
-  const { colors } = useTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const items: { label: string; icon: keyof typeof Ionicons.glyphMap; target: keyof RootStackParamList }[] = [
+const BottomNav = () => { 
+  const styles = useStyles(); 
+  const { colors } = useTheme(); 
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>(); 
+  const items: { label: string; icon: keyof typeof Ionicons.glyphMap; target: keyof RootStackParamList }[] = [ 
     { label: 'Map', icon: 'map-outline', target: 'Home' },
     { label: 'Feed', icon: 'newspaper-outline', target: 'Feed' },
     { label: 'Create', icon: 'add-circle-outline', target: 'Create' },
@@ -1162,11 +1163,11 @@ const BottomNav = () => {
     { label: 'Orders', icon: 'receipt-outline', target: 'Orders' },
   ];
   return (
-    <View style={styles.tabBar}>
-      {items.map((item) => (
-        <Pressable key={item.label} style={styles.tabItem} onPress={() => navigation.navigate(item.target)}>
-          <Ionicons name={item.icon} size={ICON_SIZES.lg} color={colors.text} />
-          <Text style={styles.tabLabel}>{item.label}</Text>
+    <View style={styles.tabBar}> 
+      {items.map((item) => ( 
+        <Pressable key={item.label} style={styles.tabItem} onPress={() => navigation.navigate(item.target)}> 
+          <Ionicons name={item.icon} size={ICON_SIZES.lg} color={colors.text} /> 
+          <Text style={styles.tabLabel}>{item.label}</Text> 
         </Pressable>
       ))}
     </View>
@@ -1231,11 +1232,11 @@ const getPostDistanceLabel = (
   return formatDistanceLabel(meters);
 };
 
-const formatRelativeTime = (value?: string | null) => { 
-  if (!value) { 
-    return 'now'; 
-  } 
-  const date = new Date(value);
+const formatRelativeTime = (value?: string | null) => {  
+  if (!value) {  
+    return 'now';  
+  }  
+  const date = new Date(value); 
   if (Number.isNaN(date.getTime())) {
     return 'now';
   }
@@ -1247,18 +1248,44 @@ const formatRelativeTime = (value?: string | null) => {
   if (minutes < 60) {
     return `${minutes}m`;
   }
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours}h`;
+  const hours = Math.floor(minutes / 60); 
+  if (hours < 24) { 
+    return `${hours}h`; 
+  } 
+  const days = Math.floor(hours / 24);  
+  return `${days}d`;  
+};  
+
+const computeStreak = (dates: string[]): number => {
+  const days = new Set(
+    dates
+      .map((iso) => {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) {
+          return null;
+        }
+        return d.toISOString().slice(0, 10);
+      })
+      .filter((v): v is string => Boolean(v))
+  );
+  let streak = 0;
+  const cursor = new Date();
+  for (;;) {
+    const key = cursor.toISOString().slice(0, 10);
+    if (days.has(key)) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+      continue;
+    }
+    break;
   }
-  const days = Math.floor(hours / 24); 
-  return `${days}d`; 
-}; 
- 
-const splitPostBody = (body: string) => { 
-  const trimmed = body.trim(); 
-  if (!trimmed) { 
-    return { title: 'Untitled post', preview: '' }; 
+  return streak;
+};
+  
+const splitPostBody = (body: string) => {  
+  const trimmed = body.trim();  
+  if (!trimmed) {  
+    return { title: 'Untitled post', preview: '' };  
   } 
   const newlineIndex = trimmed.indexOf('\n'); 
   if (newlineIndex > 0 && newlineIndex < 80) { 
@@ -2476,35 +2503,38 @@ const FeedScreen = ({ route }: FeedProps) => {
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const tags = ['food', 'events', 'jobs', 'deals', 'study'];
 
-  const loadPosts = async () => {
-    if (!supabase) {
-      setPosts([
-        { id: '1', authorHandle: 'steadygarden', body: 'New cafe pop-up near Askari 11.', createdAt: '' },
-        { id: '2', authorHandle: 'blipteam', body: 'Business chats are live for Lahore.', createdAt: '' },
-      ]);
-      return;
-    }
-    setLoading(true);
-    setNotice(null);
-    const { data, error } = await supabase
-      .from('posts')
-      .select('id, author_handle, body, created_at, media_type, media_url, latitude, longitude')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (error) {
-      setNotice('Unable to load feed.');
-      setLoading(false);
-      return;
+  const loadPosts = async () => { 
+    if (!supabase) { 
+      setPosts([ 
+        { id: '1', authorHandle: 'steadygarden', body: 'New cafe pop-up near Askari 11.', createdAt: '' }, 
+        { id: '2', authorHandle: 'blipteam', body: 'Business chats are live for Lahore.', createdAt: '' }, 
+      ]); 
+      return; 
+    } 
+    setLoading(true); 
+    setNotice(null); 
+    const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(); 
+    const { data, error } = await supabase 
+      .from('posts') 
+      .select('id, author_handle, user_id, body, created_at, media_type, media_url, latitude, longitude') 
+      .gt('created_at', cutoff) 
+      .order('created_at', { ascending: false }) 
+      .limit(50); 
+    if (error) { 
+      setNotice('Unable to load feed.'); 
+      setLoading(false); 
+      return; 
     }
     setPosts(
       (data ?? []).map((row) => ({
-        id: String(row.id ?? ''),
-        authorHandle: row.author_handle ?? 'blip',
-        body: row.body ?? '',
-        createdAt: row.created_at ?? '',
-        mediaUrl: row.media_url ?? null,
-        mediaType: row.media_type ?? null,
-        latitude: typeof row.latitude === 'number' ? row.latitude : null,
+        id: String(row.id ?? ''), 
+        authorHandle: row.author_handle ?? 'blip', 
+        userId: row.user_id ? String(row.user_id) : null, 
+        body: row.body ?? '', 
+        createdAt: row.created_at ?? '', 
+        mediaUrl: row.media_url ?? null, 
+        mediaType: row.media_type ?? null, 
+        latitude: typeof row.latitude === 'number' ? row.latitude : null, 
         longitude: typeof row.longitude === 'number' ? row.longitude : null,
       }))
     );
@@ -2714,10 +2744,36 @@ const FeedScreen = ({ route }: FeedProps) => {
     } 
   };  
 
-  const handleReport = (post: PostEntry) => { 
-    setReportingPost(post); 
-    setReportReason(''); 
-    setReportNotice(null); 
+  const handleReport = (post: PostEntry) => {  
+    setReportingPost(post);  
+    setReportReason('');  
+    setReportNotice(null);  
+  };  
+
+  const computeStreak = (dates: string[]): number => { 
+    const days = new Set( 
+      dates 
+        .map((iso) => { 
+          const d = new Date(iso); 
+          if (Number.isNaN(d.getTime())) { 
+            return null; 
+          } 
+          return d.toISOString().slice(0, 10); 
+        }) 
+        .filter((v): v is string => Boolean(v)) 
+    ); 
+    let streak = 0; 
+    const cursor = new Date(); 
+    for (;;) { 
+      const key = cursor.toISOString().slice(0, 10); 
+      if (days.has(key)) { 
+        streak += 1; 
+        cursor.setDate(cursor.getDate() - 1); 
+        continue; 
+      } 
+      break; 
+    } 
+    return streak; 
   }; 
 
   const submitReport = async () => { 
@@ -5580,13 +5636,18 @@ const ProfileScreen = () => {
   const { colors } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { userId, profile, loading } = useAuth();
-  const [ownedBusinessName, setOwnedBusinessName] = useState<string | null>(null);
-  const [kycStatusQuick, setKycStatusQuick] = useState<string | null>(null);
-  const isBusinessAccount = profile?.accountType === 'business';
-  const level = profile?.level ?? 1;
-  const xp = profile?.xp ?? 0;
-  const reputationScore = useMemo(() => {
-    const raw = xp / 10 + level * 5;
+  const [ownedBusinessName, setOwnedBusinessName] = useState<string | null>(null); 
+  const [kycStatusQuick, setKycStatusQuick] = useState<string | null>(null); 
+  const isBusinessAccount = profile?.accountType === 'business'; 
+  const level = profile?.level ?? 1; 
+  const xp = profile?.xp ?? 0; 
+  const [streaks, setStreaks] = useState<{ posts: number; chats: number; orders: number }>({ 
+    posts: 0, 
+    chats: 0, 
+    orders: 0, 
+  }); 
+  const reputationScore = useMemo(() => { 
+    const raw = xp / 10 + level * 5; 
     return Math.max(0, Math.min(100, Math.round(raw)));
   }, [level, xp]);
   const trustLabel = useMemo(() => {
@@ -5618,9 +5679,43 @@ const ProfileScreen = () => {
     return { computedLevel: nextLevel, progress, toNext, threshold };
   }, [xp]);
 
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'profile' }, userId);
-  }, [userId]);
+  useEffect(() => { 
+    void trackAnalyticsEvent('screen_view', { screen: 'profile' }, userId); 
+  }, [userId]); 
+
+  useEffect(() => { 
+    let isMounted = true; 
+    const loadStreaks = async () => { 
+      if (!supabase || !userId) { 
+        return; 
+      } 
+      const [postRows, chatRows, orderRows] = await Promise.all([ 
+        supabase.from('posts').select('created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(120), 
+        supabase 
+          .from('direct_messages') 
+          .select('created_at') 
+          .eq('sender_id', userId) 
+          .order('created_at', { ascending: false }) 
+          .limit(120), 
+        supabase.from('orders').select('created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(120), 
+      ]); 
+      if (!isMounted) { 
+        return; 
+      } 
+      const postDates = (postRows.data ?? []).map((row) => row.created_at ?? ''); 
+      const chatDates = (chatRows.data ?? []).map((row) => row.created_at ?? ''); 
+      const orderDates = (orderRows.data ?? []).map((row) => row.created_at ?? ''); 
+      setStreaks({ 
+        posts: computeStreak(postDates), 
+        chats: computeStreak(chatDates), 
+        orders: computeStreak(orderDates), 
+      }); 
+    }; 
+    void loadStreaks(); 
+    return () => { 
+      isMounted = false; 
+    }; 
+  }, [userId]); 
 
   useEffect(() => {
     let isMounted = true;
@@ -5740,22 +5835,40 @@ const ProfileScreen = () => {
             </Pressable>
           </View>
 
-          <View style={styles.profileStatsPanel}>
-            <View style={styles.profileStatsTop}>
-              <View style={[styles.levelBadge, { backgroundColor: withOpacity(colors.brand, 0.18) }]}>
-                <Text style={[styles.levelBadgeText, { color: colors.brand }]}>Lv {level}</Text>
-              </View>
-              <Text style={styles.profileStatInline}>{xp} XP</Text>
-              <Text style={styles.profileStatInline}>{reputationScore} Rep</Text>
-              <View style={[styles.trustPill, { backgroundColor: withOpacity(colors.prestige, 0.16) }]}>
-                <Text style={[styles.trustPillText, { color: colors.prestige }]}>{trustLabel}</Text>
-              </View>
-            </View>
-            <View style={styles.meterBlock}>
-              <View style={styles.rowBetween}>
-                <Text style={styles.meterLabel}>XP to next level</Text>
-                <Text style={styles.meterMeta}>{xpProgress.toNext} XP</Text>
-              </View>
+        <View style={styles.profileStatsPanel}> 
+          <View style={styles.profileStatsTop}> 
+            <View style={[styles.levelBadge, { backgroundColor: withOpacity(colors.brand, 0.18) }]}> 
+              <Text style={[styles.levelBadgeText, { color: colors.brand }]}>Lv {level}</Text> 
+            </View> 
+            <Text style={styles.profileStatInline}>{xp} XP</Text> 
+            <Text style={styles.profileStatInline}>{reputationScore} Rep</Text> 
+            <View style={[styles.trustPill, { backgroundColor: withOpacity(colors.prestige, 0.16) }]}> 
+              <Text style={[styles.trustPillText, { color: colors.prestige }]}>{trustLabel}</Text> 
+            </View> 
+          </View> 
+          <View style={styles.meterBlock}> 
+            <View style={styles.rowBetween}> 
+              <Text style={styles.meterLabel}>Daily streaks</Text> 
+              <Text style={styles.meterMeta}>Tap any action to extend</Text> 
+            </View> 
+            <View style={styles.rowBetween}> 
+              <Text style={styles.meterMeta}>Posts</Text> 
+              <Text style={styles.meterMeta}>{streaks.posts} days</Text> 
+            </View> 
+            <View style={styles.rowBetween}> 
+              <Text style={styles.meterMeta}>Chats</Text> 
+              <Text style={styles.meterMeta}>{streaks.chats} days</Text> 
+            </View> 
+            <View style={styles.rowBetween}> 
+              <Text style={styles.meterMeta}>Orders</Text> 
+              <Text style={styles.meterMeta}>{streaks.orders} days</Text> 
+            </View> 
+          </View> 
+          <View style={styles.meterBlock}> 
+            <View style={styles.rowBetween}> 
+              <Text style={styles.meterLabel}>XP to next level</Text> 
+              <Text style={styles.meterMeta}>{xpProgress.toNext} XP</Text> 
+            </View> 
               <View style={styles.meterTrack}>
                 <View style={[styles.meterFill, { width: `${Math.round(xpProgress.progress * 100)}%`, backgroundColor: colors.reward }]} />
               </View>
@@ -5772,20 +5885,12 @@ const ProfileScreen = () => {
           </View>
         </View>
 
-        <View style={styles.listGroup}>
-          <ListRow
-            icon="bookmark-outline"
-            title="Saved"
-            subtitle="Posts, rooms, and businesses"
-            rightMeta="Coming soon"
-            onPress={() => Alert.alert('Coming soon', 'Saved items are coming soon.')}
-          />
-          <View style={styles.listDivider} />
-          <ListRow
-            icon="shield-checkmark-outline"
-            title="Safety & verification"
-            subtitle="Phone, device, KYC"
-            rightMeta={safetyMeta}
+        <View style={styles.listGroup}> 
+          <ListRow 
+            icon="shield-checkmark-outline" 
+            title="Safety & verification" 
+            subtitle="Phone, device, KYC" 
+            rightMeta={safetyMeta} 
             onPress={() => navigation.navigate('Account')}
           />
           <View style={styles.listDivider} />
@@ -6291,16 +6396,17 @@ const UserProfileScreen = ({ route }: UserProfileProps) => {
   const styles = useStyles();
   const { userId } = useAuth();
   const handle = route.params?.handle ?? 'user';
-  const [profileData, setProfileData] = useState<{
-    handle: string;
-    level: number;
-    xp: number;
-  } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'user_profile', handle }, userId);
+  const [profileData, setProfileData] = useState<{ 
+    handle: string; 
+    level: number; 
+    xp: number; 
+  } | null>(null); 
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>(); 
+  const [loading, setLoading] = useState(false); 
+  const [notice, setNotice] = useState<string | null>(null); 
+ 
+  useEffect(() => { 
+    void trackAnalyticsEvent('screen_view', { screen: 'user_profile', handle }, userId); 
   }, [handle, userId]);
 
   useEffect(() => {
@@ -6345,22 +6451,25 @@ const UserProfileScreen = ({ route }: UserProfileProps) => {
           <SectionTitle icon="person-outline" label={`@${handle}`} />
           {loading ? <Text style={styles.metaText}>Loading profile...</Text> : null}
           {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
-          {profileData ? (
-            <>
-              <View style={styles.rowBetween}>
-                <Text style={styles.cardTitle}>Level</Text>
-                <Text style={styles.cardTitle}>{profileData.level}</Text>
-              </View>
-              <View style={styles.rowBetween}>
-                <Text style={styles.cardTitle}>XP</Text>
-                <Text style={styles.cardTitle}>{profileData.xp}</Text>
-              </View>
-              <Pressable style={styles.primaryButton} onPress={() => setNotice('Chat requests coming soon.')}>
-                <Text style={styles.primaryButtonText}>Request chat</Text>
-              </Pressable>
-            </>
-          ) : (
-            <Text style={styles.metaText}>This user is unavailable.</Text>
+          {profileData ? ( 
+            <> 
+              <View style={styles.rowBetween}> 
+                <Text style={styles.cardTitle}>Level</Text> 
+                <Text style={styles.cardTitle}>{profileData.level}</Text> 
+              </View> 
+              <View style={styles.rowBetween}> 
+                <Text style={styles.cardTitle}>XP</Text> 
+                <Text style={styles.cardTitle}>{profileData.xp}</Text> 
+              </View> 
+              <Pressable 
+                style={styles.primaryButton} 
+                onPress={() => navigation.navigate('DirectChat', { threadId: `request:${handle}`, title: `@${handle}` })} 
+              > 
+                <Text style={styles.primaryButtonText}>Request chat</Text> 
+              </Pressable> 
+            </> 
+          ) : ( 
+            <Text style={styles.metaText}>This user is unavailable.</Text> 
           )}
         </View>
       </ScrollView>
