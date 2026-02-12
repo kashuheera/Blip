@@ -2463,6 +2463,10 @@ const FeedScreen = ({ route }: FeedProps) => {
   const [storySubmitting, setStorySubmitting] = useState(false); 
   const [storyComposerOpen, setStoryComposerOpen] = useState(false); 
   const [activeStory, setActiveStory] = useState<StoryEntry | null>(null); 
+  const [reportingPost, setReportingPost] = useState<PostEntry | null>(null); 
+  const [reportReason, setReportReason] = useState(''); 
+  const [reportSubmitting, setReportSubmitting] = useState(false); 
+  const [reportNotice, setReportNotice] = useState<string | null>(null); 
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({}); 
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({}); 
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({}); 
@@ -2701,14 +2705,55 @@ const FeedScreen = ({ route }: FeedProps) => {
     );
   }
 
-  const handleShare = async (post: PostEntry) => {
-    try {
-      await Share.share({ message: post.body });
-      void trackAnalyticsEvent('post_share', { post_id: post.id }, userId);
-    } catch {
-      setNotice('Unable to share right now.');
-    }
-  };
+  const handleShare = async (post: PostEntry) => { 
+    try { 
+      await Share.share({ message: post.body }); 
+      void trackAnalyticsEvent('post_share', { post_id: post.id }, userId); 
+    } catch { 
+      setNotice('Unable to share right now.'); 
+    } 
+  }; 
+
+  const handleReport = (post: PostEntry) => { 
+    setReportingPost(post); 
+    setReportReason(''); 
+    setReportNotice(null); 
+  }; 
+
+  const submitReport = async () => { 
+    if (!reportingPost) { 
+      return; 
+    } 
+    if (!supabase || !userId) { 
+      setReportNotice('Sign in to report.'); 
+      return; 
+    } 
+    const reason = reportReason.trim(); 
+    if (reason.length < 4) { 
+      setReportNotice('Add a short reason.'); 
+      return; 
+    } 
+    setReportSubmitting(true); 
+    setReportNotice(null); 
+    const { error } = await supabase.from('reports').insert({ 
+      reporter_id: userId, 
+      target_type: 'post', 
+      target_id: reportingPost.id, 
+      reason, 
+    }); 
+    if (error) { 
+      setReportNotice('Unable to submit report.'); 
+      setReportSubmitting(false); 
+      return; 
+    } 
+    setReportSubmitting(false); 
+    setReportNotice('Report submitted.'); 
+    setTimeout(() => { 
+      setReportingPost(null); 
+      setReportReason(''); 
+      setReportNotice(null); 
+    }, 600); 
+  }; 
 
   const handleLike = async (postId: string) => {
     if (!supabase || !userId) {
@@ -2932,13 +2977,13 @@ const FeedScreen = ({ route }: FeedProps) => {
               style={styles.postCard} 
               onPress={() => handleReply(item)} 
               onLongPress={() => { 
-                Alert.alert('Post options', undefined, [ 
-                  { text: 'Share', onPress: () => void handleShare(item) }, 
-                  { text: 'Report', onPress: () => setNotice('Report is coming soon.') }, 
-                  { text: 'Cancel', style: 'cancel' }, 
-                ]); 
-              }} 
-            > 
+              Alert.alert('Post options', undefined, [ 
+                { text: 'Share', onPress: () => void handleShare(item) }, 
+                { text: 'Report', onPress: () => handleReport(item) }, 
+                { text: 'Cancel', style: 'cancel' }, 
+              ]); 
+            }} 
+          > 
               <View style={styles.postTopRow}> 
                 {(() => { 
                   const key = normalizeCategory(item.body) ?? 'services'; 
@@ -2987,7 +3032,7 @@ const FeedScreen = ({ route }: FeedProps) => {
                   onPress={() => { 
                     Alert.alert('Post options', undefined, [ 
                       { text: 'Share', onPress: () => void handleShare(item) }, 
-                      { text: 'Report', onPress: () => setNotice('Report is coming soon.') }, 
+                      { text: 'Report', onPress: () => handleReport(item) }, 
                       { text: 'Cancel', style: 'cancel' }, 
                     ]); 
                   }} 
@@ -3054,21 +3099,21 @@ const FeedScreen = ({ route }: FeedProps) => {
           ) 
         } 
       /> 
-      <Modal 
-        transparent 
-        animationType="fade" 
-        visible={storyComposerOpen} 
-        onRequestClose={() => setStoryComposerOpen(false)} 
-      > 
-        <View style={styles.storyViewerContainer}> 
-          <Pressable style={styles.storyViewerBackdrop} onPress={() => setStoryComposerOpen(false)} /> 
-          <View style={styles.storyComposerCard}> 
-            <View style={styles.rowBetween}> 
-              <Text style={styles.cardTitle}>New story</Text> 
-              <Pressable style={styles.iconButton} onPress={() => setStoryComposerOpen(false)}> 
-                <Ionicons name="close" size={ICON_SIZES.lg} color={colors.text} /> 
-              </Pressable> 
-            </View> 
+      <Modal  
+        transparent  
+        animationType="fade"  
+        visible={storyComposerOpen}  
+        onRequestClose={() => setStoryComposerOpen(false)}  
+      >  
+        <View style={styles.storyViewerContainer}>  
+          <Pressable style={styles.storyViewerBackdrop} onPress={() => setStoryComposerOpen(false)} />  
+          <View style={styles.storyComposerCard}>  
+            <View style={styles.rowBetween}>  
+              <Text style={styles.cardTitle}>New story</Text>  
+              <Pressable style={styles.iconButton} onPress={() => setStoryComposerOpen(false)}>  
+                <Ionicons name="close" size={ICON_SIZES.lg} color={colors.text} />  
+              </Pressable>  
+            </View>  
             <TextInput 
               style={styles.input} 
               placeholder="Caption (optional)" 
@@ -3095,15 +3140,54 @@ const FeedScreen = ({ route }: FeedProps) => {
               </Pressable> 
             </View> 
             {storiesNotice ? <Text style={styles.metaText}>{storiesNotice}</Text> : null} 
-          </View> 
-        </View> 
-      </Modal> 
-      <Modal 
-        transparent 
-        animationType="fade" 
-        visible={Boolean(activeStory)} 
-        onRequestClose={() => setActiveStory(null)} 
+          </View>  
+        </View>  
+      </Modal>  
+      <Modal
+        transparent
+        animationType="fade"
+        visible={Boolean(reportingPost)}
+        onRequestClose={() => setReportingPost(null)}
       >
+        <View style={styles.storyViewerContainer}>
+          <Pressable style={styles.storyViewerBackdrop} onPress={() => setReportingPost(null)} />
+          <View style={styles.reportCard}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.cardTitle}>Report post</Text>
+              <Pressable style={styles.iconButton} onPress={() => setReportingPost(null)}>
+                <Ionicons name="close" size={ICON_SIZES.lg} color={colors.text} />
+              </Pressable>
+            </View>
+            {reportingPost ? (
+              <Text style={styles.metaText}>@{reportingPost.authorHandle}</Text>
+            ) : null}
+            <TextInput
+              style={[styles.input, styles.multilineInput]}
+              placeholder="Reason (short)"
+              placeholderTextColor={colors.placeholder}
+              value={reportReason}
+              onChangeText={setReportReason}
+              multiline
+            />
+            <Pressable
+              style={[styles.primaryButton, styles.primaryButtonFull]}
+              onPress={() => void submitReport()}
+              disabled={reportSubmitting}
+            >
+              <Text style={styles.primaryButtonText}>
+                {reportSubmitting ? 'Submitting...' : 'Submit report'}
+              </Text>
+            </Pressable>
+            {reportNotice ? <Text style={styles.metaText}>{reportNotice}</Text> : null}
+          </View>
+        </View>
+      </Modal>
+      <Modal  
+        transparent  
+        animationType="fade"  
+        visible={Boolean(activeStory)}  
+        onRequestClose={() => setActiveStory(null)}  
+      > 
         <View style={styles.storyViewerContainer}>
           <Pressable style={styles.storyViewerBackdrop} onPress={() => setActiveStory(null)} />
           <View style={styles.storyViewerCard}>
@@ -11519,6 +11603,14 @@ const useStyles = () => {
           backgroundColor: colors.surface, 
           overflow: 'hidden', 
           padding: space.sm, 
+          gap: space.sm, 
+        }, 
+        reportCard: { 
+          borderRadius: 18, 
+          borderWidth: 1, 
+          borderColor: colors.border, 
+          backgroundColor: colors.surface, 
+          padding: space.md, 
           gap: space.sm, 
         }, 
         storyComposerCard: { 
