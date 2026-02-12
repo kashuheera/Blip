@@ -9331,10 +9331,23 @@ const AdminPortalScreen = () => {
     }
     const { data, error } = await supabase.storage.from('kyc-docs').createSignedUrl(path, 120);
     if (error || !data?.signedUrl) {
-      setNotice('Unable to open document.');
+    setNotice('Unable to open document.');
+    return;
+  }
+  void Linking.openURL(data.signedUrl);
+};
+
+  const handleResolveReport = async (reportId: string) => {
+    if (!supabase) {
       return;
     }
-    void Linking.openURL(data.signedUrl);
+    const { error } = await supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId);
+    if (error) {
+      setNotice('Unable to resolve report right now.');
+      return;
+    }
+    setReports((prev) => prev.filter((r) => r.id !== reportId));
+    setReportsCount((prev) => Math.max(0, prev - 1));
   };
   return (
     <SafeAreaView style={styles.container}>
@@ -9397,6 +9410,12 @@ const AdminPortalScreen = () => {
                 <View style={styles.listRowRight}>
                   <Text style={styles.badge}>{report.status}</Text>
                   <Text style={styles.metaText}>{report.createdAt ?? ''}</Text>
+                  <Pressable
+                    style={styles.secondaryButton}
+                    onPress={() => void handleResolveReport(report.id)}
+                  >
+                    <Text style={styles.secondaryButtonText}>Mark resolved</Text>
+                  </Pressable>
                 </View>
               </View>
             ))
