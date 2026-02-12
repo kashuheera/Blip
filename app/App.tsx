@@ -2712,7 +2712,7 @@ const FeedScreen = ({ route }: FeedProps) => {
     } catch { 
       setNotice('Unable to share right now.'); 
     } 
-  }; 
+  };  
 
   const handleReport = (post: PostEntry) => { 
     setReportingPost(post); 
@@ -4874,11 +4874,11 @@ const OrdersScreen = () => {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [orderNotes, setOrderNotes] = useState('');
-  const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]);
-  const [menuLoading, setMenuLoading] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItemEntry[]>([]);
-  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [menuItems, setMenuItems] = useState<MenuItemEntry[]>([]); 
+  const [menuLoading, setMenuLoading] = useState(false); 
+  const [cartItems, setCartItems] = useState<CartItemEntry[]>([]); 
+  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup'); 
+  const [deliveryAddress, setDeliveryAddress] = useState(''); 
   const [userPrivate, setUserPrivate] = useState<{
     fullName: string;
     phone: string;
@@ -4887,12 +4887,12 @@ const OrdersScreen = () => {
     status: string;
   } | null>(null);
   const [userPrivateById, setUserPrivateById] = useState<Record<string, { name: string; phone: string; address: string }>>({});
-  const [lastReceipt, setLastReceipt] = useState<{
-    orderId: string;
-    businessName: string;
-    items: CartItemEntry[];
-    totalCents: number;
-  } | null>(null);
+  const [lastReceipt, setLastReceipt] = useState<{ 
+    orderId: string; 
+    businessName: string; 
+    items: CartItemEntry[]; 
+    totalCents: number; 
+  } | null>(null); 
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
     businessList[0]?.id ?? null
   );
@@ -5244,21 +5244,21 @@ const OrdersScreen = () => {
           price_cents: item.priceCents,
         }))
       );
-      setOrderNotes('');
-      setLastReceipt({
-        orderId,
-        businessName: selectedBusinessId
-          ? businessIndex.get(selectedBusinessId) ?? 'Business'
-          : 'Business',
-        items: cartItems,
-        totalCents: cartTotalCents,
-      });
-      setCartItems([]);
-      setNotice('Order requested.');
-      void trackAnalyticsEvent('order_place', { business_id: selectedBusinessId }, userId);
-      if (selectedBusinessId) {
-        const { data: ownerRow } = await supabase
-          .from('businesses')
+      setOrderNotes(''); 
+      setLastReceipt({ 
+        orderId, 
+        businessName: selectedBusinessId 
+          ? businessIndex.get(selectedBusinessId) ?? 'Business' 
+          : 'Business', 
+        items: cartItems, 
+        totalCents: cartTotalCents, 
+      }); 
+      setCartItems([]); 
+      setNotice('Order requested.'); 
+      void trackAnalyticsEvent('order_place', { business_id: selectedBusinessId }, userId); 
+      if (selectedBusinessId) { 
+        const { data: ownerRow } = await supabase 
+          .from('businesses') 
           .select('owner_id')
           .eq('id', selectedBusinessId)
           .maybeSingle();
@@ -5281,6 +5281,37 @@ const OrdersScreen = () => {
     }
   };
 
+  const sendReceiptEmail = async () => { 
+    if (!lastReceipt) { 
+      setNotice('Submit an order first to email the receipt.'); 
+      return; 
+    } 
+    const subject = `Blip order receipt #${lastReceipt.orderId.slice(0, 6)}`; 
+    const lines = [ 
+      `Business: ${lastReceipt.businessName}`, 
+      `Method: ${deliveryMethod === 'delivery' ? 'Delivery' : 'Pickup'}`, 
+      ...lastReceipt.items.map((item) => { 
+        const total = ((item.priceCents ?? 0) * item.quantity) / 100; 
+        return `${item.name} x${item.quantity} — Rs ${total.toFixed(0)}`; 
+      }), 
+      `Total: Rs ${(lastReceipt.totalCents / 100).toFixed(0)}`, 
+      orderNotes ? `Notes: ${orderNotes}` : null, 
+    ].filter(Boolean); 
+    const body = encodeURIComponent(lines.join('\n')); 
+    const to = SUPPORT_EMAIL || ''; 
+    const mailtoUrl = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${body}`; 
+    try { 
+      const supported = await Linking.canOpenURL(mailtoUrl); 
+      if (!supported) { 
+        setNotice('Email client not available.'); 
+        return; 
+      } 
+      await Linking.openURL(mailtoUrl); 
+      setNotice('Opened email composer.'); 
+    } catch { 
+      setNotice('Unable to open email composer.'); 
+    } 
+  }; 
   const orderHeader = isBusinessAccount ? (
     <View style={styles.card}>
       <SectionTitle icon="briefcase-outline" label="Business orders" />
@@ -5437,18 +5468,16 @@ const OrdersScreen = () => {
             <Text style={styles.cardTitle}>Rs {(lastReceipt.totalCents / 100).toFixed(0)}</Text>
           </View>
         </View>
-      ) : null}
-      <Pressable
-        style={styles.secondaryButton}
-        onPress={() =>
-          setNotice('Receipts pending. Provider: SendGrid (email) + SMS4Connect (SMS).')
-        }
-      >
-        <Text style={styles.secondaryButtonText}>Email/SMS receipt (pending)</Text>
-      </Pressable>
-      <Text style={styles.metaText}>Provider: SendGrid (email) + SMS4Connect (SMS).</Text>
-    </View>
-  );
+      ) : null} 
+      <Pressable 
+        style={styles.secondaryButton} 
+        onPress={() => void sendReceiptEmail()} 
+      > 
+        <Text style={styles.secondaryButtonText}>Email receipt</Text> 
+      </Pressable> 
+      <Text style={styles.metaText}>SMS receipts coming soon.</Text> 
+    </View> 
+  ); 
 
   return (
     <SafeAreaView style={styles.container}>
@@ -11708,4 +11737,6 @@ const useStyles = () => {
     [colors]
   );
 };
+
+
 
