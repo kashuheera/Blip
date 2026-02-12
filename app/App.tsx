@@ -163,6 +163,7 @@ type DirectThreadSummary = {
   handle: string;
   lastMessage: string;
   updatedAt: string;
+  status: 'pending' | 'accepted' | 'rejected';
 };
 
 type DirectMessage = {
@@ -3782,25 +3783,25 @@ const MessagesScreen = () => {
     setVoiceLoading(false);
   };
 
-  const refreshThreads = async () => {
-    if (!supabase || !userId) {
-      return;
-    }
-    setThreadsLoading(true);
-    const { data: threadRows, error } = await supabase
-      .from('direct_threads')
-      .select('id, requester_id, recipient_id, status, updated_at')
-      .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
-      .limit(20)
-      .order('updated_at', { ascending: false });
+const refreshThreads = async () => { 
+    if (!supabase || !userId) { 
+      return; 
+    } 
+    setThreadsLoading(true); 
+    const { data: threadRows, error } = await supabase 
+      .from('direct_threads') 
+      .select('id, requester_id, recipient_id, status, updated_at') 
+      .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`) 
+      .limit(20) 
+      .order('updated_at', { ascending: false }); 
     if (error || !Array.isArray(threadRows) || threadRows.length === 0) {
       setThreadsLoading(false);
       return;
     }
-    const threadIds = threadRows.map((row) => String(row.id ?? ''));
-    const otherIds = threadRows
-      .map((row) => (row.requester_id === userId ? row.recipient_id : row.requester_id))
-      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    const threadIds = threadRows.map((row) => String(row.id ?? '')); 
+    const otherIds = threadRows 
+      .map((row) => (row.requester_id === userId ? row.recipient_id : row.requester_id)) 
+      .filter((id): id is string => typeof id === 'string' && id.length > 0); 
 
     const [profilesRes, messagesRes] = await Promise.all([
       supabase.from('profiles').select('id, current_handle').in('id', otherIds),
@@ -3830,19 +3831,22 @@ const MessagesScreen = () => {
       });
     });
 
-    const nextThreads = threadRows.map((row) => {
-      const threadId = String(row.id ?? '');
-      const otherId = row.requester_id === userId ? row.recipient_id : row.requester_id;
-      const handle = otherId ? handleById.get(String(otherId)) ?? 'User' : 'User';
-      const last = lastMessageByThread.get(threadId);
-      return {
-        id: threadId,
-        handle,
-        lastMessage: last?.body ?? 'No messages yet.',
-        time: last?.createdAt ?? row.updated_at ?? '',
-      };
-    });
-    setDirectThreads(nextThreads);
+    const nextThreads = threadRows.map((row) => { 
+      const threadId = String(row.id ?? ''); 
+      const otherId = row.requester_id === userId ? row.recipient_id : row.requester_id; 
+      const handle = otherId ? handleById.get(String(otherId)) ?? 'User' : 'User'; 
+      const last = lastMessageByThread.get(threadId); 
+      return { 
+        id: threadId, 
+        otherId: otherId ? String(otherId) : null, 
+        handle, 
+        lastMessage: last?.body ?? 'No messages yet.', 
+        updatedAt: row.updated_at ?? '', 
+        status: (row.status as DirectThreadSummary['status']) ?? 'pending', 
+        time: last?.createdAt ?? row.updated_at ?? '', 
+      }; 
+    }); 
+    setDirectThreads(nextThreads); 
     setThreadsLoading(false);
   };
 
@@ -3918,10 +3922,10 @@ const MessagesScreen = () => {
     };
   }, [userId]);
 
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'messages' }, userId);
-  }, [userId]);
-
+  useEffect(() => { 
+    void trackAnalyticsEvent('screen_view', { screen: 'messages' }, userId); 
+  }, [userId]); 
+ 
   const handleToggleVoiceRoom = async (room: VoiceRoomEntry) => {
     if (!supabase || !userId) {
       setVoiceNotice('Sign in to join voice rooms.');
@@ -4264,7 +4268,7 @@ const VoiceRoomScreen = ({ route }: VoiceRoomProps) => {
     setParticipants((prev) => prev.filter((entry) => entry.peerId !== peerId));
   };
 
-  const sendSignal = async (payload: VoiceRtcSignalPayload) => {
+  const sendSignal = async (payload: VoiceRtcSignalPayload) => { 
     const channel = channelRef.current;
     if (!channel) {
       return;
@@ -4717,10 +4721,14 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sendNotice, setSendNotice] = useState<string | null>(null);
-  const [mediaUploading, setMediaUploading] = useState(false);
-  const threadId = route.params?.threadId ?? '';
-  const title = route.params?.title ?? 'Chat';
+  const [sendNotice, setSendNotice] = useState<string | null>(null); 
+  const [mediaUploading, setMediaUploading] = useState(false); 
+  const [threadMeta, setThreadMeta] = useState< 
+    | { status: 'pending' | 'accepted' | 'rejected'; requesterId: string | null; recipientId: string | null } 
+    | null 
+  >(null); 
+  const threadId = route.params?.threadId ?? ''; 
+  const title = route.params?.title ?? 'Chat'; 
   useEffect(() => {
     void trackAnalyticsEvent('screen_view', { screen: 'direct_chat' }, userId);
   }, [userId]);
@@ -4751,18 +4759,39 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    if (!supabase || !threadId) {
-      return () => {
-        isMounted = false;
-      };
-    }
-    const loadMessages = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('direct_messages')
-        .select('id, body, created_at, sender_id, media_type, media_url')
+  useEffect(() => { 
+    let isMounted = true; 
+    if (!supabase || !threadId) { 
+      return () => { 
+        isMounted = false; 
+      }; 
+    } 
+    const loadThreadMeta = async () => { 
+      const { data } = await supabase 
+        .from('direct_threads') 
+        .select('id, status, requester_id, recipient_id') 
+        .eq('id', threadId) 
+        .maybeSingle(); 
+      if (!isMounted) { 
+        return; 
+      } 
+      if (data) { 
+        setThreadMeta({ 
+          status: (data.status as 'pending' | 'accepted' | 'rejected') ?? 'pending', 
+          requesterId: data.requester_id ?? null, 
+          recipientId: data.recipient_id ?? null, 
+        }); 
+      } else { 
+        setSendNotice('Chat not found.'); 
+      } 
+    }; 
+    void loadThreadMeta(); 
+
+    const loadMessages = async () => { 
+      setLoading(true); 
+      const { data, error } = await supabase 
+        .from('direct_messages') 
+        .select('id, body, created_at, sender_id, media_type, media_url') 
         .eq('thread_id', threadId)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -4802,13 +4831,25 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
     };
   }, [threadId]);
 
-  const handleSend = async () => {
-    if (!supabase || !userId || !draft.trim()) {
-      return;
-    }
-    const body = draft.trim();
-    setDraft('');
-    setSendNotice(null);
+    const handleSend = async () => { 
+    if (!supabase || !userId || !draft.trim()) { 
+      return; 
+    } 
+    if (threadMeta?.status === 'pending' && threadMeta.requesterId === userId) { 
+      setSendNotice('Awaiting acceptance.'); 
+      return; 
+    } 
+    if (threadMeta?.status === 'rejected') { 
+      setSendNotice('Chat was rejected.'); 
+      return; 
+    } 
+    if (threadMeta?.status === 'pending' && threadMeta.recipientId === userId) { 
+      setSendNotice('Accept the chat to reply.'); 
+      return; 
+    } 
+    const body = draft.trim(); 
+    setDraft(''); 
+    setSendNotice(null); 
     const moderation = await runModerationCheck({
       content_type: 'direct_message',
       content_id: threadId,
@@ -4829,13 +4870,21 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
     void trackAnalyticsEvent('message_send', { channel: 'direct' }, userId);
   };
 
-  const handleAttachDirectMedia = async () => {
-    if (!supabase || !userId || !threadId) {
-      setSendNotice('Sign in to share media.');
-      return;
-    }
-    setMediaUploading(true);
-    setSendNotice(null);
+  const handleAttachDirectMedia = async () => { 
+    if (!supabase || !userId || !threadId) { 
+      setSendNotice('Sign in to share media.'); 
+      return; 
+    } 
+    if (threadMeta?.status !== 'accepted') { 
+      setSendNotice('Media requires accepted chat.'); 
+      return; 
+    } 
+    if (messages.length < 10) { 
+      setSendNotice('Media unlocks after 10 messages.'); 
+      return; 
+    } 
+    setMediaUploading(true); 
+    setSendNotice(null); 
     const upload = await pickAndUploadImage('chat-media', `direct/${threadId}`);
     if (!upload.url) {
       setSendNotice(upload.error === 'permission' ? 'Photo permission denied.' : 'Upload canceled.');
@@ -4862,19 +4911,53 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
     setMediaUploading(false);
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <SectionTitle icon="chatbox-ellipses-outline" label={title} />
-          {loading ? <Text style={styles.metaText}>Loading messages...</Text> : null}
-          {sendNotice ? <Text style={styles.metaText}>{sendNotice}</Text> : null}
-          {[...messages].reverse().map((message) => {
-            const isMine = message.senderId === userId;
-            return (
-              <View
-                key={message.id}
+  return ( 
+    <SafeAreaView style={styles.container}> 
+      <AppHeader /> 
+      <ScrollView contentContainerStyle={styles.scrollContent}> 
+        <View style={styles.card}> 
+          <SectionTitle icon="chatbox-ellipses-outline" label={title} /> 
+          {loading ? <Text style={styles.metaText}>Loading messages...</Text> : null} 
+          {sendNotice ? <Text style={styles.metaText}>{sendNotice}</Text> : null} 
+          {threadMeta?.status === 'pending' && threadMeta.recipientId === userId ? ( 
+            <View style={styles.rowBetween}> 
+              <Pressable 
+                style={[styles.primaryButton, styles.primaryButtonFull]} 
+                onPress={async () => { 
+                  if (!supabase || !threadId) { 
+                    return; 
+                  } 
+                  await supabase.from('direct_threads').update({ status: 'accepted' }).eq('id', threadId); 
+                  setThreadMeta((prev) => 
+                    prev ? { ...prev, status: 'accepted' } : { status: 'accepted', requesterId: null, recipientId: null } 
+                  ); 
+                  setSendNotice('Chat accepted.'); 
+                }} 
+              > 
+                <Text style={styles.primaryButtonText}>Accept</Text> 
+              </Pressable> 
+              <Pressable 
+                style={styles.secondaryButton} 
+                onPress={async () => { 
+                  if (!supabase || !threadId) { 
+                    return; 
+                  } 
+                  await supabase.from('direct_threads').update({ status: 'rejected' }).eq('id', threadId); 
+                  setThreadMeta((prev) => 
+                    prev ? { ...prev, status: 'rejected' } : { status: 'rejected', requesterId: null, recipientId: null } 
+                  ); 
+                  setSendNotice('Chat rejected.'); 
+                }} 
+              > 
+                <Text style={styles.secondaryButtonText}>Reject</Text> 
+              </Pressable> 
+            </View> 
+          ) : null} 
+          {[...messages].reverse().map((message) => { 
+            const isMine = message.senderId === userId; 
+            return ( 
+              <View 
+                key={message.id} 
                 style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}
               >
                 <View
@@ -4914,7 +4997,7 @@ const DirectChatScreen = ({ route }: DirectChatProps) => {
             </Pressable>
           </View>
         </View>
-      </ScrollView>
+      </ScrollView> 
       <BottomNav />
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -6453,22 +6536,22 @@ const UserProfileScreen = ({ route }: UserProfileProps) => {
           {notice ? <Text style={styles.metaText}>{notice}</Text> : null}
           {profileData ? ( 
             <> 
-              <View style={styles.rowBetween}> 
-                <Text style={styles.cardTitle}>Level</Text> 
-                <Text style={styles.cardTitle}>{profileData.level}</Text> 
-              </View> 
-              <View style={styles.rowBetween}> 
-                <Text style={styles.cardTitle}>XP</Text> 
-                <Text style={styles.cardTitle}>{profileData.xp}</Text> 
-              </View> 
-              <Pressable 
-                style={styles.primaryButton} 
-                onPress={() => navigation.navigate('DirectChat', { threadId: `request:${handle}`, title: `@${handle}` })} 
-              > 
-                <Text style={styles.primaryButtonText}>Request chat</Text> 
-              </Pressable> 
-            </> 
-          ) : ( 
+          <View style={styles.rowBetween}> 
+            <Text style={styles.cardTitle}>Level</Text> 
+            <Text style={styles.cardTitle}>{profileData.level}</Text> 
+          </View> 
+          <View style={styles.rowBetween}> 
+            <Text style={styles.cardTitle}>XP</Text> 
+            <Text style={styles.cardTitle}>{profileData.xp}</Text> 
+          </View> 
+          <Pressable 
+            style={styles.primaryButton} 
+            onPress={() => navigation.navigate('DirectChat', { threadId: `request:${handle}`, title: `@${handle}` })} 
+          > 
+            <Text style={styles.primaryButtonText}>Request chat</Text> 
+          </Pressable> 
+        </> 
+      ) : ( 
             <Text style={styles.metaText}>This user is unavailable.</Text> 
           )}
         </View>
