@@ -164,6 +164,53 @@ type DirectThreadSummary = {
   lastMessage: string;
   updatedAt: string;
   status: 'pending' | 'accepted' | 'rejected';
+  requesterId?: string | null;
+  recipientId?: string | null;
+};
+
+const startDirectRequest = async (
+  handle: string,
+  navigation: NativeStackNavigationProp<RootStackParamList>,
+  userId?: string | null
+) => {
+  if (!supabase || !userId) {
+    Alert.alert('Sign in required', 'Sign in to start a chat.');
+    return;
+  }
+  const { data: profileRow } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('current_handle', handle)
+    .maybeSingle();
+  const otherId = profileRow?.id ?? null;
+  if (!otherId || otherId === userId) {
+    Alert.alert('Unavailable', 'User is not available for chat.');
+    return;
+  }
+  const { data: existingRows } = await supabase
+    .from('direct_threads')
+    .select('id, status, requester_id, recipient_id')
+    .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`)
+    .or(`requester_id.eq.${otherId},recipient_id.eq.${otherId}`);
+  const existing = (existingRows ?? []).find(
+    (row) =>
+      (row.requester_id === userId && row.recipient_id === otherId) ||
+      (row.requester_id === otherId && row.recipient_id === userId)
+  );
+  if (existing) {
+    navigation.navigate('DirectChat', { threadId: String(existing.id), title: `@${handle}` });
+    return;
+  }
+  const { data: insertRow, error } = await supabase
+    .from('direct_threads')
+    .insert({ requester_id: userId, recipient_id: otherId, status: 'pending' })
+    .select('id')
+    .maybeSingle();
+  if (error || !insertRow?.id) {
+    Alert.alert('Unable to start chat', 'Please try again.');
+    return;
+  }
+  navigation.navigate('DirectChat', { threadId: String(insertRow.id), title: `@${handle}` });
 };
 
 type DirectMessage = {
@@ -3794,24 +3841,24 @@ const refreshThreads = async () => {
       .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`) 
       .limit(20) 
       .order('updated_at', { ascending: false }); 
-    if (error || !Array.isArray(threadRows) || threadRows.length === 0) {
-      setThreadsLoading(false);
-      return;
-    }
+    if (error || !Array.isArray(threadRows) || threadRows.length === 0) { 
+      setThreadsLoading(false); 
+      return; 
+    } 
     const threadIds = threadRows.map((row) => String(row.id ?? '')); 
     const otherIds = threadRows 
       .map((row) => (row.requester_id === userId ? row.recipient_id : row.requester_id)) 
       .filter((id): id is string => typeof id === 'string' && id.length > 0); 
 
-    const [profilesRes, messagesRes] = await Promise.all([
-      supabase.from('profiles').select('id, current_handle').in('id', otherIds),
-      supabase
-        .from('direct_messages')
-        .select('thread_id, body, created_at')
-        .in('thread_id', threadIds)
-        .order('created_at', { ascending: false })
-        .limit(200),
-    ]);
+    const [profilesRes, messagesRes] = await Promise.all([ 
+      supabase.from('profiles').select('id, current_handle').in('id', otherIds), 
+      supabase 
+        .from('direct_messages') 
+        .select('thread_id, body, created_at') 
+        .in('thread_id', threadIds) 
+        .order('created_at', { ascending: false }) 
+        .limit(200), 
+    ]); 
     const handleById = new Map<string, string>();
     profilesRes.data?.forEach((row) => {
       if (row.id) {
@@ -3844,11 +3891,13 @@ const refreshThreads = async () => {
         updatedAt: row.updated_at ?? '', 
         status: (row.status as DirectThreadSummary['status']) ?? 'pending', 
         time: last?.createdAt ?? row.updated_at ?? '', 
+        requesterId: row.requester_id ?? null, 
+        recipientId: row.recipient_id ?? null, 
       }; 
     }); 
     setDirectThreads(nextThreads); 
-    setThreadsLoading(false);
-  };
+    setThreadsLoading(false); 
+  }; 
 
   useEffect(() => {
     let isMounted = true;
@@ -3962,11 +4011,11 @@ const refreshThreads = async () => {
     void refreshVoiceRooms();
   };
 
-  const handleCreateVoiceRoom = async () => {
-    if (!supabase || !userId) {
-      setVoiceNotice('Sign in to create a voice room.');
-      return;
-    }
+const handleCreateVoiceRoom = async () => { 
+    if (!supabase || !userId) { 
+      setVoiceNotice('Sign in to create a voice room.'); 
+      return; 
+    } 
     if (!voiceTitle.trim()) {
       setVoiceNotice('Add a room title first.');
       return;
@@ -4025,11 +4074,11 @@ const refreshThreads = async () => {
       </SafeAreaView>
     );
   }
-  return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {!userId ? (
+  return ( 
+    <SafeAreaView style={styles.container}> 
+      <AppHeader /> 
+      <ScrollView contentContainerStyle={styles.scrollContent}> 
+        {!userId ? ( 
           <View style={styles.card}>
             <SectionTitle icon="log-in-outline" label="Sign in" />
             <Text style={styles.cardBody}>Sign in to view your live chats.</Text>
@@ -6544,16 +6593,16 @@ const UserProfileScreen = ({ route }: UserProfileProps) => {
             <Text style={styles.cardTitle}>XP</Text> 
             <Text style={styles.cardTitle}>{profileData.xp}</Text> 
           </View> 
-          <Pressable 
-            style={styles.primaryButton} 
-            onPress={() => navigation.navigate('DirectChat', { threadId: `request:${handle}`, title: `@${handle}` })} 
-          > 
+          <Pressable
+            style={styles.primaryButton}
+            onPress={() => void startDirectRequest(handle, navigation, userId)}
+          >
             <Text style={styles.primaryButtonText}>Request chat</Text> 
-          </Pressable> 
-        </> 
-      ) : ( 
-            <Text style={styles.metaText}>This user is unavailable.</Text> 
-          )}
+          </Pressable>
+        </>  
+      ) : (  
+            <Text style={styles.metaText}>This user is unavailable.</Text>  
+          )} 
         </View>
       </ScrollView>
       <BottomNav />
