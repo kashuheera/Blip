@@ -3321,23 +3321,22 @@ const FeedScreen = ({ route }: FeedProps) => {
 
 type PostRepliesProps = NativeStackScreenProps<RootStackParamList, 'PostReplies'>;
 
-const PostRepliesScreen = ({ route }: PostRepliesProps) => {
-  const styles = useStyles();
-  const { colors } = useTheme();
-  const { userId, profile, loading: authLoading } = useAuth();
-  const postId = route.params?.postId ?? '';
+const PostRepliesScreen = ({ route }: PostRepliesProps) => { 
+  const styles = useStyles(); 
+  const { colors } = useTheme(); 
+  const { userId, profile, loading: authLoading } = useAuth(); 
+  const postId = route.params?.postId ?? ''; 
   const authorHandle = route.params?.authorHandle ?? 'post';
-  const [comments, setComments] = useState<
-    { id: string; body: string; author: string; createdAt: string }[]
-  >([]);
-  const [draft, setDraft] = useState('');
-  const [notice, setNotice] = useState<string | null>(null);
-  const [replyAs, setReplyAs] = useState<string | null>(null);
-  const isBusinessAccount = profile?.accountType === 'business';
-
-  useEffect(() => {
-    void trackAnalyticsEvent('screen_view', { screen: 'post_replies', post_id: postId }, userId);
-  }, [postId, userId]);
+  const [comments, setComments] = useState< 
+    { id: string; body: string; author: string; createdAt: string }[] 
+  >([]); 
+  const [draft, setDraft] = useState(''); 
+  const [notice, setNotice] = useState<string | null>(null); 
+  const isBusinessAccount = profile?.accountType === 'business'; 
+ 
+  useEffect(() => { 
+    void trackAnalyticsEvent('screen_view', { screen: 'post_replies', post_id: postId }, userId); 
+  }, [postId, userId]); 
 
   useEffect(() => {
     let isMounted = true;
@@ -3370,60 +3369,25 @@ const PostRepliesScreen = ({ route }: PostRepliesProps) => {
     };
   }, [postId]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadReplyAs = async () => {
-      if (!supabase || !userId || !isBusinessAccount) {
-        return;
-      }
-      const { data: ownedRows } = await supabase
-        .from('businesses')
-        .select('id, name')
-        .eq('owner_id', userId)
-        .limit(1);
-      let name = ownedRows?.[0]?.name ?? null;
-      if (!name) {
-        const { data: staffRows } = await supabase
-          .from('business_staff')
-          .select('business_id')
-          .eq('user_id', userId)
-          .limit(1);
-        const staffId = staffRows?.[0]?.business_id ?? null;
-        if (staffId) {
-          const { data: staffBiz } = await supabase
-            .from('businesses')
-            .select('name')
-            .eq('id', staffId)
-            .maybeSingle();
-          name = staffBiz?.name ?? null;
-        }
-      }
-      if (!isMounted) {
-        return;
-      }
-      setReplyAs(name);
-    };
-    void loadReplyAs();
-    return () => {
-      isMounted = false;
-    };
-  }, [userId, isBusinessAccount]);
-
-  const handleSubmitReply = async () => {
-    if (!supabase || !userId || !isBusinessAccount) {
-      setNotice('Replies are available for business accounts only.');
-      return;
-    }
-    if (!draft.trim()) {
-      setNotice('Write a reply first.');
-      return;
-    }
-    const author = replyAs ?? profile?.handle ?? 'Business';
-    const { error } = await supabase.from('post_comments').insert({
-      post_id: postId,
-      user_id: userId,
-      author_handle: author,
-      body: draft.trim(),
+  const handleSubmitReply = async () => { 
+    if (!supabase || !userId) { 
+      setNotice('Sign in to reply.'); 
+      return; 
+    } 
+    if (!draft.trim()) { 
+      setNotice('Write a reply first.'); 
+      return; 
+    } 
+    if (isBusinessAccount) { 
+      setNotice('Business accounts cannot reply to user posts.'); 
+      return; 
+    } 
+    const author = profile?.handle ?? 'user'; 
+    const { error } = await supabase.from('post_comments').insert({ 
+      post_id: postId, 
+      user_id: userId, 
+      author_handle: author, 
+      body: draft.trim(), 
     });
     if (error) {
       setNotice('Unable to post reply.');
@@ -3468,32 +3432,23 @@ const PostRepliesScreen = ({ route }: PostRepliesProps) => {
             ))
           )}
         </View>
-        <View style={styles.card}>
-          <SectionTitle icon="create-outline" label="Reply" />
-          {isBusinessAccount ? (
-            <>
-              <Text style={styles.metaText}>
-                Posting as {replyAs ?? 'Business'}.
-              </Text>
-              <TextInput
-                style={[styles.input, styles.multilineInput]}
-                value={draft}
-                onChangeText={setDraft}
-                placeholder="Write a business reply..."
-                placeholderTextColor={colors.placeholder}
-                multiline
-              />
-              <Pressable style={styles.primaryButton} onPress={() => void handleSubmitReply()}>
-                <Text style={styles.primaryButtonText}>Post reply</Text>
-              </Pressable>
-            </>
-          ) : (
-            <Text style={styles.metaText}>Replies are available for businesses only.</Text>
-          )}
-        </View>
-      </ScrollView>
-      <BottomNav />
-      <StatusBar style="auto" />
+        <View style={styles.card}> 
+          <SectionTitle icon="create-outline" label="Reply" /> 
+          <TextInput 
+            style={[styles.input, styles.multilineInput]} 
+            value={draft} 
+            onChangeText={setDraft} 
+            placeholder="Write a reply..." 
+            placeholderTextColor={colors.placeholder} 
+            multiline 
+          /> 
+          <Pressable style={styles.primaryButton} onPress={() => void handleSubmitReply()}> 
+            <Text style={styles.primaryButtonText}>Post reply</Text> 
+          </Pressable> 
+        </View> 
+      </ScrollView> 
+      <BottomNav /> 
+      <StatusBar style="auto" /> 
     </SafeAreaView>
   );
 };
