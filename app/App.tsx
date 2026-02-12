@@ -446,6 +446,8 @@ type ReportEntry = {
   targetType: string;
   reason: string;
   status: string;
+  targetId?: string;
+  createdAt?: string | null;
 };
 
 type AppealEntry = {
@@ -9044,6 +9046,7 @@ const AdminPortalScreen = () => {
   const [flaggedUsers, setFlaggedUsers] = useState<UserFlagEntry[]>([]);
   const [recentOrders, setRecentOrders] = useState<OrderEntry[]>([]);
   const [auditLog, setAuditLog] = useState<BusinessAuditEntry[]>([]);
+  const [reports, setReports] = useState<ReportEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -9069,8 +9072,10 @@ const AdminPortalScreen = () => {
       ] = await Promise.all([
         supabase
           .from('reports')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'open'),
+          .select('id, target_type, target_id, reason, status, created_at', { count: 'exact' })
+          .eq('status', 'open')
+          .order('created_at', { ascending: false })
+          .limit(20),
         supabase
           .from('appeal_requests')
           .select('id', { count: 'exact', head: true })
@@ -9128,6 +9133,16 @@ const AdminPortalScreen = () => {
 
       setReportsCount(reportsRes.count ?? 0);
       setAppealsCount(appealsRes.count ?? 0);
+      const nextReports =
+        reportsRes.data?.map((row) => ({
+          id: String(row.id ?? ''),
+          targetType: row.target_type ?? 'unknown',
+          reason: row.reason ?? '',
+          status: row.status ?? 'open',
+          targetId: row.target_id ? String(row.target_id) : undefined,
+          createdAt: row.created_at ?? null,
+        })) ?? [];
+      setReports(nextReports);
 
       const nextRequests =
         verificationRes.data?.map((row) => ({
@@ -9356,6 +9371,35 @@ const AdminPortalScreen = () => {
                 </Text>
               </View>
             </View>
+          )}
+        </View>
+        <View style={styles.adminSectionCard}>
+          <SectionTitle icon="alert-circle-outline" label="Open reports" />
+          <Text style={styles.metaText}>User complaints (orders, posts, chats).</Text>
+          {loading ? (
+            <View style={styles.skeletonStack}>
+              {Array.from({ length: 3 }).map((_, index) => (
+                <SkeletonRowItem key={`admin-report-skel-${index}`} />
+              ))}
+            </View>
+          ) : reports.length === 0 ? (
+            <Text style={styles.metaText}>No open reports.</Text>
+          ) : (
+            reports.map((report) => (
+              <View key={report.id} style={styles.listRow}>
+                <View style={styles.listRowInfo}>
+                  <Text style={styles.cardTitle}>
+                    {report.targetType}
+                    {report.targetId ? ` #${report.targetId.slice(0, 6)}` : ''}
+                  </Text>
+                  <Text style={styles.metaText}>{report.reason}</Text>
+                </View>
+                <View style={styles.listRowRight}>
+                  <Text style={styles.badge}>{report.status}</Text>
+                  <Text style={styles.metaText}>{report.createdAt ?? ''}</Text>
+                </View>
+              </View>
+            ))
           )}
         </View>
         <View style={styles.adminSectionCard}>
@@ -10572,6 +10616,10 @@ const useStyles = () => {
           justifyContent: 'space-between',
           gap: 12,
           paddingVertical: 6,
+        },
+        listRowRight: {
+          alignItems: 'flex-end',
+          gap: 4,
         },
         listRowInfo: {
           flex: 1,
